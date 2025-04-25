@@ -14,6 +14,8 @@ const Passwordbd = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [error, setError] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+
 
   // Validation Checks
   const isMinLength = password.length >= 6;
@@ -22,7 +24,7 @@ const Passwordbd = () => {
   const hasUpperLower = /(?=.*[a-z])(?=.*[A-Z])/.test(password);
   const passwordsMatch = password === confirmPassword;
 
-  const handleSubmit = () => {
+  const handleSubmit =  async () => {
     if (!isMinLength || !hasNumber || !hasSpecialChar || !hasUpperLower) {
       setError("Please meet all password requirements");
       return;
@@ -33,9 +35,50 @@ const Passwordbd = () => {
       return;
     }
 
-    // If we get here, all validations passed
-    setError("");
-    router.push("/VerifyEmail");
+    setIsLoading(true);
+    console.log("Sending request with password:", password); // Log the request
+
+    try {
+      // Get email from localStorage
+      const email = localStorage.getItem('userEmail');
+      
+      if (!email) {
+        setError("Session expired. Please start over.");
+        return;
+      }
+
+      const response = await fetch('https://evolve2p-backend.onrender.com/api/auth/register', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email,
+          username: "string", // Required field
+          password,
+          confirmPassword,
+          country: "string", // Required field
+          verified: true,    // Required field
+          phone: "string"
+        }),
+      });
+      const data = await response.json();
+      console.log('API Response:', data);
+
+      if (!response.ok) {
+        throw new Error(data.message || 'Failed to update password');
+      }
+
+      // Clear error and proceed
+      setError('');
+      router.push('/VerifyEmail');
+      
+    } catch (err: any) {
+      console.error('Password update error:', err);
+      setError(err.message || 'Something went wrong. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   
@@ -173,11 +216,34 @@ const Passwordbd = () => {
       </div>
 
       <button
-        className="w-[400px] h-[56px] border-none cursor-pointer mt-[40px] bg-[#4DF2BE] text-[#0F1012] py-3 rounded-[100px] hover:bg-[#1a5d50]"
+        className={`w-[400px] h-[56px] border-none cursor-pointer mt-[40px] bg-[#4DF2BE] text-[#0F1012] py-3 rounded-[100px] hover:bg-[#1a5d50] ${
+          isLoading ? 'opacity-50 cursor-not-allowed' : ''
+        }`}
         onClick={handleSubmit}
+        disabled={isLoading}
       >
-        Continue
+        {isLoading ? 'Processing...' : 'Continue'}
       </button>
+
+      {/* Add loading indicator */}
+      {isLoading && (
+        <div className="flex justify-center mt-4">
+          <div className="loader"></div>
+          <style jsx>{`
+            .loader {
+              width: 24px;
+              height: 24px;
+              border-radius: 50%;
+              border: 2px solid #222222;
+              border-top-color: #4DF2BE;
+              animation: spin 1s linear infinite;
+            }
+            @keyframes spin {
+              to {transform: rotate(360deg)}
+                 }
+          `}</style>
+        </div>
+      )}
     </div>
   );
 };

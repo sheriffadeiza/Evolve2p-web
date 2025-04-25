@@ -11,6 +11,7 @@ import Lauth from './Lauth/page';
 import Resetp from './Resetp/page';
 import Lverify from './Lverify/page';
 import Lpass from './Lpass/page';
+import Sconfirm from './Sconfirm/page';
 
 
 
@@ -24,6 +25,7 @@ export default function Home() {
     <VerifyEmail />
     <Profile/>
     <Secpin/>
+    <Sconfirm/>
     </div>
 
     <div>
@@ -35,6 +37,7 @@ export default function Home() {
       <Resetp/>
       <Lverify/>
       <Lpass/>
+      
 
     </div>
     
