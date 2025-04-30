@@ -1,9 +1,9 @@
 
 import React from 'react';
-import Signup from './Signup/page';
-import Password from './Password/page';
-import VerifyEmail from './VerifyEmail/page';
-import Profile from './Profile/page';
+import Signup from './Signups/Email/page';
+import Password from './Signups/Password/page';
+import VerifyEmail from './Signups/VerifyEmail/page';
+import Profile from './Signups/Profile/page';
 import Secpin from './Lsecpin/page'
 import Login from './login/page';
 import Lsecpin from './Lsecpin/page';
@@ -11,7 +11,7 @@ import Lauth from './Lauth/page';
 import Resetp from './Resetp/page';
 import Lverify from './Lverify/page';
 import Lpass from './Lpass/page';
-import Sconfirm from './Sconfirm/page';
+import Sconfirm from './Signups/Sconfirm/page';
 
 
 

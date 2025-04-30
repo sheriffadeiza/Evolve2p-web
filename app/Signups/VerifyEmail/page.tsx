@@ -1,9 +1,10 @@
 import React from 'react';
-import Header from '../../components/Signup/SignupPassword/Header';
 
+import Emailvernav from '../../../components/Signup/SignupVerify/Emailvernav';
+import VerifyEmailbd from '../../../components/Signup/SignupVerify/verifyEmailbd';
 import ImageContent from '@/components/Signup/SignupEmail/ImageContent';
-import Lauthnav from '@/Lcomponents3/Lauthnav';
-import Lauthbd from '@/Lcomponents3/Lauthbd';
+
+import Header from '../../../components/Signup/SignupPassword/Header';
 
 
 const page = () => {
@@ -16,10 +17,8 @@ const page = () => {
         {/* Left side content */}
         
       <div className="w-1/2 min-h-[calc(150vh-64px)]"> 
-      <Lauthnav/>
-      <Lauthbd/>
-   
-     
+      <Emailvernav/>
+      <VerifyEmailbd/>
       </div>
        
        {/* Right side content */}

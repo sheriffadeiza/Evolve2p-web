@@ -1,7 +1,7 @@
-'use client';
+'use client'
 
 import React from 'react'
-import Head from '../components/Signup/SignupEmail/Header'
+import Head from '../SignupEmail/Header'
 
 const Header = () => {
   return (
