@@ -1,7 +1,7 @@
 
 
 import React from 'react';
-import Header from '../../components/Header';
+import Header from '../../components/Signup/SignupEmail/Header';
 import Lpassbd from '@/Lcomponents6/Lpassbd';
 import Lpassnav from '@/Lcomponents6/Lpassnav';
 

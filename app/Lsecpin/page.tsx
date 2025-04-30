@@ -1,7 +1,7 @@
 import React from 'react';
-import Header from '../../components2/Header';
+import Header from '../../components/Signup/SignupPassword/Header';
 
-import ImageContent from '@/components/ImageContent';
+import ImageContent from '@/components/Signup/SignupEmail/ImageContent';
 import LsecPinnav from '../../Lcomponents2/Lsecpinnav';
 import LsecPinBd from '@/Lcomponents2/Lsecpinbd';
 

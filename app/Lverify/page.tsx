@@ -1,7 +1,7 @@
 
 
 import React from 'react';
-import Header from '../../components/Header';
+import Header from '../../components/Signup/SignupEmail/Header';
 import Lverifynav from '../../Lcomponents5/Lverifynav';
 import Lverifybd from '@/Lcomponents5/Lverifybd';
 

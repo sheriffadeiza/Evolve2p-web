@@ -2,8 +2,9 @@ import React from 'react';
 import Header from '../../components/Signup/SignupPassword/Header';
 
 import ImageContent from '@/components/Signup/SignupEmail/ImageContent';
-import Lauthnav from '@/Lcomponents3/Lauthnav';
-import Lauthbd from '@/Lcomponents3/Lauthbd';
+import SecPinnav from '@/components5/SecPinnav';
+import SecPinBd from '@/components5/SecPinbd';
+
 
 
 const page = () => {
@@ -16,9 +17,8 @@ const page = () => {
         {/* Left side content */}
         
       <div className="w-1/2 min-h-[calc(150vh-64px)]"> 
-      <Lauthnav/>
-      <Lauthbd/>
-   
+      <SecPinnav/>
+      <SecPinBd/>
      
       </div>
        
