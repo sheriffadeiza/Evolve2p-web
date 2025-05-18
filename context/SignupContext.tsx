@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useState } from 'react';
+import React, { createContext, useContext, useState, useEffect } from 'react';
 
 type SignupStep = 'email' | 'password' | 'verify' | 'profile' | 'secpin' | 'confirm';
 
@@ -10,7 +10,7 @@ interface SignupData {
   password: string;
   country: string;
   phone: string;
-  verified?: boolean;  // Add verified field
+  verified?: boolean;
 }
 
 interface SignupContextType {
@@ -20,12 +20,12 @@ interface SignupContextType {
   updateSignupData: (data: Partial<SignupData>) => void;
 }
 
-const initialSignupData: SignupData = {
-  username: 'temp_user',  // Provide temporary values
-  password: 'temp_pass',
-  country: 'default',
-  phone: '0000000000',
+const defaultSignupData: SignupData = {
   email: '',
+  username: '',
+  password: '',
+  country: '',
+  phone: '',
   verified: false
 };
 
@@ -33,10 +33,26 @@ const SignupContext = createContext<SignupContextType | undefined>(undefined);
 
 export function SignupProvider({ children }: { children: React.ReactNode }) {
   const [currentStep, setCurrentStep] = useState<SignupStep>('email');
-  const [signupData, setSignupData] = useState<SignupData>(initialSignupData);
+  const [signupData, setSignupData] = useState<SignupData>(defaultSignupData);
+
+  useEffect(() => {
+    // Load email and password from localStorage if available
+    const email = localStorage.getItem('userEmail') || '';
+    const password = localStorage.getItem('userPassword') || '';
+    if (email && password) {
+      setSignupData(prev => ({
+        ...prev,
+        email,
+        password
+      }));
+    }
+  }, []);
 
   const updateSignupData = (data: Partial<SignupData>) => {
-    setSignupData(prev => ({ ...prev, ...data }));
+    setSignupData(prev => ({
+      ...prev,
+      ...data
+    }));
   };
 
   return (
@@ -48,7 +64,7 @@ export function SignupProvider({ children }: { children: React.ReactNode }) {
 
 export const useSignup = () => {
   const context = useContext(SignupContext);
-  if (context === undefined) {
+  if (!context) {
     throw new Error('useSignup must be used within a SignupProvider');
   }
   return context;

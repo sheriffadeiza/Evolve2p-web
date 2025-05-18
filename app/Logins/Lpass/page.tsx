@@ -1,10 +1,9 @@
 
 
 import React from 'react';
-import Header from '../../components/Signup/SignupEmail/Header';
-import Resetpnav from '@/components/Login/LoginReset/Resetpnav';
-import Resetpbd from '@/components/Login/LoginReset/Resetpbd';
-
+import Header from '@/components/Signup/SignupEmail/Header';
+import Lpassbd from '@/components/Login/LoginPass/Lpassbd';
+import Lpassnav from '@/components/Login/LoginPass/Lpassnav';
 
 const page = () => {
   return (
@@ -15,8 +14,9 @@ const page = () => {
       {/* Main Content */}
       <div className="">
         
-          <Resetpnav/>
-          <Resetpbd/>
+          <Lpassnav/>
+          <Lpassbd/>
+         
          
         </div>
         

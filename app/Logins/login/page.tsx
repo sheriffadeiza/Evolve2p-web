@@ -1,12 +1,14 @@
 
 
 import React from 'react';
-import Header from '../../../components/Signup/SignupEmail/Header';
-import Ev2pnav from '../../../components/Signup/SignupEmail/Ev2pnav';
-import EmailForm from '../../../components/Signup/SignupEmail/EmailForm';
-import ImageContent from '@/components/Signup/SignupEmail/ImageContent';
+import Header from '@/components/Signup/SignupEmail/Header';
 
-const Page = () => {
+import ImageContent from '@/components/Signup/SignupEmail/ImageContent';
+import Loginnav from '@/components/Login/LoginE&P/Loginnav';
+import Loginbd from '@/components/Login/LoginE&P/Loginbd';
+
+
+const page = () => {
   return (
     <div className="min-h-screen flex flex-col bg-[#0F1012]">
       {/* Header Section */}
@@ -16,8 +18,8 @@ const Page = () => {
       <div className="flex flex-1">
         {/* Left Section */}
         <div className="w-1/2 min-h-[calc(150vh-64px)]">
-          <Ev2pnav />
-          <EmailForm />
+          <Loginnav/>
+          <Loginbd/>
         </div>
         
         {/* Right Section */}
@@ -29,4 +31,4 @@ const Page = () => {
   );
 };
 
-export default Page;
+export default page;

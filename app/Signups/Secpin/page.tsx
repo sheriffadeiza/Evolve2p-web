@@ -1,9 +1,9 @@
 import React from 'react';
-import Header from '../../components/Signup/SignupPassword/Header';
+import Header from '../../../components/Signup/SignupPassword/Header';
 
 import ImageContent from '@/components/Signup/SignupEmail/ImageContent';
-import SecPinnav from '@/components5/SecPinnav';
-import SecPinBd from '@/components5/SecPinbd';
+import SecPinnav from '@/components/Signup/SignupSecpin/SecPinnav';
+import SecPinBd from '@/components/Signup/SignupSecpin/SecPinbd';
 
 
 
@@ -24,7 +24,7 @@ const page = () => {
        
        {/* Right side content */}
 
-      <div className="w-1/2 mt-[20px]  min-h-[calc(150vh-64px)] bg-[#2D2D2D]">
+      <div className="w-1/2 mt-[20px]  min-h-[calc(150vh-64px)]">
           <ImageContent />
         </div>
      

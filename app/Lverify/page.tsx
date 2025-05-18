@@ -2,8 +2,8 @@
 
 import React from 'react';
 import Header from '../../components/Signup/SignupEmail/Header';
-import Lverifynav from '../../Lcomponents5/Lverifynav';
-import Lverifybd from '@/Lcomponents5/Lverifybd';
+import Lverifynav from '@/components/Login/LoginVerify/Lverifynav';
+import Lverifybd from '@/components/Login/LoginVerify/Lverifybd';
 
 const page = () => {
   return (

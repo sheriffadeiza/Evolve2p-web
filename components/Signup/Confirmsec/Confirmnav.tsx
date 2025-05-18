@@ -24,8 +24,8 @@ const Confirmnav = () => {
         <Image 
           src={image} 
           alt="Go back" 
-          width={80} 
-          height={40}
+          width={50} 
+          height={25}
         />
       </button>
 
