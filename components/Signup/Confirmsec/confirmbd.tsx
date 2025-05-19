@@ -53,8 +53,8 @@ const ConfirmPinBd: React.FC = () => {
   }, [pin]);
 
   const handleContinue = () => {
-    setCurrentStep('kyc');
-    router.push('/Signups/Kyc');
+    setCurrentStep('kYC');
+    router.push('/Signups/KYC');
   };
 
   return (
