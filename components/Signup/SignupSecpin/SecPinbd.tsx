@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useRouter } from 'next/navigation';
 import { useSignup } from '@/context/SignupContext';
 
@@ -33,27 +33,52 @@ const SecPinBd: React.FC = () => {
     }
   };
 
-  useEffect(() => {
+  // Handle PIN submission - memoized to prevent infinite re-renders
+  const handlePinSubmit = useCallback(() => {
     const fullPin = pin.join('');
-    if (fullPin.length === 4) {
-      setIsLoading(true);
+    if (fullPin.length !== 4) return;
 
-      // Store the PIN in the signup context instead of localStorage
-      // This will be accessible throughout the signup process
-      console.log('Setting PIN in context:', fullPin);
+    setIsLoading(true);
 
+    try {
       // Store the PIN in the signup context
+      console.log('Setting PIN in context:', fullPin);
       updateSignupData({ securityPin: fullPin });
-
       console.log('PIN stored successfully in context');
 
-      // Delay navigation to show loader briefly
-      setTimeout(() => {
+      // Add a safety timeout to prevent infinite loading
+      const navigationTimeout = setTimeout(() => {
         setCurrentStep('confirm-pin');
         router.push('/Signups/Sconfirm');
       }, 1000);
+
+      // Add a safety timeout to reset loading state if navigation fails
+      const safetyTimeout = setTimeout(() => {
+        if (document.visibilityState !== 'hidden') {
+          console.warn('Navigation timeout - resetting loading state');
+          setIsLoading(false);
+          clearTimeout(navigationTimeout);
+        }
+      }, 5000);
+
+      // Clean up timeouts if component unmounts
+      return () => {
+        clearTimeout(navigationTimeout);
+        clearTimeout(safetyTimeout);
+      };
+    } catch (error) {
+      console.error('Error handling PIN submission:', error);
+      setIsLoading(false);
     }
-  }, [pin, router, setCurrentStep, updateSignupData]);
+  }, [pin, updateSignupData, setCurrentStep, router, setIsLoading]);
+
+  // Detect when all 4 digits are entered
+  useEffect(() => {
+    const fullPin = pin.join('');
+    if (fullPin.length === 4) {
+      handlePinSubmit();
+    }
+  }, [pin, handlePinSubmit]);
 
   return (
     <div className="text-white ml-[100px] mt-[30px]">
