@@ -233,7 +233,7 @@ const LsecPinBd: React.FC = () => {
         console.log('PIN submission reset, can try again');
       }, delay);
     }
-  };
+  }, [pin, loading, router, user, updateUser, pinSubmitted, error]);
 
   // Only trigger pin submission when all digits are entered and not already loading or submitted
   useEffect(() => {
