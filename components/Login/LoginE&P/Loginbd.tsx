@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import image from '../../../public/Assets/Evolve2p_viewslash/view-off-slash.png';
 import { extractErrorMessage } from '@/Utils/errorHandler';
+import { API_ENDPOINTS } from '@/config/api';
 
 const Loginbd: React.FC = () => {
   const router = useRouter();
@@ -26,7 +27,7 @@ const Loginbd: React.FC = () => {
     setLoading(true);
 
     try {
-      const response = await fetch('https://evolve2p-backend.onrender.com/api/auth/login', {
+      const response = await fetch(API_ENDPOINTS.LOGIN, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password }),
@@ -63,7 +64,7 @@ const Loginbd: React.FC = () => {
 
     setLoading(true);
     try {
-      const response = await fetch('https://evolve2p-backend.onrender.com/api/forgot-password', {
+      const response = await fetch(API_ENDPOINTS.FORGOT_PASSWORD, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email }),

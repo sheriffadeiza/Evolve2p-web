@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { API_ENDPOINTS } from '@/config/api';
 
 const VerifyEmailBody: React.FC = () => {
   const router = useRouter();
@@ -44,7 +45,7 @@ const VerifyEmailBody: React.FC = () => {
 
     try {
       const response = await fetch(
-        "https://evolve2p-backend.onrender.com/api/send-otp",
+        API_ENDPOINTS.SEND_OTP,
         {
           method: "POST",
           headers: {
@@ -90,7 +91,7 @@ const VerifyEmailBody: React.FC = () => {
 
     try {
       const response = await fetch(
-        "https://evolve2p-backend.onrender.com/api/verify-email",
+        API_ENDPOINTS.VERIFY_EMAIL,
         {
           method: "POST",
           headers: {

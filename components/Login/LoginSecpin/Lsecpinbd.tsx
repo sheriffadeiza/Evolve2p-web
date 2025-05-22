@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useLogin } from '@/context/LoginContext';
+import { API_ENDPOINTS } from '@/config/api';
 
 const LsecPinBd: React.FC = () => {
   const [pin, setPin] = useState<string[]>(['', '', '', '']);
@@ -59,7 +60,7 @@ const LsecPinBd: React.FC = () => {
     setError('');
 
     try {
-      const response = await fetch('https://evolve2p-backend.onrender.com/api/check-pin', {
+      const response = await fetch(API_ENDPOINTS.CHECK_PIN, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

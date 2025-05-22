@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { useSignup } from '@/context/SignupContext';
 import arrow_down from '../../../public/Assets/Evolve2p_arrowd/arrow-down-01.png';
+import { API_ENDPOINTS } from '@/config/api';
 
 const Profilebd = () => {
   const router = useRouter();
@@ -128,7 +129,7 @@ const Profilebd = () => {
       };
 
       // ✅ Backend API call to register the user
-      const res = await fetch('https://evolve2p-backend.onrender.com/api/auth/register', {
+      const res = await fetch(API_ENDPOINTS.REGISTER, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
