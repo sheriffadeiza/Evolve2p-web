@@ -38,18 +38,47 @@ const SecPinBd: React.FC = () => {
     if (fullPin.length === 4) {
       setIsLoading(true);
 
-      // Add debugging to see what's happening
-      console.log('Setting PIN in localStorage:', fullPin);
+      try {
+        // Add debugging to see what's happening
+        console.log('Setting PIN in localStorage:', fullPin);
 
-      // Clear any existing PIN first
-      localStorage.removeItem('tempPin');
+        // Clear any existing PIN first
+        try {
+          localStorage.removeItem('tempPin');
+        } catch (e) {
+          console.warn('Could not remove tempPin from localStorage:', e);
+        }
 
-      // Save temp PIN for confirm step
-      localStorage.setItem('tempPin', fullPin);
+        // Save temp PIN for confirm step
+        try {
+          localStorage.setItem('tempPin', fullPin);
 
-      // Verify the PIN was stored correctly
-      const storedPin = localStorage.getItem('tempPin');
-      console.log('Verified PIN in localStorage:', storedPin);
+          // Verify the PIN was stored correctly
+          const storedPin = localStorage.getItem('tempPin');
+          console.log('Verified PIN in localStorage:', storedPin);
+        } catch (e) {
+          console.warn('Could not store PIN in localStorage:', e);
+
+          // Use sessionStorage as fallback
+          try {
+            sessionStorage.setItem('tempPin', fullPin);
+            console.log('Stored PIN in sessionStorage instead');
+          } catch (e2) {
+            console.warn('Could not store PIN in sessionStorage either:', e2);
+
+            // Use global variable as last resort
+            try {
+              // Extend Window interface to include our custom property
+              (window as any).tempPin = fullPin;
+              console.log('Stored PIN in window.tempPin as last resort');
+            } catch (e3) {
+              console.error('Could not store PIN anywhere:', e3);
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Error handling PIN storage:', error);
+      }
 
       // Delay navigation to show loader briefly
       setTimeout(() => {
