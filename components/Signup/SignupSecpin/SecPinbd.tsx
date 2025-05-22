@@ -43,6 +43,25 @@ const SecPinBd: React.FC = () => {
     updateSignupData({ securityPin: fullPin });
     console.log('PIN stored successfully in context');
 
+    // Also try to store in localStorage for cross-page persistence
+    try {
+      localStorage.setItem('tempPin', fullPin);
+
+      // Make sure the email is also stored in localStorage
+      if (signupData.email) {
+        localStorage.setItem('userEmail', signupData.email);
+
+        // Also store as a user object for redundancy
+        const userObj = {
+          email: signupData.email,
+          securityPin: fullPin
+        };
+        localStorage.setItem('user', JSON.stringify(userObj));
+      }
+    } catch (e) {
+      console.warn('Could not store data in localStorage:', e);
+    }
+
     // Show loading state
     setIsLoading(true);
 

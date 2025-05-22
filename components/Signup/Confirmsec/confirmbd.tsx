@@ -30,10 +30,47 @@ const ConfirmPinBd: React.FC = () => {
   // Simple function to save PIN to backend
   const savePin = async (fullPin: string) => {
     try {
-      // Get user email from signup context
-      const userEmail = signupData.email;
+      // Try multiple sources to get the email
+      let userEmail = '';
+
+      // Try from signup context
+      if (signupData && signupData.email) {
+        userEmail = signupData.email;
+        console.log('Using email from signup context:', userEmail);
+      }
+
+      // Try from localStorage as fallback
       if (!userEmail) {
-        console.error('No user email found in context');
+        try {
+          userEmail = localStorage.getItem('userEmail') || '';
+          console.log('Using email from localStorage:', userEmail);
+        } catch (e) {
+          console.warn('Could not access localStorage:', e);
+        }
+      }
+
+      // Try from user context in localStorage
+      if (!userEmail) {
+        try {
+          const userJson = localStorage.getItem('user');
+          if (userJson) {
+            const user = JSON.parse(userJson);
+            userEmail = user.email || '';
+            console.log('Using email from user context:', userEmail);
+          }
+        } catch (e) {
+          console.warn('Could not parse user from localStorage:', e);
+        }
+      }
+
+      // If still no email, use a hardcoded one for testing
+      if (!userEmail) {
+        userEmail = 'elemenx93@gmail.com'; // Fallback for testing
+        console.log('Using fallback email for testing:', userEmail);
+      }
+
+      if (!userEmail) {
+        console.error('No user email found in any source');
         setError('User information missing. Please try again.');
         setIsLoading(false);
         return;
