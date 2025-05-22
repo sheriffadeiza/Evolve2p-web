@@ -4,13 +4,23 @@ import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useLogin } from '@/context/LoginContext';
 import { API_ENDPOINTS } from '@/config/api';
+import { enhancedFetch, getApiEnvironment } from '@/utils/apiUtils';
 
 const LsecPinBd: React.FC = () => {
   const [pin, setPin] = useState<string[]>(['', '', '', '']);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
+  const [apiInfo, setApiInfo] = useState({ baseUrl: '', isLocal: false });
   const router = useRouter();
   const { user, updateUser } = useLogin();
+
+  // Display API environment information on component mount
+  useEffect(() => {
+    const env = getApiEnvironment();
+    setApiInfo(env);
+    console.log('API Environment in PIN verification:', env);
+  }, []);
 
   useEffect(() => {
     const token = localStorage.getItem('token');
@@ -60,11 +70,10 @@ const LsecPinBd: React.FC = () => {
     setError('');
 
     try {
-      // Log the API endpoint for debugging
-      console.log('Calling API endpoint:', API_ENDPOINTS.CHECK_PIN);
+      console.log(`Attempting PIN verification with API endpoint: ${API_ENDPOINTS.CHECK_PIN}`);
       console.log('Request payload:', { email, pin: pinStr });
 
-      const response = await fetch(API_ENDPOINTS.CHECK_PIN, {
+      const { data: responseData } = await enhancedFetch(API_ENDPOINTS.CHECK_PIN, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -72,49 +81,56 @@ const LsecPinBd: React.FC = () => {
         body: JSON.stringify({ email, pin: pinStr }),
       });
 
-      // Log the response status and headers for debugging
-      console.log('Response status:', response.status);
-      console.log('Response headers:', Object.fromEntries([...response.headers.entries()]));
-
-      let responseData: any;
-      try {
-        responseData = await response.json();
-        console.log('SERVER RESPONSE:', responseData); // Keep this for debugging
-      } catch (e) {
-        const text = await response.text();
-        console.log('SERVER RESPONSE (text):', text); // Log text response
-        responseData = { message: text || 'Invalid server response format' };
-      }
-
-      if (!response.ok) {
-        let readableMessage = 'Something went wrong';
-        if (responseData?.message) {
-          readableMessage = typeof responseData.message === 'string' ? responseData.message : JSON.stringify(responseData.message);
-        } else if (typeof responseData === 'string') {
-          readableMessage = responseData;
-        } else if (Object.keys(responseData).length === 0) {
-          readableMessage = 'Server error: empty JSON response.';
-        }
-        throw new Error(`HTTP error! status: ${response.status}, message: ${readableMessage}`);
-      }
-
       updateUser({ pin: pinStr });
-      router.push('/Logins/Lauth');
+
+      // Show success message briefly before redirecting
+      setError('');
+      setSuccess('PIN verified successfully! Redirecting to dashboard...');
+      setLoading(false);
+
+      // Add a small delay before redirecting to dashboard
+      setTimeout(() => {
+        router.push('/dashboard');
+      }, 1000);
     } catch (err: any) {
-      const finalMessage = typeof err === 'string' ? err : err?.message || JSON.stringify(err);
+      console.error('PIN verification error:', err);
+
+      // Get a user-friendly error message
+      let finalMessage = '';
+      if (typeof err === 'string') {
+        finalMessage = err;
+      } else if (err?.message) {
+        finalMessage = err.message;
+      } else {
+        finalMessage = 'An error occurred while verifying your PIN. Please try again.';
+      }
+
+      // Set the error and reset the PIN
+      setSuccess('');
       setError(finalMessage);
       setPin(['', '', '', '']);
+      setPinComplete(false); // Reset the PIN complete flag
       setTimeout(() => document.getElementById('pin-0')?.focus(), 100);
-    } finally {
       setLoading(false);
     }
   };
 
+  // Track if PIN is complete to avoid multiple submissions
+  const [pinComplete, setPinComplete] = useState(false);
+
+  // This effect handles PIN submission when all digits are filled
   useEffect(() => {
-    if (pin.every(digit => digit !== '') && !loading) {
+    // Only submit when all digits are filled, not already loading, and not already submitted
+    const allDigitsFilled = pin.every(digit => digit !== '');
+
+    if (allDigitsFilled && !loading && !pinComplete) {
+      setPinComplete(true); // Mark as complete to prevent multiple submissions
       handlePinSubmit();
+    } else if (!allDigitsFilled && pinComplete) {
+      // Reset the complete flag if PIN is changed/cleared
+      setPinComplete(false);
     }
-  }, [pin, loading, handlePinSubmit]); // Added handlePinSubmit to dependency array (best practice for useCallback-like behavior)
+  }, [pin, loading, pinComplete]);
 
   return (
     <div className="text-white ml-[95px] mt-[30px]">
@@ -124,12 +140,18 @@ const LsecPinBd: React.FC = () => {
       </p>
 
       {error && (
-        <p className="text-[#ffffff] mb-4">
-          {error}
+        <div className="p-3 mb-4 text-[#F5918A] bg-[#332222] rounded w-[90%]">
+          <p>{error}</p>
           {error.includes('expired') && (
             <span className="text-[#4DF2BE] ml-2">Redirecting...</span>
           )}
-        </p>
+        </div>
+      )}
+
+      {success && (
+        <div className="p-3 mb-4 text-[#4DF2BE] bg-[#223322] rounded w-[90%]">
+          <p>{success}</p>
+        </div>
       )}
 
       <div className="flex gap-2">

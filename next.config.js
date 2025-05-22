@@ -14,6 +14,11 @@ const nextConfig = {
         destination: '/Signups/Email',
         permanent: true,
       },
+      {
+        source: '/Logins/Lauth',
+        destination: '/',
+        permanent: true,
+      },
     ];
   },
   // Disable ESLint during build for deployment

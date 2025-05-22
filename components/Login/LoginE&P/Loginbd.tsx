@@ -1,11 +1,12 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import image from '../../../public/Assets/Evolve2p_viewslash/view-off-slash.png';
 import { extractErrorMessage } from '@/Utils/errorHandler';
 import { API_ENDPOINTS } from '@/config/api';
+import { enhancedFetch, getApiEnvironment } from '@/utils/apiUtils';
 
 const Loginbd: React.FC = () => {
   const router = useRouter();
@@ -14,6 +15,14 @@ const Loginbd: React.FC = () => {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [apiInfo, setApiInfo] = useState({ baseUrl: '', isLocal: false });
+
+  // Display API environment information on component mount
+  useEffect(() => {
+    const env = getApiEnvironment();
+    setApiInfo(env);
+    console.log('API Environment:', env);
+  }, []);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -27,19 +36,13 @@ const Loginbd: React.FC = () => {
     setLoading(true);
 
     try {
-      const response = await fetch(API_ENDPOINTS.LOGIN, {
+      console.log(`Attempting login with API endpoint: ${API_ENDPOINTS.LOGIN}`);
+
+      const { data: responseData } = await enhancedFetch(API_ENDPOINTS.LOGIN, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password }),
       });
-
-      const responseData = await response.json().catch(async () => {
-        return { message: await response.text() };
-      });
-
-      if (!response.ok) {
-        throw new Error(extractErrorMessage(responseData));
-      }
 
       const authToken = responseData.token || responseData.accessToken;
       if (authToken) {
@@ -64,19 +67,13 @@ const Loginbd: React.FC = () => {
 
     setLoading(true);
     try {
-      const response = await fetch(API_ENDPOINTS.FORGOT_PASSWORD, {
+      console.log(`Attempting password reset with API endpoint: ${API_ENDPOINTS.FORGOT_PASSWORD}`);
+
+      await enhancedFetch(API_ENDPOINTS.FORGOT_PASSWORD, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email }),
       });
-
-      const responseData = await response.json().catch(async () => {
-        return { message: await response.text() };
-      });
-
-      if (!response.ok) {
-        throw new Error(extractErrorMessage(responseData));
-      }
 
       alert('Password reset link sent');
       setError('');
@@ -89,6 +86,14 @@ const Loginbd: React.FC = () => {
 
   return (
     <div className="text-white max-w-md ml-[100px] w-full mx-auto">
+      {/* API Environment Indicator - only visible in development */}
+      {process.env.NODE_ENV === 'development' && (
+        <div className={`text-xs mb-4 p-2 rounded ${apiInfo.isLocal ? 'bg-blue-900' : 'bg-green-900'}`}>
+          <p>API: {apiInfo.baseUrl}</p>
+          <p>Environment: {apiInfo.isLocal ? 'Local Development' : 'Production'}</p>
+        </div>
+      )}
+
       <h2 className="text-[24px] font-[700] text-[#FCFCFC]">Welcome Back!</h2>
       <p className="text-[16px] font-[400] mt-[-10px] text-[#8F8F8F]">
         Log in to continue trading securely.
