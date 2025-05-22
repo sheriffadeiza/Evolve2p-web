@@ -166,8 +166,14 @@ const LsecPinBd: React.FC = () => {
       }
     } catch (err: any) {
       // Extract error message
-      const finalMessage = typeof err === 'string' ? err : err?.message || JSON.stringify(err);
+      let finalMessage = typeof err === 'string' ? err : err?.message || JSON.stringify(err);
       console.error('PIN verification error:', finalMessage);
+
+      // Handle database errors
+      if (finalMessage.includes('no such table') ||
+          (finalMessage.includes('table') && finalMessage.includes('not exist'))) {
+        finalMessage = 'The service is temporarily unavailable. Please try again later.';
+      }
 
       // Check if it's an invalid PIN error
       const isInvalidPin = finalMessage.includes('Invalid security PIN') ||
@@ -247,12 +253,23 @@ const LsecPinBd: React.FC = () => {
       </p>
 
       {error && (
-        <p className="text-[#ffffff] mb-4">
-          {error}
-          {error.includes('expired') && (
-            <span className="text-[#4DF2BE] ml-2">Redirecting...</span>
-          )}
-        </p>
+        <div className="p-4 mb-4 text-[#F5918A] bg-[#332222] rounded w-[90%] border border-[#553333]">
+          <div className="flex items-start">
+            <svg className="w-5 h-5 mr-2 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+              <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd"></path>
+            </svg>
+            <div>
+              <p className="font-medium">Error</p>
+              <p className="text-sm mt-1">{error}</p>
+              {error.includes('temporarily unavailable') && (
+                <p className="text-xs mt-2 text-[#8F8F8F]">Our team has been notified and is working to resolve this issue.</p>
+              )}
+              {error.includes('expired') && (
+                <p className="text-[#4DF2BE] text-sm mt-1">Redirecting...</p>
+              )}
+            </div>
+          </div>
+        </div>
       )}
 
       <div className="flex gap-2 pin-container">
