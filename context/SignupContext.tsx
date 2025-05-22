@@ -11,6 +11,7 @@ interface SignupData {
   country: string;
   phone: string;
   verified?: boolean;
+  securityPin?: string;
 }
 
 interface SignupContextType {
@@ -26,7 +27,8 @@ const defaultSignupData: SignupData = {
   password: '',
   country: '',
   phone: '',
-  verified: false
+  verified: false,
+  securityPin: ''
 };
 
 const SignupContext = createContext<SignupContextType | undefined>(undefined);

@@ -8,7 +8,7 @@ const SecPinBd: React.FC = () => {
   const [pin, setPin] = useState<string[]>(["", "", "", ""]);
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
-  const { setCurrentStep } = useSignup();
+  const { setCurrentStep, updateSignupData, signupData } = useSignup();
 
   // Handle input change, only allow digits
   const handleChange = (val: string, idx: number) => {
@@ -38,47 +38,14 @@ const SecPinBd: React.FC = () => {
     if (fullPin.length === 4) {
       setIsLoading(true);
 
-      try {
-        // Add debugging to see what's happening
-        console.log('Setting PIN in localStorage:', fullPin);
+      // Store the PIN in the signup context instead of localStorage
+      // This will be accessible throughout the signup process
+      console.log('Setting PIN in context:', fullPin);
 
-        // Clear any existing PIN first
-        try {
-          localStorage.removeItem('tempPin');
-        } catch (e) {
-          console.warn('Could not remove tempPin from localStorage:', e);
-        }
+      // Store the PIN in the signup context
+      updateSignupData({ securityPin: fullPin });
 
-        // Save temp PIN for confirm step
-        try {
-          localStorage.setItem('tempPin', fullPin);
-
-          // Verify the PIN was stored correctly
-          const storedPin = localStorage.getItem('tempPin');
-          console.log('Verified PIN in localStorage:', storedPin);
-        } catch (e) {
-          console.warn('Could not store PIN in localStorage:', e);
-
-          // Use sessionStorage as fallback
-          try {
-            sessionStorage.setItem('tempPin', fullPin);
-            console.log('Stored PIN in sessionStorage instead');
-          } catch (e2) {
-            console.warn('Could not store PIN in sessionStorage either:', e2);
-
-            // Use global variable as last resort
-            try {
-              // Extend Window interface to include our custom property
-              (window as any).tempPin = fullPin;
-              console.log('Stored PIN in window.tempPin as last resort');
-            } catch (e3) {
-              console.error('Could not store PIN anywhere:', e3);
-            }
-          }
-        }
-      } catch (error) {
-        console.error('Error handling PIN storage:', error);
-      }
+      console.log('PIN stored successfully in context');
 
       // Delay navigation to show loader briefly
       setTimeout(() => {
@@ -86,7 +53,7 @@ const SecPinBd: React.FC = () => {
         router.push('/Signups/Sconfirm');
       }, 1000);
     }
-  }, [pin, router, setCurrentStep]);
+  }, [pin, router, setCurrentStep, updateSignupData]);
 
   return (
     <div className="text-white ml-[100px] mt-[30px]">

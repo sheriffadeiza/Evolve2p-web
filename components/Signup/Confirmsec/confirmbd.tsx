@@ -31,60 +31,22 @@ const ConfirmPinBd: React.FC = () => {
     const fullPin = pin.join('');
     if (fullPin.length !== 4) return;
 
-    try {
-      // Get the original PIN from various storage options
-      let originalPin = '';
+    // Compare with the PIN stored in the context
+    const originalPin = signupData.securityPin || '';
+    console.log('Entered PIN:', fullPin);
+    console.log('Original PIN from context:', originalPin);
 
-      try {
-        // Try localStorage first
-        originalPin = localStorage.getItem('tempPin') || '';
-        console.log('Retrieved PIN from localStorage:', originalPin);
-      } catch (e) {
-        console.warn('Could not access localStorage:', e);
-
-        try {
-          // Try sessionStorage as fallback
-          originalPin = sessionStorage.getItem('tempPin') || '';
-          console.log('Retrieved PIN from sessionStorage:', originalPin);
-        } catch (e2) {
-          console.warn('Could not access sessionStorage:', e2);
-
-          // Try global variable as last resort
-          if ((window as any).tempPin) {
-            originalPin = (window as any).tempPin;
-            console.log('Retrieved PIN from window.tempPin:', originalPin);
-          } else {
-            console.warn('No PIN found in any storage');
-          }
-        }
-      }
-
-      console.log('Entered PIN:', fullPin);
-      console.log('Original PIN from storage:', originalPin);
-
-      // Normalize both PINs to ensure consistent comparison
-      const normalizedEnteredPin = fullPin.trim();
-      const normalizedOriginalPin = originalPin.trim();
-
-      console.log('Normalized entered PIN:', normalizedEnteredPin);
-      console.log('Normalized original PIN:', normalizedOriginalPin);
-
-      // If we couldn't retrieve a PIN or it doesn't match
-      if (!normalizedOriginalPin || normalizedEnteredPin !== normalizedOriginalPin) {
-        console.log('PINs do not match');
-        setError("PINs don't match. Please try again.");
-        setPin(["", "", "", ""]);
-        const firstInput = document.getElementById('pin-0');
-        if (firstInput) (firstInput as HTMLInputElement).focus();
-        return;
-      }
-
-      console.log('PINs match successfully');
-    } catch (error) {
-      console.error('Error comparing PINs:', error);
-      setError("An error occurred. Please try again.");
+    // Check if PINs match
+    if (originalPin && fullPin !== originalPin) {
+      console.log('PINs do not match');
+      setError("PINs don't match. Please try again.");
+      setPin(["", "", "", ""]);
+      const firstInput = document.getElementById('pin-0');
+      if (firstInput) (firstInput as HTMLInputElement).focus();
       return;
     }
+
+    console.log('PINs match successfully');
 
     setIsLoading(true);
 
