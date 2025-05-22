@@ -146,7 +146,6 @@ const Loginbd: React.FC = () => {
         <div className="p-4 mb-4 text-[#F5918A] bg-[#332222] rounded w-[90%] border border-[#553333]">
           <div className="flex items-start">
             <div>
-              <p className="font-medium">Login Error</p>
               <p className="text-sm mt-1">{error}</p>
               {error.includes('temporarily unavailable') && (
                 <p className="text-xs mt-2 text-[#8F8F8F]">Our team has been notified and is working to resolve this issue.</p>
