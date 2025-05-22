@@ -47,16 +47,28 @@ const SecPinBd: React.FC = () => {
     try {
       localStorage.setItem('tempPin', fullPin);
 
-      // Make sure the email is also stored in localStorage
-      if (signupData.email) {
-        localStorage.setItem('userEmail', signupData.email);
+      // Store all signup data in localStorage
+      if (signupData) {
+        // Store individual fields for backward compatibility
+        if (signupData.email) localStorage.setItem('userEmail', signupData.email);
+        if (signupData.username) localStorage.setItem('username', signupData.username);
+        if (signupData.password) localStorage.setItem('password', signupData.password);
+        if (signupData.country) localStorage.setItem('country', signupData.country);
+        if (signupData.phone) localStorage.setItem('phone', signupData.phone);
 
-        // Also store as a user object for redundancy
-        const userObj = {
-          email: signupData.email,
-          securityPin: fullPin
+        // Store complete signup data as JSON
+        const completeUserData = {
+          ...signupData,
+          securityPin: fullPin,
+          lastUpdated: new Date().toISOString()
         };
-        localStorage.setItem('user', JSON.stringify(userObj));
+
+        // Store in multiple keys for redundancy
+        localStorage.setItem('user', JSON.stringify(completeUserData));
+        localStorage.setItem('signupData', JSON.stringify(completeUserData));
+        localStorage.setItem('registrationData', JSON.stringify(completeUserData));
+
+        console.log('All user data stored in localStorage:', completeUserData);
       }
     } catch (e) {
       console.warn('Could not store data in localStorage:', e);

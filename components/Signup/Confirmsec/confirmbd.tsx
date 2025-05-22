@@ -27,56 +27,84 @@ const ConfirmPinBd: React.FC = () => {
     }
   };
 
+  // Function to retrieve complete user data from all possible sources
+  const getUserData = () => {
+    let userData = { ...signupData };
+    let dataSource = 'context';
+
+    // Try to get complete data from localStorage if context is incomplete
+    if (!userData.email || !userData.username) {
+      try {
+        // Try multiple storage keys
+        const storageKeys = ['signupData', 'registrationData', 'user'];
+
+        for (const key of storageKeys) {
+          const storedData = localStorage.getItem(key);
+          if (storedData) {
+            try {
+              const parsedData = JSON.parse(storedData);
+              if (parsedData && parsedData.email) {
+                userData = { ...userData, ...parsedData };
+                dataSource = `localStorage:${key}`;
+                console.log(`Retrieved user data from ${key}:`, parsedData);
+                break;
+              }
+            } catch (e) {
+              console.warn(`Could not parse ${key} from localStorage:`, e);
+            }
+          }
+        }
+      } catch (e) {
+        console.warn('Could not access localStorage:', e);
+      }
+    }
+
+    // If still missing data, try individual fields from localStorage
+    if (!userData.email) {
+      try {
+        userData.email = localStorage.getItem('userEmail') || userData.email || '';
+        if (userData.email) {
+          dataSource = 'localStorage:individual';
+          console.log('Retrieved email from individual localStorage item:', userData.email);
+        }
+      } catch (e) {
+        console.warn('Could not get email from localStorage:', e);
+      }
+    }
+
+    if (!userData.username) {
+      try {
+        userData.username = localStorage.getItem('username') || userData.username || '';
+      } catch (e) {
+        console.warn('Could not get username from localStorage:', e);
+      }
+    }
+
+    // If still no email, use hardcoded fallback for testing
+    if (!userData.email) {
+      userData.email = 'elemenx93@gmail.com';
+      dataSource = 'hardcoded';
+      console.log('Using fallback email for testing:', userData.email);
+    }
+
+    console.log(`Final user data (from ${dataSource}):`, userData);
+    return userData;
+  };
+
   // Simple function to save PIN to backend
   const savePin = async (fullPin: string) => {
     try {
-      // Try multiple sources to get the email
-      let userEmail = '';
+      // Get complete user data
+      const userData = getUserData();
 
-      // Try from signup context
-      if (signupData && signupData.email) {
-        userEmail = signupData.email;
-        console.log('Using email from signup context:', userEmail);
-      }
-
-      // Try from localStorage as fallback
-      if (!userEmail) {
-        try {
-          userEmail = localStorage.getItem('userEmail') || '';
-          console.log('Using email from localStorage:', userEmail);
-        } catch (e) {
-          console.warn('Could not access localStorage:', e);
-        }
-      }
-
-      // Try from user context in localStorage
-      if (!userEmail) {
-        try {
-          const userJson = localStorage.getItem('user');
-          if (userJson) {
-            const user = JSON.parse(userJson);
-            userEmail = user.email || '';
-            console.log('Using email from user context:', userEmail);
-          }
-        } catch (e) {
-          console.warn('Could not parse user from localStorage:', e);
-        }
-      }
-
-      // If still no email, use a hardcoded one for testing
-      if (!userEmail) {
-        userEmail = 'elemenx93@gmail.com'; // Fallback for testing
-        console.log('Using fallback email for testing:', userEmail);
-      }
-
-      if (!userEmail) {
+      if (!userData.email) {
         console.error('No user email found in any source');
         setError('User information missing. Please try again.');
         setIsLoading(false);
         return;
       }
 
-      console.log(`Setting PIN for email: ${userEmail}`);
+      console.log(`Setting PIN for email: ${userData.email}`);
 
       // Send PIN to backend
       const response = await fetch(API_ENDPOINTS.SET_REGISTRATION_PIN, {
@@ -85,7 +113,7 @@ const ConfirmPinBd: React.FC = () => {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          email: userEmail,
+          email: userData.email,
           pin: fullPin
         })
       });
