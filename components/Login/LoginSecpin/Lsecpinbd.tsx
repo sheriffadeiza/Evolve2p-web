@@ -60,14 +60,21 @@ const LsecPinBd: React.FC = () => {
     setError('');
 
     try {
+      // Log the API endpoint for debugging
+      console.log('Calling API endpoint:', API_ENDPOINTS.CHECK_PIN);
+      console.log('Request payload:', { email, pin: pinStr });
+
       const response = await fetch(API_ENDPOINTS.CHECK_PIN, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${authToken}`
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify({ email, pin: pinStr }),
       });
+
+      // Log the response status and headers for debugging
+      console.log('Response status:', response.status);
+      console.log('Response headers:', Object.fromEntries([...response.headers.entries()]));
 
       let responseData: any;
       try {
