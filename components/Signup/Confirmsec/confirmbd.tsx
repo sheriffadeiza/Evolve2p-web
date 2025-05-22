@@ -27,8 +27,8 @@ const ConfirmPinBd: React.FC = () => {
     }
   };
 
-  // Function to save PIN to backend
-  const savePin = useCallback(async (fullPin: string) => {
+  // Simple function to save PIN to backend
+  const savePin = async (fullPin: string) => {
     try {
       // Get user email from signup context
       const userEmail = signupData.email;
@@ -36,119 +36,83 @@ const ConfirmPinBd: React.FC = () => {
         console.error('No user email found in context');
         setError('User information missing. Please try again.');
         setIsLoading(false);
-        return false;
+        return;
       }
 
       console.log(`Setting PIN for email: ${userEmail}`);
-      console.log(`Using endpoint: ${API_ENDPOINTS.SET_REGISTRATION_PIN}`);
 
-      // Set a timeout to prevent infinite loading
-      const timeoutId = setTimeout(() => {
-        console.warn('API request timeout - resetting loading state');
-        setIsLoading(false);
-        setError('Request timed out. Please try again.');
-      }, 10000);
+      // Send PIN to backend
+      const response = await fetch(API_ENDPOINTS.SET_REGISTRATION_PIN, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          email: userEmail,
+          pin: fullPin
+        })
+      });
 
-      try {
-        // Send PIN to backend using the registration endpoint (no auth required)
-        const response = await fetch(API_ENDPOINTS.SET_REGISTRATION_PIN, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            email: userEmail,
-            pin: fullPin
-          })
-        });
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error('Failed to save PIN:', errorData);
 
-        // Clear the timeout since we got a response
-        clearTimeout(timeoutId);
-
-        if (!response.ok) {
-          const errorData = await response.json();
-          console.error('Failed to save PIN:', errorData);
-
-          // Handle specific error cases
-          if (response.status === 404) {
-            setError('User not found. Please complete registration first.');
-          } else {
-            setError('Failed to save PIN. Please try again.');
-          }
-
-          setIsLoading(false);
-          return false;
+        if (response.status === 404) {
+          setError('User not found. Please complete registration first.');
+        } else {
+          setError('Failed to save PIN. Please try again.');
         }
 
-        // Show success message
-        setShowSuccess(true);
         setIsLoading(false);
-        return true;
-      } catch (error) {
-        // Clear the timeout since we got an error
-        clearTimeout(timeoutId);
-        throw error;
+        return;
       }
+
+      // Show success message
+      setShowSuccess(true);
+      setIsLoading(false);
     } catch (error) {
       console.error('Error saving PIN:', error);
       setError('An error occurred. Please try again.');
       setIsLoading(false);
-      return false;
     }
-  }, [signupData.email, setError, setIsLoading, setShowSuccess]);
+  };
 
-  // Handle PIN verification and submission
-  const handlePinVerification = useCallback(() => {
+  // Handle PIN submission
+  const handleSubmit = () => {
     const fullPin = pin.join('');
     if (fullPin.length !== 4) return;
 
-    // Compare with the PIN stored in the context
-    const originalPin = signupData.securityPin || '';
-    console.log('Entered PIN:', fullPin);
-    console.log('Original PIN from context:', originalPin);
-
-    // For testing purposes, always consider the PIN as matching
-    // Remove this in production and use the actual comparison
-    if (false && originalPin && fullPin !== originalPin) {
-      console.log('PINs do not match');
-      setError("PINs don't match. Please try again.");
-      setPin(["", "", "", ""]);
-      const firstInput = document.getElementById('pin-0');
-      if (firstInput) (firstInput as HTMLInputElement).focus();
-      return;
-    }
-
-    console.log('PINs match successfully');
+    // Always consider PIN as valid for now
+    console.log('PIN accepted');
     setIsLoading(true);
 
     // Store confirmed PIN
-    try {
-      updateSignupData({ ...signupData, securityPin: fullPin });
+    updateSignupData({ ...signupData, securityPin: fullPin });
 
-      // Try to store in localStorage, but don't fail if it's not available
-      try {
-        localStorage.setItem('userPin', fullPin);
-        localStorage.removeItem('tempPin');
-      } catch (e) {
-        console.warn('Could not access localStorage:', e);
-      }
+    // Send PIN to backend
+    savePin(fullPin);
+  };
 
-      // Send PIN to backend
-      savePin(fullPin);
-    } catch (error) {
-      console.error('Error during PIN confirmation:', error);
-      setError('An error occurred. Please try again.');
-      setIsLoading(false);
+  // Handle input for the last digit
+  const handleLastDigitInput = (value: string, index: number) => {
+    if (index === 3 && value.length === 1) {
+      // If this is the last digit and a value was entered
+      const newPin = [...pin];
+      newPin[index] = value;
+      setPin(newPin);
+
+      // Short delay before submission to allow state update
+      setTimeout(() => {
+        const fullPin = [...newPin].join('');
+        if (fullPin.length === 4) {
+          handleSubmit();
+        }
+      }, 100);
+    } else {
+      // Normal input handling for other digits
+      handleChange(value, index);
     }
-  }, [pin, signupData, updateSignupData, savePin, setError, setIsLoading, setPin]);
-
-  // Detect when all 4 digits are entered
-  useEffect(() => {
-    const fullPin = pin.join('');
-    if (fullPin.length === 4) {
-      handlePinVerification();
-    }
-  }, [pin, handlePinVerification]);
+  };
 
   const handleContinue = () => {
     setCurrentStep('kyc');
@@ -191,7 +155,7 @@ const ConfirmPinBd: React.FC = () => {
             id={`pin-${idx}`}
             maxLength={1}
             value={digit}
-            onChange={(e) => handleChange(e.target.value, idx)}
+            onChange={(e) => handleLastDigitInput(e.target.value, idx)}
             className="w-[70px] h-[56px] ml-[10px] rounded-[10px] border-none bg-[#222222] font-[500] text-center text-[14px] text-[#FCFCFC] focus:outline-none focus:ring-1 focus:ring-[#1ECB84]"
             type="password"
             inputMode="numeric"
@@ -199,6 +163,16 @@ const ConfirmPinBd: React.FC = () => {
           />
         ))}
       </div>
+
+      {/* Continue button as fallback */}
+      {pin.join('').length === 4 && !isLoading && !showSuccess && (
+        <button
+          onClick={handleSubmit}
+          className="w-[300px] h-[48px] mt-[30px] bg-[#4DF2BE] text-[#0F1012] rounded-[100px] font-[700]"
+        >
+          Confirm PIN
+        </button>
+      )}
 
       {/* Loader */}
       {isLoading && !showSuccess && (

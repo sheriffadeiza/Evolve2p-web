@@ -33,52 +33,48 @@ const SecPinBd: React.FC = () => {
     }
   };
 
-  // Handle PIN submission - memoized to prevent infinite re-renders
-  const handlePinSubmit = useCallback(() => {
+  // Handle PIN submission when all 4 digits are entered
+  const handlePinSubmit = () => {
     const fullPin = pin.join('');
     if (fullPin.length !== 4) return;
 
+    // Store the PIN in the signup context
+    console.log('Setting PIN in context:', fullPin);
+    updateSignupData({ securityPin: fullPin });
+    console.log('PIN stored successfully in context');
+
+    // Show loading state
     setIsLoading(true);
 
-    try {
-      // Store the PIN in the signup context
-      console.log('Setting PIN in context:', fullPin);
-      updateSignupData({ securityPin: fullPin });
-      console.log('PIN stored successfully in context');
+    // Navigate to confirmation page after a short delay
+    setTimeout(() => {
+      router.push('/Signups/Sconfirm');
+    }, 500);
+  };
 
-      // Add a safety timeout to prevent infinite loading
-      const navigationTimeout = setTimeout(() => {
-        setCurrentStep('confirm-pin');
-        router.push('/Signups/Sconfirm');
-      }, 1000);
+  // Handle input for the last digit
+  const handleLastDigitInput = (value: string, index: number) => {
+    if (index === 3 && value.length === 1) {
+      // If this is the last digit and a value was entered
+      const newPin = [...pin];
+      newPin[index] = value;
+      setPin(newPin);
 
-      // Add a safety timeout to reset loading state if navigation fails
-      const safetyTimeout = setTimeout(() => {
-        if (document.visibilityState !== 'hidden') {
-          console.warn('Navigation timeout - resetting loading state');
-          setIsLoading(false);
-          clearTimeout(navigationTimeout);
+      // Short delay before submission to allow state update
+      setTimeout(() => {
+        const fullPin = [...newPin].join('');
+        if (fullPin.length === 4) {
+          // Store the PIN and navigate
+          updateSignupData({ securityPin: fullPin });
+          setIsLoading(true);
+          router.push('/Signups/Sconfirm');
         }
-      }, 5000);
-
-      // Clean up timeouts if component unmounts
-      return () => {
-        clearTimeout(navigationTimeout);
-        clearTimeout(safetyTimeout);
-      };
-    } catch (error) {
-      console.error('Error handling PIN submission:', error);
-      setIsLoading(false);
+      }, 100);
+    } else {
+      // Normal input handling for other digits
+      handleChange(value, index);
     }
-  }, [pin, updateSignupData, setCurrentStep, router, setIsLoading]);
-
-  // Detect when all 4 digits are entered
-  useEffect(() => {
-    const fullPin = pin.join('');
-    if (fullPin.length === 4) {
-      handlePinSubmit();
-    }
-  }, [pin, handlePinSubmit]);
+  };
 
   return (
     <div className="text-white ml-[100px] mt-[30px]">
@@ -94,7 +90,7 @@ const SecPinBd: React.FC = () => {
             id={`pin-${idx}`}
             maxLength={1}
             value={digit}
-            onChange={(e) => handleChange(e.target.value, idx)}
+            onChange={(e) => handleLastDigitInput(e.target.value, idx)}
             onKeyDown={(e) => handleKeyDown(e, idx)}
             className="w-[70px] h-[56px] ml-[10px] rounded-[10px] border-none bg-[#222222] font-[500] text-center text-[14px] text-[#FCFCFC] focus:outline-none focus:ring-1 focus:ring-[#1ECB84]"
             type="password"
@@ -106,6 +102,16 @@ const SecPinBd: React.FC = () => {
           />
         ))}
       </div>
+
+      {/* Continue button as fallback */}
+      {pin.join('').length === 4 && !isLoading && (
+        <button
+          onClick={handlePinSubmit}
+          className="w-[300px] h-[48px] mt-[30px] bg-[#4DF2BE] text-[#0F1012] rounded-[100px] font-[700]"
+        >
+          Continue
+        </button>
+      )}
 
       {/* Loader below PIN inputs */}
       {isLoading && (
