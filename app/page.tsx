@@ -22,6 +22,15 @@ export default function Home() {
           >
             Login
           </Link>
+          {/* Alternative login link that will redirect */}
+          {/*
+          <Link
+            href="/login"
+            className="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded"
+          >
+            Login
+          </Link>
+          */}
         </div>
       </div>
     </div>

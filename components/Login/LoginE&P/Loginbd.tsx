@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import image from '../../../public/Assets/Evolve2p_viewslash/view-off-slash.png';
 import { extractErrorMessage } from '@/Utils/errorHandler';
+import { API_ENDPOINTS } from '@/config/api';
 
 const Loginbd: React.FC = () => {
   const router = useRouter();
@@ -26,7 +27,7 @@ const Loginbd: React.FC = () => {
     setLoading(true);
 
     try {
-      const response = await fetch('https://evolve2p-backend.onrender.com/api/auth/login', {
+      const response = await fetch(API_ENDPOINTS.LOGIN, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password }),
@@ -36,14 +37,36 @@ const Loginbd: React.FC = () => {
         return { message: await response.text() };
       });
 
+      // Check if the response indicates email verification is required
+      if (response.status === 403 && responseData.email_verified === false) {
+        console.log('Email not verified, redirecting to verification page');
+
+        // Store email for verification page
+        localStorage.setItem('unverified_email', email);
+
+        // Redirect to email verification page
+        router.push('/Logins/verify-email');
+        return;
+      }
+
       if (!response.ok) {
         throw new Error(extractErrorMessage(responseData));
       }
 
       const authToken = responseData.token || responseData.accessToken;
       if (authToken) {
+        // Store user data including verification status
+        const userData = {
+          email,
+          is_verified: responseData.user?.is_verified || true,
+          username: responseData.user?.username || '',
+          id: responseData.user?.id || ''
+        };
+
         localStorage.setItem('token', authToken);
-        localStorage.setItem('user', JSON.stringify({ email }));
+        localStorage.setItem('user', JSON.stringify(userData));
+
+        // Redirect to security PIN page
         router.push('/Logins/Lsecpin');
       } else {
         throw new Error('No authentication token received');
@@ -63,7 +86,7 @@ const Loginbd: React.FC = () => {
 
     setLoading(true);
     try {
-      const response = await fetch('https://evolve2p-backend.onrender.com/api/forgot-password', {
+      const response = await fetch(API_ENDPOINTS.FORGOT_PASSWORD, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email }),

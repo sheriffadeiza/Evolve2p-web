@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { API_ENDPOINTS, API_ENV } from "@/config/api";
 
 const VerifyEmailBody: React.FC = () => {
   const router = useRouter();
@@ -43,23 +44,60 @@ const VerifyEmailBody: React.FC = () => {
     setError("");
 
     try {
+      console.log(`Sending OTP to ${email} with endpoint: ${API_ENDPOINTS.SEND_OTP}`);
+      console.log(`API_BASE_URL: ${API_ENV.apiUrl}`);
+      console.log(`Environment: ${API_ENV.isLocal ? 'Development' : 'Production'}`);
+
+      // Add a timestamp to prevent caching
+      const timestamp = new Date().getTime();
+      const urlWithTimestamp = `${API_ENDPOINTS.SEND_OTP}?_=${timestamp}`;
+
       const response = await fetch(
-        "https://evolve2p-backend.onrender.com/api/send-otp",
+        urlWithTimestamp,
         {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
+            "Accept": "application/json",
+            "Cache-Control": "no-cache, no-store, must-revalidate",
+            "Pragma": "no-cache"
           },
           body: JSON.stringify({ email }),
         }
       );
 
+      console.log(`Response status: ${response.status}`);
+      console.log(`Response headers:`, Object.fromEntries([...response.headers.entries()]));
+
+      // Check if response is JSON
+      const contentType = response.headers.get("content-type");
+      if (!contentType || !contentType.includes("application/json")) {
+        console.error("Response is not JSON:", contentType);
+        const text = await response.text();
+        console.error("Response text:", text);
+
+        // Try to parse the response as JSON anyway (sometimes content-type is wrong)
+        try {
+          return JSON.parse(text);
+        } catch (parseError) {
+          console.error("Failed to parse response as JSON:", parseError);
+          throw new Error("Server returned non-JSON response. Please try again later.");
+        }
+      }
+
       const data = await response.json();
+      console.log("Response data:", data);
 
       if (!response.ok) {
-        throw new Error(data.message || "Failed to send OTP");
+        throw new Error(data.message || data.detail || "Failed to send OTP");
+      }
+
+      // If the response includes the OTP code (for development), log it
+      if (data.code) {
+        console.log(`OTP code for testing: ${data.code}`);
       }
     } catch (err: any) {
+      console.error("Send OTP error:", err);
       setError(err.message || "Failed to send verification code");
     } finally {
       setIsLoading(false);
@@ -89,12 +127,23 @@ const VerifyEmailBody: React.FC = () => {
     setError("");
 
     try {
+      console.log(`Verifying code with endpoint: ${API_ENDPOINTS.VERIFY_EMAIL}`);
+      console.log(`API_BASE_URL: ${API_ENV.apiUrl}`);
+      console.log(`Environment: ${API_ENV.isLocal ? 'Development' : 'Production'}`);
+
+      // Add a timestamp to prevent caching
+      const timestamp = new Date().getTime();
+      const urlWithTimestamp = `${API_ENDPOINTS.VERIFY_EMAIL}?_=${timestamp}`;
+
       const response = await fetch(
-        "https://evolve2p-backend.onrender.com/api/verify-email",
+        urlWithTimestamp,
         {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
+            "Accept": "application/json",
+            "Cache-Control": "no-cache, no-store, must-revalidate",
+            "Pragma": "no-cache"
           },
           body: JSON.stringify({
             email: email,
@@ -103,15 +152,45 @@ const VerifyEmailBody: React.FC = () => {
         }
       );
 
-      const data = await response.json();
+      console.log(`Response status: ${response.status}`);
+      console.log(`Response headers:`, Object.fromEntries([...response.headers.entries()]));
 
-      if (!response.ok) {
-        throw new Error(data.message || "Verification failed");
+      // Check if response is JSON
+      const contentType = response.headers.get("content-type");
+      if (!contentType || !contentType.includes("application/json")) {
+        console.error("Response is not JSON:", contentType);
+        const text = await response.text();
+        console.error("Response text:", text);
+
+        // Try to parse the response as JSON anyway (sometimes content-type is wrong)
+        try {
+          return JSON.parse(text);
+        } catch (parseError) {
+          console.error("Failed to parse response as JSON:", parseError);
+          throw new Error("Server returned non-JSON response. Please try again later.");
+        }
       }
 
-      // On success navigate to Profile page (next step)
-      router.push("/Signups/Profile");
+      const data = await response.json();
+      console.log("Response data:", data);
+
+      if (!response.ok) {
+        throw new Error(data.message || data.detail || "Verification failed");
+      }
+
+      // Store verification status
+      localStorage.setItem("email_verified", "true");
+
+      // Show success message
+      setError(""); // Clear any previous errors
+
+      // Add a small delay before redirecting
+      setTimeout(() => {
+        // On success navigate to Profile page (next step)
+        router.push("/Signups/Profile");
+      }, 1000);
     } catch (err: any) {
+      console.error("Verification error:", err);
       setError(err.message || "Invalid verification code. Please try again.");
       setPin(["", "", "", "", "", ""]);
       const firstInput = document.getElementById("pin-0");
