@@ -46,9 +46,10 @@ const SecPinBd: React.FC = () => {
     // Show loading state
     setIsLoading(true);
 
-    // Navigate to confirmation page after a short delay
+    // Use window.location for direct navigation instead of Next.js router
+    // This avoids RSC (React Server Component) issues
     setTimeout(() => {
-      router.push('/Signups/Sconfirm');
+      window.location.href = '/Signups/Sconfirm';
     }, 500);
   };
 
@@ -60,16 +61,8 @@ const SecPinBd: React.FC = () => {
       newPin[index] = value;
       setPin(newPin);
 
-      // Short delay before submission to allow state update
-      setTimeout(() => {
-        const fullPin = [...newPin].join('');
-        if (fullPin.length === 4) {
-          // Store the PIN and navigate
-          updateSignupData({ securityPin: fullPin });
-          setIsLoading(true);
-          router.push('/Signups/Sconfirm');
-        }
-      }, 100);
+      // Normal input handling without auto-submission
+      // Let the user click the button instead
     } else {
       // Normal input handling for other digits
       handleChange(value, index);

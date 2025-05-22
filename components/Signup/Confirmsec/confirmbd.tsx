@@ -101,13 +101,8 @@ const ConfirmPinBd: React.FC = () => {
       newPin[index] = value;
       setPin(newPin);
 
-      // Short delay before submission to allow state update
-      setTimeout(() => {
-        const fullPin = [...newPin].join('');
-        if (fullPin.length === 4) {
-          handleSubmit();
-        }
-      }, 100);
+      // Don't auto-submit, let the user click the button
+      // This avoids navigation issues
     } else {
       // Normal input handling for other digits
       handleChange(value, index);
@@ -116,7 +111,8 @@ const ConfirmPinBd: React.FC = () => {
 
   const handleContinue = () => {
     setCurrentStep('kyc');
-    router.push('/Signups/Kyc');
+    // Use window.location for direct navigation instead of Next.js router
+    window.location.href = '/Signups/Kyc';
   };
 
   return (
