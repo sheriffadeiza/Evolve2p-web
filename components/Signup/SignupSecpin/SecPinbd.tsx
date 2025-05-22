@@ -38,8 +38,18 @@ const SecPinBd: React.FC = () => {
     if (fullPin.length === 4) {
       setIsLoading(true);
 
+      // Add debugging to see what's happening
+      console.log('Setting PIN in localStorage:', fullPin);
+
+      // Clear any existing PIN first
+      localStorage.removeItem('tempPin');
+
       // Save temp PIN for confirm step
       localStorage.setItem('tempPin', fullPin);
+
+      // Verify the PIN was stored correctly
+      const storedPin = localStorage.getItem('tempPin');
+      console.log('Verified PIN in localStorage:', storedPin);
 
       // Delay navigation to show loader briefly
       setTimeout(() => {

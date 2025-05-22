@@ -31,14 +31,28 @@ const ConfirmPinBd: React.FC = () => {
     const fullPin = pin.join('');
     if (fullPin.length !== 4) return;
 
+    // Add debugging to see what's happening
     const originalPin = localStorage.getItem('tempPin') || '';
-    if (fullPin !== originalPin) {
+    console.log('Entered PIN:', fullPin);
+    console.log('Original PIN from localStorage:', originalPin);
+
+    // Normalize both PINs to ensure consistent comparison
+    const normalizedEnteredPin = fullPin.trim();
+    const normalizedOriginalPin = originalPin.trim();
+
+    console.log('Normalized entered PIN:', normalizedEnteredPin);
+    console.log('Normalized original PIN:', normalizedOriginalPin);
+
+    if (normalizedEnteredPin !== normalizedOriginalPin) {
+      console.log('PINs do not match');
       setError("PINs don't match. Please try again.");
       setPin(["", "", "", ""]);
       const firstInput = document.getElementById('pin-0');
       if (firstInput) (firstInput as HTMLInputElement).focus();
       return;
     }
+
+    console.log('PINs match successfully');
 
     setIsLoading(true);
 
