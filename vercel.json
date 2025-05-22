@@ -19,10 +19,6 @@
       "dest": "/Signups/Email"
     },
     {
-      "src": "/Logins/Lauth",
-      "dest": "/"
-    },
-    {
       "src": "/(.*)",
       "dest": "/$1"
     }

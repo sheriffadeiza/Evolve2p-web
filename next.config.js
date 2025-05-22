@@ -14,11 +14,6 @@ const nextConfig = {
         destination: '/Signups/Email',
         permanent: true,
       },
-      {
-        source: '/Logins/Lauth',
-        destination: '/',
-        permanent: true,
-      },
     ];
   },
   // Disable ESLint during build for deployment
@@ -36,6 +31,12 @@ const nextConfig = {
   // Configure image domains
   images: {
     domains: ['evolve2p-backend.vercel.app'],
+  },
+  // Disable static optimization for pages that use browser APIs
+  experimental: {
+    // This prevents Next.js from statically optimizing pages that might use browser APIs
+    // like localStorage during the initial render
+    appDir: true,
   },
 };
 

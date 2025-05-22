@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { useRouter } from 'next/navigation';
 import { useSignup } from '@/context/SignupContext';
+import { API_ENDPOINTS } from '@/config/api';
 
 const ConfirmPinBd: React.FC = () => {
   const [pin, setPin] = useState<string[]>(["", "", "", ""]);
@@ -46,11 +47,60 @@ const ConfirmPinBd: React.FC = () => {
     localStorage.setItem('userPin', fullPin);
     localStorage.removeItem('tempPin');
 
-    setTimeout(() => {
-      setShowSuccess(true);
-      setIsLoading(false);
-    }, 1000);
-  }, [pin]);
+    // Send PIN to backend
+    const savePin = async () => {
+      try {
+        // Get user email from localStorage or signup context
+        const userEmail = localStorage.getItem('userEmail') || signupData.email;
+        if (!userEmail) {
+          console.error('No user email found');
+          setError('User information missing. Please try again.');
+          setIsLoading(false);
+          return;
+        }
+
+        console.log(`Setting PIN for email: ${userEmail}`);
+        console.log(`Using endpoint: ${API_ENDPOINTS.SET_REGISTRATION_PIN}`);
+
+        // Send PIN to backend using the registration endpoint (no auth required)
+        const response = await fetch(API_ENDPOINTS.SET_REGISTRATION_PIN, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            email: userEmail,
+            pin: fullPin
+          })
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          console.error('Failed to save PIN:', errorData);
+
+          // Handle specific error cases
+          if (response.status === 404) {
+            setError('User not found. Please complete registration first.');
+          } else {
+            setError('Failed to save PIN. Please try again.');
+          }
+
+          setIsLoading(false);
+          return;
+        }
+
+        // Show success message
+        setShowSuccess(true);
+        setIsLoading(false);
+      } catch (error) {
+        console.error('Error saving PIN:', error);
+        setError('An error occurred. Please try again.');
+        setIsLoading(false);
+      }
+    };
+
+    savePin();
+  }, [pin, signupData, updateSignupData]);
 
   const handleContinue = () => {
     setCurrentStep('kyc');
