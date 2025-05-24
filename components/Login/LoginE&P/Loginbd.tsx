@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import image from '../../../public/Assets/Evolve2p_viewslash/view-off-slash.png';
 import { extractErrorMessage } from '@/Utils/errorHandler';
+import { API_ENDPOINTS } from '@/config/api';
 
 const Loginbd: React.FC = () => {
   const router = useRouter();
@@ -26,24 +27,68 @@ const Loginbd: React.FC = () => {
     setLoading(true);
 
     try {
-      const response = await fetch('https://evolve2p-backend.onrender.com/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
-      });
+      console.log(`Attempting login with API endpoint: ${API_ENDPOINTS.LOGIN}`);
 
-      const responseData = await response.json().catch(async () => {
-        return { message: await response.text() };
-      });
+      // Define responseData at a higher scope
+      let responseData: any = null;
 
-      if (!response.ok) {
-        throw new Error(extractErrorMessage(responseData));
+      try {
+        const response = await fetch(API_ENDPOINTS.LOGIN, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password }),
+        });
+
+        try {
+          responseData = await response.json();
+        } catch (jsonError) {
+          // Handle non-JSON responses
+          const textResponse = await response.text();
+          responseData = {
+            message: textResponse || 'Server returned an invalid response format'
+          };
+        }
+
+        console.log('Login response status:', response.status);
+
+        // Check if the response indicates email verification is required
+        if (response.status === 403 && responseData.email_verified === false) {
+          console.log('Email not verified, redirecting to verification page');
+
+          // Store email for verification page
+          localStorage.setItem('unverified_email', email);
+
+          // Redirect to email verification page
+          router.push('/Logins/verify-email');
+          return;
+        }
+
+        if (!response.ok) {
+          // Use our enhanced error handler to get a user-friendly message
+          throw new Error(extractErrorMessage(responseData));
+        }
+      } catch (fetchError) {
+        // Handle network errors
+        if (fetchError instanceof TypeError && fetchError.message.includes('fetch')) {
+          throw new Error('Network error. Please check your internet connection and try again.');
+        }
+        throw fetchError;
       }
 
       const authToken = responseData.token || responseData.accessToken;
       if (authToken) {
+        // Store user data including verification status
+        const userData = {
+          email,
+          is_verified: responseData.user?.is_verified || true,
+          username: responseData.user?.username || '',
+          id: responseData.user?.id || ''
+        };
+
         localStorage.setItem('token', authToken);
-        localStorage.setItem('user', JSON.stringify({ email }));
+        localStorage.setItem('user', JSON.stringify(userData));
+
+        // Redirect to security PIN page
         router.push('/Logins/Lsecpin');
       } else {
         throw new Error('No authentication token received');
@@ -63,7 +108,7 @@ const Loginbd: React.FC = () => {
 
     setLoading(true);
     try {
-      const response = await fetch('https://evolve2p-backend.onrender.com/api/forgot-password', {
+      const response = await fetch(API_ENDPOINTS.FORGOT_PASSWORD, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email }),
@@ -94,8 +139,19 @@ const Loginbd: React.FC = () => {
       </p>
 
       {error && (
-        <div className="p-3 mb-4 text-[#F5918A] bg-[#332222] rounded w-[60%]">
-          {error}
+        <div className="p-4 mb-4 text-[#F5918A] bg-[#332222] rounded w-[90%] border border-[#553333]">
+          <div className="flex items-start">
+            <svg className="w-5 h-5 mr-2 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+              <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd"></path>
+            </svg>
+            <div>
+              <p className="font-medium">Login Error</p>
+              <p className="text-sm mt-1">{error}</p>
+              {error.includes('temporarily unavailable') && (
+                <p className="text-xs mt-2 text-[#8F8F8F]">Our team has been notified and is working to resolve this issue.</p>
+              )}
+            </div>
+          </div>
         </div>
       )}
 
