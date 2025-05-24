@@ -11,6 +11,7 @@ interface SignupData {
   country: string;
   phone: string;
   verified?: boolean;
+  securityPin?: string;
 }
 
 interface SignupContextType {
@@ -26,7 +27,8 @@ const defaultSignupData: SignupData = {
   password: '',
   country: '',
   phone: '',
-  verified: false
+  verified: false,
+  securityPin: ''
 };
 
 const SignupContext = createContext<SignupContextType | undefined>(undefined);
@@ -36,23 +38,91 @@ export function SignupProvider({ children }: { children: React.ReactNode }) {
   const [signupData, setSignupData] = useState<SignupData>(defaultSignupData);
 
   useEffect(() => {
-    // Load email and password from localStorage if available
-    const email = localStorage.getItem('userEmail') || '';
-    const password = localStorage.getItem('userPassword') || '';
-    if (email && password) {
-      setSignupData(prev => ({
-        ...prev,
-        email,
-        password
-      }));
+    try {
+      // Try to load complete signup data from localStorage
+      const storageKeys = ['signupData', 'registrationData', 'user'];
+      let loadedData = null;
+
+      // Try each storage key
+      for (const key of storageKeys) {
+        try {
+          const storedData = localStorage.getItem(key);
+          if (storedData) {
+            const parsedData = JSON.parse(storedData);
+            if (parsedData && parsedData.email) {
+              loadedData = parsedData;
+              console.log(`Loaded signup data from localStorage key '${key}':`, parsedData);
+              break;
+            }
+          }
+        } catch (e) {
+          console.warn(`Error parsing data from localStorage key '${key}':`, e);
+        }
+      }
+
+      // If complete data wasn't found, try individual fields
+      if (!loadedData) {
+        const email = localStorage.getItem('userEmail') || '';
+        const username = localStorage.getItem('username') || '';
+        const password = localStorage.getItem('password') || '';
+        const country = localStorage.getItem('country') || '';
+        const phone = localStorage.getItem('phone') || '';
+        const securityPin = localStorage.getItem('tempPin') || '';
+
+        if (email || username || password) {
+          loadedData = {
+            email,
+            username,
+            password,
+            country,
+            phone,
+            securityPin,
+            verified: false
+          };
+          console.log('Loaded signup data from individual localStorage items:', loadedData);
+        }
+      }
+
+      // Update state with loaded data
+      if (loadedData) {
+        setSignupData(prev => ({
+          ...prev,
+          ...loadedData
+        }));
+      }
+    } catch (e) {
+      console.warn('Error loading signup data from localStorage:', e);
     }
   }, []);
 
   const updateSignupData = (data: Partial<SignupData>) => {
-    setSignupData(prev => ({
-      ...prev,
-      ...data
-    }));
+    // Update state
+    setSignupData(prev => {
+      const newData = {
+        ...prev,
+        ...data
+      };
+
+      // Also save to localStorage
+      try {
+        // Save complete data
+        localStorage.setItem('signupData', JSON.stringify(newData));
+
+        // Also save individual fields for backward compatibility
+        if (data.email) localStorage.setItem('userEmail', data.email);
+        if (data.username) localStorage.setItem('username', data.username);
+        if (data.password) localStorage.setItem('password', data.password);
+        if (data.country) localStorage.setItem('country', data.country);
+        if (data.phone) localStorage.setItem('phone', data.phone);
+        if (data.securityPin) localStorage.setItem('tempPin', data.securityPin);
+
+        console.log('Saved updated signup data to localStorage:', newData);
+      } catch (e) {
+        console.warn('Could not save signup data to localStorage:', e);
+      }
+
+      return newData;
+    });
   };
 
   return (

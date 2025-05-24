@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useRouter } from 'next/navigation';
 import { useSignup } from '@/context/SignupContext';
 
@@ -8,7 +8,7 @@ const SecPinBd: React.FC = () => {
   const [pin, setPin] = useState<string[]>(["", "", "", ""]);
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
-  const { setCurrentStep } = useSignup();
+  const { setCurrentStep, updateSignupData, signupData } = useSignup();
 
   // Handle input change, only allow digits
   const handleChange = (val: string, idx: number) => {
@@ -33,21 +33,72 @@ const SecPinBd: React.FC = () => {
     }
   };
 
-  useEffect(() => {
+  // Handle PIN submission when all 4 digits are entered
+  const handlePinSubmit = () => {
     const fullPin = pin.join('');
-    if (fullPin.length === 4) {
-      setIsLoading(true);
+    if (fullPin.length !== 4) return;
 
-      // Save temp PIN for confirm step
+    // Store the PIN in the signup context
+    console.log('Setting PIN in context:', fullPin);
+    updateSignupData({ securityPin: fullPin });
+    console.log('PIN stored successfully in context');
+
+    // Also try to store in localStorage for cross-page persistence
+    try {
       localStorage.setItem('tempPin', fullPin);
 
-      // Delay navigation to show loader briefly
-      setTimeout(() => {
-        setCurrentStep('confirm-pin');
-        router.push('/Signups/Sconfirm');
-      }, 1000);
+      // Store all signup data in localStorage
+      if (signupData) {
+        // Store individual fields for backward compatibility
+        if (signupData.email) localStorage.setItem('userEmail', signupData.email);
+        if (signupData.username) localStorage.setItem('username', signupData.username);
+        if (signupData.password) localStorage.setItem('password', signupData.password);
+        if (signupData.country) localStorage.setItem('country', signupData.country);
+        if (signupData.phone) localStorage.setItem('phone', signupData.phone);
+
+        // Store complete signup data as JSON
+        const completeUserData = {
+          ...signupData,
+          securityPin: fullPin,
+          lastUpdated: new Date().toISOString()
+        };
+
+        // Store in multiple keys for redundancy
+        localStorage.setItem('user', JSON.stringify(completeUserData));
+        localStorage.setItem('signupData', JSON.stringify(completeUserData));
+        localStorage.setItem('registrationData', JSON.stringify(completeUserData));
+
+        console.log('All user data stored in localStorage:', completeUserData);
+      }
+    } catch (e) {
+      console.warn('Could not store data in localStorage:', e);
     }
-  }, [pin, router, setCurrentStep]);
+
+    // Show loading state
+    setIsLoading(true);
+
+    // Use window.location for direct navigation instead of Next.js router
+    // This avoids RSC (React Server Component) issues
+    setTimeout(() => {
+      window.location.href = '/Signups/Sconfirm';
+    }, 500);
+  };
+
+  // Handle input for the last digit
+  const handleLastDigitInput = (value: string, index: number) => {
+    if (index === 3 && value.length === 1) {
+      // If this is the last digit and a value was entered
+      const newPin = [...pin];
+      newPin[index] = value;
+      setPin(newPin);
+
+      // Normal input handling without auto-submission
+      // Let the user click the button instead
+    } else {
+      // Normal input handling for other digits
+      handleChange(value, index);
+    }
+  };
 
   return (
     <div className="text-white ml-[100px] mt-[30px]">
@@ -63,7 +114,7 @@ const SecPinBd: React.FC = () => {
             id={`pin-${idx}`}
             maxLength={1}
             value={digit}
-            onChange={(e) => handleChange(e.target.value, idx)}
+            onChange={(e) => handleLastDigitInput(e.target.value, idx)}
             onKeyDown={(e) => handleKeyDown(e, idx)}
             className="w-[70px] h-[56px] ml-[10px] rounded-[10px] border-none bg-[#222222] font-[500] text-center text-[14px] text-[#FCFCFC] focus:outline-none focus:ring-1 focus:ring-[#1ECB84]"
             type="password"
@@ -75,6 +126,16 @@ const SecPinBd: React.FC = () => {
           />
         ))}
       </div>
+
+      {/* Continue button as fallback */}
+      {pin.join('').length === 4 && !isLoading && (
+        <button
+          onClick={handlePinSubmit}
+          className="w-[300px] h-[48px] mt-[30px] bg-[#4DF2BE] text-[#0F1012] rounded-[100px] font-[700]"
+        >
+          Continue
+        </button>
+      )}
 
       {/* Loader below PIN inputs */}
       {isLoading && (

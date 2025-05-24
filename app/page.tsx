@@ -1,48 +1,38 @@
 
 import React from 'react';
-import Signup from './Signups/Email/page';
-import Password from './Signups/Password/page';
-import VerifyEmail from './Signups/VerifyEmail/page';
-import Profile from './Signups/Profile/page';
-import Secpin from './Lsecpin/page'
-import Login from './login/page';
-import Lsecpin from './Lsecpin/page';
-import Lauth from './Lauth/page';
-import Resetp from './Resetp/page';
-import Lverify from './Lverify/page';
-import Lpass from './Lpass/page';
-import Sconfirm from './Signups/Sconfirm/page';
-
-
+import Link from 'next/link';
 
 export default function Home() {
   return (
-   <div  >
-     {/* for signup page */}
-    <div>
-    <Signup /> 
-    <Password />  
-    <VerifyEmail />
-    <Profile/>
-    <Secpin/>
-    <Sconfirm/>
-    </div>
+    <div className="min-h-screen flex flex-col items-center justify-center bg-[#0F1012] text-white">
+      <div className="text-center">
+        <h1 className="text-4xl font-bold mb-6">Welcome to Evolve2p</h1>
+        <p className="text-xl mb-8">Your secure trading platform</p>
 
-    <div>
-      {/* for Login page */}
-
-      <Login />
-      <Lsecpin/>
-      <Lauth />
-      <Resetp/>
-      <Lverify/>
-      <Lpass/>
-      
-
+        <div className="flex gap-4">
+          <Link
+            href="/Signups/Email"
+            className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded"
+          >
+            Sign Up
+          </Link>
+          <Link
+            href="/Logins/login"
+            className="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded"
+          >
+            Login
+          </Link>
+          {/* Alternative login link that will redirect */}
+          {/*
+          <Link
+            href="/login"
+            className="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded"
+          >
+            Login
+          </Link>
+          */}
+        </div>
+      </div>
     </div>
-    
-    </div>
-    
-       
   );
 }

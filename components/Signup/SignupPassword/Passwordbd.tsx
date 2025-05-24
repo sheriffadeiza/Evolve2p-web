@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useSignup } from "@/context/SignupContext";
@@ -16,13 +16,27 @@ const Passwordbd = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [error, setError] = useState("");
+  const [userEmail, setUserEmail] = useState("");
+  const [isMounted, setIsMounted] = useState(false);
+
+  // Safely access localStorage after component mounts
+  useEffect(() => {
+    setIsMounted(true);
+    if (typeof window !== 'undefined') {
+      setUserEmail(localStorage.getItem("userEmail") || "");
+    }
+  }, []);
 
   // Validation checks
-  const isMinLength = password.length >= 6;
+  const isMinLength = password.length >= 6; // Using 6 characters to match backend setting
   const hasNumber = /\d/.test(password);
   const hasSpecialChar = /[!@#$%^&*(),.?":{}|<>]/.test(password);
   const hasUpperLower = /(?=.*[a-z])(?=.*[A-Z])/.test(password);
   const passwordsMatch = password === confirmPassword;
+
+  // Simple check for personal info
+  const emailUsername = userEmail ? userEmail.split('@')[0] : "";
+  const containsPersonalInfo = emailUsername && password.toLowerCase().includes(emailUsername.toLowerCase());
 
   const handleSubmit = () => {
     // Validate password rules
@@ -30,6 +44,12 @@ const Passwordbd = () => {
       setError("Please meet all password requirements");
       return;
     }
+
+    if (containsPersonalInfo) {
+      setError("Password should not contain parts of your email address.");
+      return;
+    }
+
     if (!passwordsMatch) {
       setError("Passwords don't match");
       return;
@@ -38,9 +58,13 @@ const Passwordbd = () => {
     // Clear error
     setError("");
 
-    // Save password in signup context and localStorage
+    // Save password in signup context
     updateSignupData({ password });
-    localStorage.setItem("userPassword", password);
+
+    // Safely use localStorage
+    if (typeof window !== 'undefined') {
+      localStorage.setItem("userPassword", password);
+    }
 
     // Move to next step: verify email
     setCurrentStep("verify");
@@ -127,6 +151,17 @@ const Passwordbd = () => {
           />
           <span className={`${hasUpperLower ? "text-[#FCFCFC]" : "text-[#8F8F8F]"}`}>
             1 uppercase and 1 lowercase letter
+          </span>
+        </li>
+        <li className="flex items-center gap-[5px]">
+          <Image
+            src={!containsPersonalInfo ? checklistActive : checklistInactive}
+            alt="check list"
+            width={16}
+            height={16}
+          />
+          <span className={`${!containsPersonalInfo ? "text-[#FCFCFC]" : "text-[#8F8F8F]"}`}>
+            Doesn't contain parts of your email
           </span>
         </li>
       </ul>

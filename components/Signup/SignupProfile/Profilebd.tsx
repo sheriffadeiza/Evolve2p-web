@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { useSignup } from '@/context/SignupContext';
 import arrow_down from '../../../public/Assets/Evolve2p_arrowd/arrow-down-01.png';
+import { API_ENDPOINTS } from '@/config/api';
 
 const Profilebd = () => {
   const router = useRouter();
@@ -123,12 +124,11 @@ const Profilebd = () => {
         username: formData.username,
         password,
         country: formData.country,
-        phone: phoneNumber,
-        verified: true
+        phone: phoneNumber
       };
 
       // ✅ Backend API call to register the user
-      const res = await fetch('https://evolve2p-backend.onrender.com/api/auth/register', {
+      const res = await fetch(API_ENDPOINTS.REGISTER, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -138,7 +138,31 @@ const Profilebd = () => {
 
       if (!res.ok) {
         const errorData = await res.json();
-        throw new Error(errorData.message || 'Failed to register user');
+        console.error('Registration error response:', errorData);
+
+        // Handle different error formats
+        let errorMessage = 'Failed to register user';
+
+        if (errorData.message) {
+          errorMessage = errorData.message;
+        } else if (errorData.detail) {
+          errorMessage = errorData.detail;
+        } else if (errorData.email) {
+          errorMessage = `Email: ${errorData.email}`;
+        } else if (errorData.username) {
+          errorMessage = `Username: ${errorData.username}`;
+        } else if (errorData.password) {
+          errorMessage = `Password: ${errorData.password}`;
+        } else if (typeof errorData === 'string') {
+          errorMessage = errorData;
+        } else if (Object.keys(errorData).length > 0) {
+          // If there are field-specific errors, format them
+          errorMessage = Object.entries(errorData)
+            .map(([field, errors]) => `${field}: ${Array.isArray(errors) ? errors.join(', ') : errors}`)
+            .join('; ');
+        }
+
+        throw new Error(errorMessage);
       }
 
       updateSignupData(userData);
