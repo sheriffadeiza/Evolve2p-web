@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { useSignup } from '@/context/SignupContext';
 import arrow_down from '../../../public/Assets/Evolve2p_arrowd/arrow-down-01.png';
+import { API_ENDPOINTS } from '@/config/api';
 
 const Profilebd = () => {
   const router = useRouter();
@@ -123,12 +124,11 @@ const Profilebd = () => {
         username: formData.username,
         password,
         country: formData.country,
-        phone: phoneNumber,
-        verified: true
+        phone: phoneNumber
       };
 
       // ✅ Backend API call to register the user
-      const res = await fetch('https://evolve2p-backend.onrender.com/api/auth/register', {
+      const res = await fetch(API_ENDPOINTS.REGISTER, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -138,7 +138,31 @@ const Profilebd = () => {
 
       if (!res.ok) {
         const errorData = await res.json();
-        throw new Error(errorData.message || 'Failed to register user');
+        console.error('Registration error response:', errorData);
+
+        // Handle different error formats
+        let errorMessage = 'Failed to register user';
+
+        if (errorData.message) {
+          errorMessage = errorData.message;
+        } else if (errorData.detail) {
+          errorMessage = errorData.detail;
+        } else if (errorData.email) {
+          errorMessage = `Email: ${errorData.email}`;
+        } else if (errorData.username) {
+          errorMessage = `Username: ${errorData.username}`;
+        } else if (errorData.password) {
+          errorMessage = `Password: ${errorData.password}`;
+        } else if (typeof errorData === 'string') {
+          errorMessage = errorData;
+        } else if (Object.keys(errorData).length > 0) {
+          // If there are field-specific errors, format them
+          errorMessage = Object.entries(errorData)
+            .map(([field, errors]) => `${field}: ${Array.isArray(errors) ? errors.join(', ') : errors}`)
+            .join('; ');
+        }
+
+        throw new Error(errorMessage);
       }
 
       updateSignupData(userData);
@@ -185,18 +209,18 @@ const Profilebd = () => {
       {/* Username Input */}
       <div className="mt-[20px]">
         <label className="text-[14px] mt-2 font-[500] text-[#8F8F8F]">Username</label>
-        <div className={`relative w-[370px] rounded-t-[10px] ${usernameStatus === 'invalid' ? 'border border-[#F5918A]' : 'border border-[#2E2E2E]'}`}>
+        <div className={`relative w-[388px] rounded-t-[10px] ${usernameStatus === 'invalid' ? 'border border-[#F5918A]' : 'border border-[#2E2E2E]'}`}>
           <span className='text-[#DBDBDB] absolute ml-[10px] mt-[18px]'>@</span>
           <input
             type="text"
             value={formData.username}
             onChange={handleUsernameChange}
-            className="w-[343px] h-[56px] text-[#FCFCFC] rounded-t-[10px] px-4 py-3 bg-[#222222] border-none pl-[25px] focus:outline-none"
+            className="w-[360px] h-[56px] text-[#FCFCFC] rounded-t-[10px] px-4 py-3 bg-[#222222] border-none pl-[25px] focus:outline-none"
             required
             disabled={isLoadingCountries}
           />
         </div>
-        <div className={`w-[350px] h-[30px] pl-[20px] flex items-center px-4 bg-[#222222] rounded-b-[10px] ${usernameStatus === 'invalid' ? 'border border-[#F5918A] border-t-0' : 'border border-[#2E2E2E] border-t-0'}`}>
+        <div className={`w-[368px] h-[30px] pl-[20px] flex items-center px-4 bg-[#222222] rounded-b-[10px] ${usernameStatus === 'invalid' ? 'border border-[#F5918A] border-t-0' : 'border border-[#2E2E2E] border-t-0'}`}>
           {usernameStatus === 'checking' && <span className="text-[12px] text-[#8F8F8F]">Checking username...</span>}
           {usernameStatus === 'valid' && <span className="text-[12px] text-[#1ECB84]">Username available</span>}
           {usernameStatus === 'invalid' && (
@@ -232,7 +256,7 @@ const Profilebd = () => {
                 )}
               </div>
               <select
-                className="w-[370px] h-[56px] bg-[#222222] mt-[10px] pl-[35px] pr-12 border border-[#2E2E2E] rounded-[10px] text-[14px] font-[500] text-[#FCFCFC] appearance-none"
+                className="w-[385px] h-[56px] bg-[#222222] mt-[10px] pl-[35px] pr-12 border border-[#2E2E2E] rounded-[10px] text-[14px] font-[500] text-[#FCFCFC] appearance-none"
                 value={formData.countryCode}
                 onChange={(e) => {
                   const selected = countries.find(c => c.code === e.target.value);
@@ -269,7 +293,7 @@ const Profilebd = () => {
 
       {/* Phone Input */}
       <label className="text-[14px] mt-[30px] font-[500] text-[#8F8F8F] mb-2">Phone number</label>
-      <div className={`flex items-center pl-[10px] w-[360px] mt-[10px] bg-[#222222] border rounded-[10px] ${formData.phone.trim() === '' ? 'border-[#F5918A]' : 'border-[#2E2E2E]'}`}>
+      <div className={`flex items-center pl-[10px] w-[375px] mt-[10px] bg-[#222222] border rounded-[10px] ${formData.phone.trim() === '' ? 'border-[#F5918A]' : 'border-[#2E2E2E]'}`}>
         <span className="text-[#DBDBDB] w-[51px] h-[24px] pt-[5px] text-center text-[14px] font-[500] bg-[#3A3A3A] px-4 py-4 rounded-[100px]">
           {countries.find(c => c.code === formData.countryCode)?.dialCode || '+234'}
         </span>
@@ -290,7 +314,7 @@ const Profilebd = () => {
       {/* Continue Button */}
       <button
         onClick={handleSubmit}
-        className={`w-[370px] h-[48px] border-[#4DF2BE] bg-[#2DE3A3] text-[#0F1012] text-[14px] font-[700] mt-[40px] py-3 rounded-full font-medium hover:opacity-90 transition flex items-center justify-center ${
+        className={`w-[388px] h-[48px] border-none bg-[#2DE3A3] text-[#0F1012] text-[14px] font-[700] mt-[40px] py-3 rounded-full font-medium hover:opacity-90 transition flex items-center justify-center ${
           !allFieldsValid() || isLoading ? 'opacity-50 cursor-not-allowed' : ''
         }`}
         disabled={!allFieldsValid() || isLoading}

@@ -2,12 +2,12 @@
 
 import { createContext, useContext, useState, ReactNode, useEffect } from 'react';
 
-type LoginStep = 'LoginE&P' | 'LoginSecpin';
+type LoginStep = 'LoginE&P' | 'LoginSecpin' | 'LoginAuth';
 
 interface UserData {
     email: string;
     username?: string;
-    password?: string; // Made optional since we shouldn't store passwords in context/localStorage
+    password: string; 
     country?: string;
     phone?: string;
     verified?: boolean;
@@ -103,4 +103,4 @@ export const useLogin = () => {
     throw new Error('useLogin must be used within a LoginProvider');
   }
   return context;
-};
+};      

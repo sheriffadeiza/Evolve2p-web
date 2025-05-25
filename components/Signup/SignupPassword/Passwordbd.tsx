@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useSignup } from "@/context/SignupContext";
@@ -16,13 +16,27 @@ const Passwordbd = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [error, setError] = useState("");
+  const [userEmail, setUserEmail] = useState("");
+  const [isMounted, setIsMounted] = useState(false);
+
+  // Safely access localStorage after component mounts
+  useEffect(() => {
+    setIsMounted(true);
+    if (typeof window !== 'undefined') {
+      setUserEmail(localStorage.getItem("userEmail") || "");
+    }
+  }, []);
 
   // Validation checks
-  const isMinLength = password.length >= 6;
+  const isMinLength = password.length >= 6; // Using 6 characters to match backend setting
   const hasNumber = /\d/.test(password);
   const hasSpecialChar = /[!@#$%^&*(),.?":{}|<>]/.test(password);
   const hasUpperLower = /(?=.*[a-z])(?=.*[A-Z])/.test(password);
   const passwordsMatch = password === confirmPassword;
+
+  // Simple check for personal info
+  const emailUsername = userEmail ? userEmail.split('@')[0] : "";
+  const containsPersonalInfo = emailUsername && password.toLowerCase().includes(emailUsername.toLowerCase());
 
   const handleSubmit = () => {
     // Validate password rules
@@ -30,6 +44,12 @@ const Passwordbd = () => {
       setError("Please meet all password requirements");
       return;
     }
+
+    if (containsPersonalInfo) {
+      setError("Password should not contain parts of your email address.");
+      return;
+    }
+
     if (!passwordsMatch) {
       setError("Passwords don't match");
       return;
@@ -38,9 +58,13 @@ const Passwordbd = () => {
     // Clear error
     setError("");
 
-    // Save password in signup context and localStorage
+    // Save password in signup context
     updateSignupData({ password });
-    localStorage.setItem("userPassword", password);
+
+    // Safely use localStorage
+    if (typeof window !== 'undefined') {
+      localStorage.setItem("userPassword", password);
+    }
 
     // Move to next step: verify email
     setCurrentStep("verify");
@@ -67,7 +91,7 @@ const Passwordbd = () => {
             setPassword(e.target.value);
             if (error) setError("");
           }}
-          className={`w-[350px] h-[56px] mt-[10px] bg-[#222222] text-[#DBDBDB] text-[14px] font-[500] mb-4 pl-[15px] pr-10 focus:outline-none rounded-[10px] border-2 ${
+          className={`w-[380px] h-[56px] mt-[10px] bg-[#222222] text-[#DBDBDB] text-[14px] font-[500] mb-4 pl-[15px] pr-10 focus:outline-none rounded-[10px] border-2 ${
             error && (!isMinLength || !hasNumber || !hasSpecialChar || !hasUpperLower)
               ? "border-[#F5918A]"
               : "border-[#222222]"
@@ -129,6 +153,7 @@ const Passwordbd = () => {
             1 uppercase and 1 lowercase letter
           </span>
         </li>
+      
       </ul>
 
       <label className="block text-[14px] mt-[20px] font-[500] text-[#8F8F8F] mb-1">Confirm password</label>
@@ -140,7 +165,7 @@ const Passwordbd = () => {
             setConfirmPassword(e.target.value);
             if (error) setError("");
           }}
-          className={`w-[350px] h-[56px] bg-[#222222] mt-[10px] text-[#DBDBDB] text-[14px] mb-4 pl-[15px] font-[500] pr-10 rounded-[10px] focus:outline-none border-2 ${
+          className={`w-[380px] h-[56px] bg-[#222222] mt-[10px] text-[#DBDBDB] text-[14px] mb-4 pl-[15px] font-[500] pr-10 rounded-[10px] focus:outline-none border-2 ${
             error && !passwordsMatch ? "border-[#F5918A]" : "border-[#222222]"
           }`}
           placeholder="Re-enter your password"

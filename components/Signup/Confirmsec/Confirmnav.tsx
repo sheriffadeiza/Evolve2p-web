@@ -16,7 +16,7 @@ const Confirmnav = () => {
   };
 
   return (
-    <div className="flex gap-[45%] mt-[100px] items-center ml-[70px] p-[12px_20px]">
+    <div className="flex gap-[40%] mt-[100px] items-center ml-[70px] p-[12px_20px]">
       <button
         onClick={handleGoBack}
         className="border-0 bg-transparent cursor-pointer"

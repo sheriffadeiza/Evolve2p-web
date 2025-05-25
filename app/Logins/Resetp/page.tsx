@@ -1,7 +1,7 @@
 
 
 import React from 'react';
-import Header from '../../components/Signup/SignupEmail/Header';
+import Header from '@/components/Signup/SignupEmail/Header';
 import Resetpnav from '@/components/Login/LoginReset/Resetpnav';
 import Resetpbd from '@/components/Login/LoginReset/Resetpbd';
 

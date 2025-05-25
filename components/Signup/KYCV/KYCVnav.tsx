@@ -16,7 +16,7 @@ const KYCVnav = () => {
   };
 
   return (
-    <div className="flex gap-[55%] mt-[100px] items-center ml-[50px] p-[12px_20px]">
+    <div className="flex gap-[48%] mt-[100px] items-center ml-[50px] p-[12px_20px]">
       <button 
         onClick={handleGoBack}
         className="border-0 bg-transparent cursor-pointer"
@@ -24,7 +24,7 @@ const KYCVnav = () => {
         <Image 
           src={image} 
           alt="Go back" 
-          width={50} 
+          width={60} 
           height={25} 
         />
       </button>

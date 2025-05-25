@@ -16,7 +16,7 @@ const Emailvernav = () => {
   };
 
   return (
-    <div className="flex gap-[55%] mt-[100px] items-center ml-[40px] p-[12px_20px]">
+    <div className="flex gap-[46%] mt-[100px] items-center ml-[95px] p-[12px_20px]">
       <button
         onClick={handleGoBack}
         className="border-0 bg-transparent cursor-pointer"

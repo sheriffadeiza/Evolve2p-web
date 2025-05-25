@@ -6,9 +6,13 @@
     "dev": "next dev --turbopack",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "use-dev-api": "node scripts/toggle-api-env.js dev",
+    "use-prod-api": "node scripts/toggle-api-env.js prod",
+    "toggle-api": "node scripts/toggle-api-env.js"
   },
   "dependencies": {
+    "framer-motion": "^12.12.2",
     "next": "15.3.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
