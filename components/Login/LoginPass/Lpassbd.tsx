@@ -41,12 +41,55 @@ const Lpassbd = () => {
     }
 
     setIsLoading(true);
-    
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1500));
-    
-    setIsLoading(false);
-    setShowSuccessModal(true);
+
+    try {
+      const email = typeof window !== 'undefined' ? localStorage.getItem('reset_email') || '' : '';
+      if (!email) {
+        setError("No email found for password reset.");
+        setIsLoading(false);
+        return;
+      }
+
+      // Fetch user details (username, country, phone, verified) from backend
+      const userRes = await fetch(`https://evolve2p-backend.onrender.com/api/get-user?email=${encodeURIComponent(email)}`);
+      const userData = await userRes.json();
+
+      if (!userRes.ok) {
+        setError(userData.detail || userData.message || 'Failed to fetch user details.');
+        setIsLoading(false);
+        return;
+      }
+
+      // Prepare request body for update
+      const updateBody = {
+        email: email,
+        username: userData.username || "",
+        password: password,
+        country: userData.country || "",
+        verified: true,
+        phone: userData.phone || ""
+      };
+
+      const res = await fetch('https://evolve2p-backend.onrender.com/api/update-user', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updateBody),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        setError(data.detail || data.message || 'Failed to update password. Please try again.');
+        setIsLoading(false);
+        return;
+      }
+
+      setShowSuccessModal(true);
+    } catch {
+      setError('Network error. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleGoToLogin = () => {

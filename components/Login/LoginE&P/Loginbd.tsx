@@ -1,29 +1,21 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { useLogin } from '@/context/LoginContext';
 import Image from 'next/image';
 import image from '../../../public/Assets/Evolve2p_viewslash/view-off-slash.png';
-import { extractErrorMessage } from '@/Utils/errorHandler';
-import { API_ENDPOINTS, API_ENV } from '@/config/api';
+
+const LOGIN_ENDPOINT = 'https://evolve2p-backend.onrender.com/api/auth/login';
 
 const Loginbd: React.FC = () => {
   const router = useRouter();
+  const { setUser } = useLogin();
   const [showPassword, setShowPassword] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [apiInfo, setApiInfo] = useState({ baseUrl: '', isLocal: false });
-
-  // Display API environment information on component mount
-  useEffect(() => {
-    setApiInfo({
-      baseUrl: API_ENV.apiUrl,
-      isLocal: API_ENV.isLocal
-    });
-    console.log('API Environment:', API_ENV);
-  }, []);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -37,106 +29,57 @@ const Loginbd: React.FC = () => {
     setLoading(true);
 
     try {
-      console.log(`Attempting login with API endpoint: ${API_ENDPOINTS.LOGIN}`);
+      const response = await fetch(LOGIN_ENDPOINT, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+      });
 
-      // Define responseData at a higher scope
-      let responseData: any = null;
+      const data = await response.json();
 
-      try {
-        const response = await fetch(API_ENDPOINTS.LOGIN, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email, password }),
-        });
-
-        try {
-          responseData = await response.json();
-        } catch (jsonError) {
-          // Handle non-JSON responses
-          const textResponse = await response.text();
-          responseData = {
-            message: textResponse || 'Server returned an invalid response format'
-          };
-        }
-
-        console.log('Login response status:', response.status);
-
-        // Check if the response indicates email verification is required
-        if (response.status === 403 && responseData.email_verified === false) {
-          console.log('Email not verified, redirecting to verification page');
-
-          // Store email for verification page
-          localStorage.setItem('unverified_email', email);
-
-          // Redirect to email verification page
-          router.push('/Logins/verify-email');
-          return;
-        }
-
-        if (!response.ok) {
-          // Use our enhanced error handler to get a user-friendly message
-          throw new Error(extractErrorMessage(responseData));
-        }
-      } catch (fetchError) {
-        // Handle network errors
-        if (fetchError instanceof TypeError && fetchError.message.includes('fetch')) {
-          throw new Error('Network error. Please check your internet connection and try again.');
-        }
-        throw fetchError;
+      if (!response.ok) {
+        setError(data.detail || data.message || 'Invalid email or password. Please check your credentials and try again.');
+        setLoading(false);
+        return;
       }
-      const authToken = responseData.token || responseData.accessToken;
-      if (authToken) {
-        // Store user data including verification status
-        const userData = {
-          email,
-          is_verified: responseData.user?.is_verified || true,
-          username: responseData.user?.username || '',
-          id: responseData.user?.id || ''
-        };
 
-        localStorage.setItem('token', authToken);
-        localStorage.setItem('user', JSON.stringify(userData));
+      // Try to get the token from the response or from localStorage
+      let token = data.access_token || data.token;
+      if (!token) {
+        token = localStorage.getItem('access_token');
+      } else {
+        localStorage.setItem('access_token', token);
+      }
 
-        // Redirect to security PIN page
+      if (token) {
+        // Remove password before storing user in context and localStorage
+        const userWithPassword = { ...(data.user || {}), email };
+        setUser(userWithPassword);
+        localStorage.setItem('user', JSON.stringify(userWithPassword));
+        localStorage.setItem('loginEmail', email);
+
         router.push('/Logins/Lsecpin');
       } else {
-        throw new Error('No authentication token received');
+        setError('No authentication token received. Please contact support.');
       }
-    } catch (err: unknown) {
-      setError(extractErrorMessage(err));
+    } catch (err: any) {
+      setError('Network error. Please try again.');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleForgotPassword = async () => {
+  const handleForgotPassword = () => {
     if (!email) {
       setError('Please enter your email first');
       return;
     }
-
-    setLoading(true);
-    try {
-      console.log(`Attempting password reset with API endpoint: ${API_ENDPOINTS.FORGOT_PASSWORD}`);
-
-      const response = await fetch(API_ENDPOINTS.FORGOT_PASSWORD, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email }),
-      });
-
-      alert('Password reset link sent');
-      setError('');
-    } catch (err: unknown) {
-      setError(extractErrorMessage(err));
-    } finally {
-      setLoading(false);
-    }
+    localStorage.setItem('reset_email', email);
+    router.push('/Logins/Resetp');
   };
 
   return (
     <div className="text-white max-w-md ml-[100px] w-full mx-auto">
-
       <h2 className="text-[24px] font-[700] text-[#FCFCFC]">Welcome Back!</h2>
       <p className="text-[16px] font-[400] mt-[-10px] text-[#8F8F8F]">
         Log in to continue trading securely.
@@ -147,9 +90,6 @@ const Loginbd: React.FC = () => {
           <div className="flex items-start">
             <div>
               <p className="text-sm mt-1">{error}</p>
-              {error.includes('temporarily unavailable') && (
-                <p className="text-xs mt-2 text-[#8F8F8F]">Our team has been notified and is working to resolve this issue.</p>
-              )}
             </div>
           </div>
         </div>

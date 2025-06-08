@@ -2,10 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import Image from 'next/image';
 import { useSignup } from '@/context/SignupContext';
-import arrow_down from '../../../public/Assets/Evolve2p_arrowd/arrow-down-01.png';
-import { API_ENDPOINTS } from '@/config/api';
 
 const Profilebd = () => {
   const router = useRouter();
@@ -18,7 +15,7 @@ const Profilebd = () => {
     phone: ''
   });
 
-  const [countries, setCountries] = useState([]);
+  const [countries, setCountries] = useState<any[]>([]);
   const [usernameStatus, setUsernameStatus] = useState('');
   const [isValidUsername, setIsValidUsername] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -33,17 +30,17 @@ const Profilebd = () => {
         const response = await fetch('https://restcountries.com/v3.1/all');
         const data = await response.json();
 
-        const formattedCountries = data.map((country) => ({
+        const formattedCountries = data.map((country: any) => ({
           name: country.name.common,
           code: country.cca2,
           dialCode: country.idd?.root
             ? `${country.idd.root}${country.idd.suffixes?.[0] || ''}`
             : '+1'
-        })).sort((a, b) => a.name.localeCompare(b.name));
+        })).sort((a: any, b: any) => a.name.localeCompare(b.name));
 
         setCountries(formattedCountries);
 
-        const nigeria = formattedCountries.find(c => c.code === 'NG');
+        const nigeria = formattedCountries.find((c: any) => c.code === 'NG');
         if (nigeria) {
           setFormData(prev => ({
             ...prev,
@@ -99,7 +96,7 @@ const Profilebd = () => {
 
   const handleContinueToSecurityPin = () => {
     setShowSuccessModal(false);
-    setCurrentStep('security-pin');
+    setCurrentStep('secpin');
     router.push('/Signups/Secpin');
   };
 
@@ -109,70 +106,90 @@ const Profilebd = () => {
     setErrorMessage('');
 
     try {
+      // Get email and password from localStorage
       const email = localStorage.getItem('userEmail') || '';
       const password = localStorage.getItem('userPassword') || '';
 
-      if (!email || !password) {
-        throw new Error('Session expired. Please start over.');
+      // Validate email
+      const isValidEmail = (email: string) => /\S+@\S+\.\S+/.test(email);
+      if (!email || !isValidEmail(email)) {
+        throw new Error('Session expired or invalid email. Please start over.');
       }
 
       const selectedCountry = countries.find(c => c.code === formData.countryCode);
       const phoneNumber = selectedCountry ? `${selectedCountry.dialCode}${formData.phone}` : formData.phone;
 
       const userData = {
-        email,
+        email: email,
         username: formData.username,
-        password,
+        password: password,
         country: formData.country,
-        phone: phoneNumber
+        verified: true,
+        phone: phoneNumber,
+        
       };
 
-      // ✅ Backend API call to register the user
-      const res = await fetch(API_ENDPOINTS.REGISTER, {
+      // Get token if it exists (for example, if user is updating profile)
+      const token = localStorage.getItem('access_token') || '';
+      if (token) {
+        console.log("Sending profile with token:", token);
+      }
+
+      // Send profile data to backend with Authorization header if token exists
+      const res = await fetch('https://evolve2p-backend.onrender.com/api/auth/register', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          ...(token && { 'Authorization': `Bearer ${token}` }),
         },
         body: JSON.stringify(userData),
       });
 
-      if (!res.ok) {
-        const errorData = await res.json();
-        console.error('Registration error response:', errorData);
+      const responseData = await res.json().catch(() => ({}));
 
-        // Handle different error formats
-        let errorMessage = 'Failed to register user';
+      if (res.status === 201) {
+        // Store access_token if present in response
+        if (responseData.access_token) {
+          localStorage.setItem('access_token', responseData.access_token);
+          console.log("Access token saved:", responseData.access_token);
+        }
+        updateSignupData(userData);
+        // Save the full user profile including email
+        localStorage.setItem('userProfile', JSON.stringify(userData));
+        localStorage.removeItem('userEmail');
+        localStorage.removeItem('userPassword');
+        setShowSuccessModal(true);
+      } else {
+        let errorMessage = 'Failed to complete registration';
 
-        if (errorData.message) {
-          errorMessage = errorData.message;
-        } else if (errorData.detail) {
-          errorMessage = errorData.detail;
-        } else if (errorData.email) {
-          errorMessage = `Email: ${errorData.email}`;
-        } else if (errorData.username) {
-          errorMessage = `Username: ${errorData.username}`;
-        } else if (errorData.password) {
-          errorMessage = `Password: ${errorData.password}`;
-        } else if (typeof errorData === 'string') {
-          errorMessage = errorData;
-        } else if (Object.keys(errorData).length > 0) {
-          // If there are field-specific errors, format them
-          errorMessage = Object.entries(errorData)
+        if (typeof responseData.message === 'string') {
+          errorMessage = responseData.message;
+        } else if (Array.isArray(responseData.message)) {
+          errorMessage = responseData.message.join(', ');
+        } else if (typeof responseData.detail === 'string') {
+          errorMessage = responseData.detail;
+        } else if (Array.isArray(responseData.detail)) {
+          errorMessage = responseData.detail.join(', ');
+        } else if (typeof responseData.detail === 'object' && responseData.detail !== null) {
+          errorMessage = Object.entries(responseData.detail)
             .map(([field, errors]) => `${field}: ${Array.isArray(errors) ? errors.join(', ') : errors}`)
             .join('; ');
+        } else if (typeof responseData === 'string') {
+          errorMessage = responseData;
+        } else if (Object.keys(responseData).length > 0) {
+          errorMessage = JSON.stringify(responseData);
+        }
+
+        if (
+          errorMessage.toLowerCase().includes('profile is already completed') ||
+          errorMessage.toLowerCase().includes('already registered')
+        ) {
+          errorMessage = "This email is already registered. Please log in instead.";
         }
 
         throw new Error(errorMessage);
       }
-
-      updateSignupData(userData);
-      localStorage.setItem('userProfile', JSON.stringify(userData));
-      localStorage.removeItem('userEmail');
-      localStorage.removeItem('userPassword');
-
-      setShowSuccessModal(true);
     } catch (error: any) {
-      console.error('Registration error:', error);
       setErrorMessage(error.message || 'Failed to complete registration. Please try again.');
     } finally {
       setIsLoading(false);
@@ -278,14 +295,6 @@ const Profilebd = () => {
                   </option>
                 ))}
               </select>
-              <div className="absolute text-[#DBDBDB] right-[-20px] top-[40px] -translate-y-1/2 pointer-events-none">
-                <Image
-                  src={arrow_down}
-                  alt="Select arrow"
-                  width={20}
-                  height={20}
-                />
-              </div>
             </>
           )}
         </div>

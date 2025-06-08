@@ -5,13 +5,12 @@ import { createContext, useContext, useState, ReactNode, useEffect } from 'react
 type LoginStep = 'LoginE&P' | 'LoginSecpin' | 'LoginAuth';
 
 interface UserData {
-    email: string;
-    username?: string;
-    password: string; 
-    country?: string;
-    phone?: string;
-    verified?: boolean;
-    pin?: string;
+  email: string;
+  username?: string;
+  password: string;
+  country?: string;
+  phone?: string;
+  verified?: boolean;
 }
 
 interface LoginContextType {
@@ -87,7 +86,8 @@ export const LoginProvider = ({ children }: { children: ReactNode }) => {
   };
 
   useEffect(() => {
-    console.log('User context updated:', user);
+    // For debugging: log user context changes
+    // console.log('User context updated:', user);
   }, [user]);
 
   return (
@@ -103,4 +103,4 @@ export const useLogin = () => {
     throw new Error('useLogin must be used within a LoginProvider');
   }
   return context;
-};      
+};

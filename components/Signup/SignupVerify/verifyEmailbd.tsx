@@ -2,9 +2,11 @@
 
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { API_ENDPOINTS, API_ENV } from "@/config/api";
 
-const VerifyEmailBody: React.FC = () => {
+const VERIFY_EMAIL_ENDPOINT = "https://evolve2p-backend.onrender.com/api/verify-email";
+const SEND_OTP_ENDPOINT = "https://evolve2p-backend.onrender.com/api/send-otp";
+
+const VerifyEmailbd: React.FC = () => {
   const router = useRouter();
   const [pin, setPin] = useState<string[]>(["", "", "", "", "", ""]);
   const [isLoading, setIsLoading] = useState(false);
@@ -13,7 +15,7 @@ const VerifyEmailBody: React.FC = () => {
   const [resendTimer, setResendTimer] = useState(30);
   const [canResend, setCanResend] = useState(false);
 
-  // Initialize email and send OTP on mount
+  // On mount: get email and send OTP
   useEffect(() => {
     const userEmail = localStorage.getItem("userEmail");
     if (userEmail) {
@@ -22,88 +24,68 @@ const VerifyEmailBody: React.FC = () => {
     } else {
       router.push("/Signups/Email");
     }
-
-    // Start resend timer
-    const timer = setInterval(() => {
-      setResendTimer((prev) => {
-        if (prev <= 1) {
-          clearInterval(timer);
-          setCanResend(true);
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-
-    return () => clearInterval(timer);
+    // eslint-disable-next-line
   }, [router]);
 
-  // Send OTP function
+  // Timer for resend button
+  useEffect(() => {
+    if (!canResend && resendTimer > 0) {
+      const timer = setInterval(() => {
+        setResendTimer((prev) => {
+          if (prev <= 1) {
+            clearInterval(timer);
+            setCanResend(true);
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+      return () => clearInterval(timer);
+    }
+  }, [canResend, resendTimer]);
+
+  // Send or Resend OTP
   const sendOTP = async (email: string) => {
     setIsLoading(true);
     setError("");
-
     try {
-      console.log(`Sending OTP to ${email} with endpoint: ${API_ENDPOINTS.SEND_OTP}`);
-      console.log(`API_BASE_URL: ${API_ENV.apiUrl}`);
-      console.log(`Environment: ${API_ENV.isLocal ? 'Development' : 'Production'}`);
+      const response = await fetch(SEND_OTP_ENDPOINT, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Accept": "application/json",
+        },
+        body: JSON.stringify({ email }),
+      });
 
-      // Add a timestamp to prevent caching
-      const timestamp = new Date().getTime();
-      const urlWithTimestamp = `${API_ENDPOINTS.SEND_OTP}?_=${timestamp}`;
-
-      const response = await fetch(
-        urlWithTimestamp,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "Accept": "application/json",
-            "Cache-Control": "no-cache, no-store, must-revalidate",
-            "Pragma": "no-cache"
-          },
-          body: JSON.stringify({ email }),
-        }
-      );
-
-      console.log(`Response status: ${response.status}`);
-      console.log(`Response headers:`, Object.fromEntries([...response.headers.entries()]));
-
-      // Check if response is JSON
-      const contentType = response.headers.get("content-type");
-      if (!contentType || !contentType.includes("application/json")) {
-        console.error("Response is not JSON:", contentType);
-        const text = await response.text();
-        console.error("Response text:", text);
-
-        // Try to parse the response as JSON anyway (sometimes content-type is wrong)
-        try {
-          return JSON.parse(text);
-        } catch (parseError) {
-          console.error("Failed to parse response as JSON:", parseError);
-          throw new Error("Server returned non-JSON response. Please try again later.");
-        }
+      let data;
+      try {
+        data = await response.json();
+      } catch {
+        data = {};
       }
-
-      const data = await response.json();
-      console.log("Response data:", data);
 
       if (!response.ok) {
-        throw new Error(data.message || data.detail || "Failed to send OTP");
-      }
-
-      // If the response includes the OTP code (for development), log it
-      if (data.code) {
-        console.log(`OTP code for testing: ${data.code}`);
+        let msg =
+          typeof data.message === "string"
+            ? data.message
+            : typeof data.detail === "string"
+            ? data.detail
+            : JSON.stringify(data);
+        throw new Error(msg || "Failed to send code");
       }
     } catch (err: any) {
-      console.error("Send OTP error:", err);
-      setError(err.message || "Failed to send verification code");
+      setError(
+        typeof err.message === "string"
+          ? err.message
+          : JSON.stringify(err.message) || "Failed to send code"
+      );
     } finally {
       setIsLoading(false);
     }
   };
 
+  // Handle PIN input
   const handleChange = (val: string, idx: number) => {
     if (!/^\d?$/.test(val)) return;
 
@@ -122,76 +104,56 @@ const VerifyEmailBody: React.FC = () => {
     }
   };
 
+  // Verify OTP
   const verifyCode = async (code: string) => {
     setIsLoading(true);
     setError("");
 
     try {
-      console.log(`Verifying code with endpoint: ${API_ENDPOINTS.VERIFY_EMAIL}`);
-      console.log(`API_BASE_URL: ${API_ENV.apiUrl}`);
-      console.log(`Environment: ${API_ENV.isLocal ? 'Development' : 'Production'}`);
+      const response = await fetch(VERIFY_EMAIL_ENDPOINT, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Accept": "application/json",
+        },
+        body: JSON.stringify({
+          email: email,
+          otp_code: code,
+        }),
+      });
 
-      // Add a timestamp to prevent caching
-      const timestamp = new Date().getTime();
-      const urlWithTimestamp = `${API_ENDPOINTS.VERIFY_EMAIL}?_=${timestamp}`;
-
-      const response = await fetch(
-        urlWithTimestamp,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "Accept": "application/json",
-            "Cache-Control": "no-cache, no-store, must-revalidate",
-            "Pragma": "no-cache"
-          },
-          body: JSON.stringify({
-            email: email,
-            verificationCode: code,
-          }),
-        }
-      );
-
-      console.log(`Response status: ${response.status}`);
-      console.log(`Response headers:`, Object.fromEntries([...response.headers.entries()]));
-
-      // Check if response is JSON
-      const contentType = response.headers.get("content-type");
-      if (!contentType || !contentType.includes("application/json")) {
-        console.error("Response is not JSON:", contentType);
-        const text = await response.text();
-        console.error("Response text:", text);
-
-        // Try to parse the response as JSON anyway (sometimes content-type is wrong)
-        try {
-          return JSON.parse(text);
-        } catch (parseError) {
-          console.error("Failed to parse response as JSON:", parseError);
-          throw new Error("Server returned non-JSON response. Please try again later.");
-        }
+      let data;
+      try {
+        data = await response.json();
+      } catch {
+        data = {};
       }
-
-      const data = await response.json();
-      console.log("Response data:", data);
 
       if (!response.ok) {
-        throw new Error(data.message || data.detail || "Verification failed");
+        let msg = "Verification failed";
+        if (Array.isArray(data.detail) && data.detail.length > 0 && data.detail[0].msg) {
+          msg = data.detail[0].msg;
+        } else if (typeof data.message === "string") {
+          msg = data.message;
+        } else if (typeof data.detail === "string") {
+          msg = data.detail;
+        } else {
+          msg = JSON.stringify(data);
+        }
+        throw new Error(msg);
       }
 
-      // Store verification status
       localStorage.setItem("email_verified", "true");
-
-      // Show success message
-      setError(""); // Clear any previous errors
-
-      // Add a small delay before redirecting
+      setError("");
       setTimeout(() => {
-        // On success navigate to Profile page (next step)
         router.push("/Signups/Profile");
       }, 1000);
     } catch (err: any) {
-      console.error("Verification error:", err);
-      setError(err.message || "Invalid verification code. Please try again.");
+      let msg = "Invalid verification code. Please try again.";
+      if (err?.message) {
+        msg = typeof err.message === "string" ? err.message : JSON.stringify(err.message);
+      }
+      setError(msg);
       setPin(["", "", "", "", "", ""]);
       const firstInput = document.getElementById("pin-0");
       if (firstInput) (firstInput as HTMLInputElement).focus();
@@ -200,33 +162,15 @@ const VerifyEmailBody: React.FC = () => {
     }
   };
 
+  // Resend OTP
   const handleResendCode = async () => {
     if (!canResend) return;
-
     setIsLoading(true);
     setError("");
     setCanResend(false);
     setResendTimer(30);
 
-    try {
-      await sendOTP(email);
-
-      const timer = setInterval(() => {
-        setResendTimer((prev) => {
-          if (prev <= 1) {
-            clearInterval(timer);
-            setCanResend(true);
-            return 0;
-          }
-          return prev - 1;
-        });
-      }, 1000);
-    } catch (err: any) {
-      setError(err.message || "Failed to resend verification code");
-      setCanResend(true);
-    } finally {
-      setIsLoading(false);
-    }
+    await sendOTP(email);
   };
 
   return (
@@ -247,7 +191,7 @@ const VerifyEmailBody: React.FC = () => {
             key={idx}
             id={`pin-${idx}`}
             maxLength={1}
-            value={digit}
+            value={pin[idx]}
             onChange={(e) => handleChange(e.target.value, idx)}
             className="w-[55px] h-[56px] rounded-[10px] border-none bg-[#222222] text-center text-[14px] font-[500] text-[#FCFCFC] focus:outline-none focus:ring-1 focus:ring-[#4DF2BE]"
             type="password"
@@ -262,9 +206,9 @@ const VerifyEmailBody: React.FC = () => {
         Didn't receive code?{" "}
         <button
           onClick={handleResendCode}
-          disabled={!canResend}
+          disabled={!canResend || isLoading}
           className={`text-[#FFFFFF] w-[149px] h-[40px] text-[14px] ml-[10px] rounded-[100px] bg-[#222222] border-none font-[700] hover:underline ${
-            !canResend ? "opacity-50 cursor-not-allowed" : ""
+            !canResend || isLoading ? "opacity-50 cursor-not-allowed" : ""
           }`}
         >
           {canResend ? "Resend code" : `Resend code ${resendTimer}s`}
@@ -274,7 +218,6 @@ const VerifyEmailBody: React.FC = () => {
       {isLoading && (
         <div className="fixed inset-0 flex ml-[15%] mt-[30px] items-center justify-center bg-black bg-opacity-50 z-50">
           <div className="loader"></div>
-
           <style jsx global>{`
             .loader {
               width: 30px;
@@ -308,4 +251,4 @@ const VerifyEmailBody: React.FC = () => {
   );
 };
 
-export default VerifyEmailBody;
+export default VerifyEmailbd;

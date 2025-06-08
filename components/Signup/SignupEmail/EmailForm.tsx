@@ -30,13 +30,12 @@ const EmailForm = () => {
     setError('');
 
     try {
-      // Only store email locally & in context, no API call here
+      // Store email locally & in context, no API call here
       updateSignupData({ email });
       localStorage.setItem('userEmail', email);
 
       setCurrentStep('password');
       router.push('/Signups/Password');
-
     } catch (err: any) {
       console.error('Error saving email:', err);
       setError(err?.message || 'Something went wrong. Please try again.');

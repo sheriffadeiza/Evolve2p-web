@@ -7,7 +7,7 @@ import Lauthnav from '@/components/Login/LoginAuth/Lauthnav';
 import Lauthbd from '@/components/Login/LoginAuth/Lauthbd';
 
 
-
+ 
   const page = () => {
   return (
        <div className="min-h-screen flex flex-col bg-[#0F1012]">

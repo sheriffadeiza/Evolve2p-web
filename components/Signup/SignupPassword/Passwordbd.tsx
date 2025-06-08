@@ -17,58 +17,63 @@ const Passwordbd = () => {
   const [showConfirm, setShowConfirm] = useState(false);
   const [error, setError] = useState("");
   const [userEmail, setUserEmail] = useState("");
-  const [isMounted, setIsMounted] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
 
-  // Safely access localStorage after component mounts
+  // Get email from localStorage on mount
   useEffect(() => {
-    setIsMounted(true);
     if (typeof window !== 'undefined') {
       setUserEmail(localStorage.getItem("userEmail") || "");
     }
   }, []);
 
   // Validation checks
-  const isMinLength = password.length >= 6; // Using 6 characters to match backend setting
+  const isMinLength = password.length >= 6;
   const hasNumber = /\d/.test(password);
   const hasSpecialChar = /[!@#$%^&*(),.?":{}|<>]/.test(password);
   const hasUpperLower = /(?=.*[a-z])(?=.*[A-Z])/.test(password);
   const passwordsMatch = password === confirmPassword;
 
-  // Simple check for personal info
+  // Check for personal info in password
   const emailUsername = userEmail ? userEmail.split('@')[0] : "";
   const containsPersonalInfo = emailUsername && password.toLowerCase().includes(emailUsername.toLowerCase());
 
-  const handleSubmit = () => {
-    // Validate password rules
+  const handleContinue = async () => {
+    if (!userEmail) {
+      setError("Email is missing. Please go back and enter your email.");
+      return;
+    }
     if (!isMinLength || !hasNumber || !hasSpecialChar || !hasUpperLower) {
       setError("Please meet all password requirements");
       return;
     }
-
     if (containsPersonalInfo) {
       setError("Password should not contain parts of your email address.");
       return;
     }
-
     if (!passwordsMatch) {
       setError("Passwords don't match");
       return;
     }
 
-    // Clear error
     setError("");
+    setIsLoading(true);
 
-    // Save password in signup context
-    updateSignupData({ password });
-
-    // Safely use localStorage
-    if (typeof window !== 'undefined') {
-      localStorage.setItem("userPassword", password);
+    try {
+      updateSignupData({ password });
+      if (typeof window !== 'undefined') {
+        localStorage.setItem("userPassword", password);
+      }
+      setCurrentStep("secpin");
+      router.push("/Signups/VerifyEmail");
+    } catch (err: any) {
+      setError(
+        typeof err.message === "string"
+          ? err.message
+          : JSON.stringify(err.message) || "Something went wrong"
+      );
+    } finally {
+      setIsLoading(false);
     }
-
-    // Move to next step: verify email
-    setCurrentStep("verify");
-    router.push("/Signups/VerifyEmail");
   };
 
   return (
@@ -153,7 +158,6 @@ const Passwordbd = () => {
             1 uppercase and 1 lowercase letter
           </span>
         </li>
-      
       </ul>
 
       <label className="block text-[14px] mt-[20px] font-[500] text-[#8F8F8F] mb-1">Confirm password</label>
@@ -182,9 +186,10 @@ const Passwordbd = () => {
 
       <button
         className="w-[370px] h-[56px] border-none cursor-pointer mt-[40px] bg-[#4DF2BE] text-[#0F1012] py-3 rounded-[100px] hover:bg-[#1a5d50]"
-        onClick={handleSubmit}
+        onClick={handleContinue}
+        disabled={isLoading}
       >
-        Continue
+        {isLoading ? "Processing..." : "Continue"}
       </button>
     </div>
   );

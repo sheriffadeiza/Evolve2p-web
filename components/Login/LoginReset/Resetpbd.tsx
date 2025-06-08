@@ -4,21 +4,56 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 
-export default function ResetPasswordPage() {
+const Resetpbd = () => {
   const [email, setEmail] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
   const router = useRouter();
 
-  const handleReset = (e: React.FormEvent) => {
+  const handleReset = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!email) {
-      alert('Please enter your email.');
+      setError('Please enter your email.');
       return;
     }
 
-    // Simulate sending reset email, then navigate
-    console.log(`Reset link sent to: ${email}`);
-    router.push('/Lverify'); // change this to your target route
+    setLoading(true);
+    setError('');
+
+    try {
+      // 1. Check if email exists (success means user exists)
+      const checkRes = await fetch('https://evolve2p-backend.onrender.com/api/check-email-exist', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+      });
+
+      if (!checkRes.ok) {
+        const checkData = await checkRes.json();
+        throw new Error(checkData.detail || checkData.message || 'Email does not exist.');
+      }
+
+      // 2. Send OTP to email
+      const otpRes = await fetch('https://evolve2p-backend.onrender.com/api/send-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+      });
+
+      if (!otpRes.ok) {
+        const otpData = await otpRes.json();
+        throw new Error(otpData.detail || otpData.message || 'Failed to send OTP.');
+      }
+
+      // 3. Redirect to verification page
+      localStorage.setItem('reset_email', email);
+      router.push('/Logins/Lverify');
+    } catch (err: any) {
+      setError(err.message || 'An error occurred. Please try again.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -26,7 +61,7 @@ export default function ResetPasswordPage() {
       <div>
         <h1 className="text-[24px] font-[700] text-[#FCFCFC]">Reset Your Password</h1>
         <p className="text-[16px] font-[400] ml-[14%] text-[#8F8F8F] mt-1">
-          Enter your registered email, and we’ll send you a reset link.
+          Enter your registered email, and we'll send you a reset code.
         </p>
       </div>
 
@@ -45,17 +80,22 @@ export default function ResetPasswordPage() {
             onChange={(e) => setEmail(e.target.value)}
             className="w-[380px] h-[56px] mt-[10px] pl-[10px] ml-[15%] px-4 py-2 rounded-[10px] bg-[#1F1F1F] border border-[#2E2E2E] text-[#FCFCFC] font-[500] text-[14px] focus:outline-none focus:ring-2 focus:ring-[#2DE3A3]"
             placeholder="Enter your email address"
+            disabled={loading}
           />
         </div>
 
+        {error && (
+          <div className="text-[#F5918A] text-[14px] font-[500] mt-2">{error}</div>
+        )}
+
         <button
           type="submit"
-          disabled={!email}
+          disabled={!email || loading}
           className={`w-[380px] h-[56px] py-2 mt-[60px] ml-[15%] border-none justify-center rounded-[100px] text-[14px] font-[700] transition ${
-            email ? 'bg-[#4DF2BE] text-[#0F1012] hover:opacity-90' : 'bg-[#4DF2BE]/50 text-[#0F1012]/50 cursor-not-allowed'
+            email && !loading ? 'bg-[#4DF2BE] text-[#0F1012] hover:opacity-90' : 'bg-[#4DF2BE]/50 text-[#0F1012]/50 cursor-not-allowed'
           }`}
         >
-          Reset password
+          {loading ? 'Processing...' : 'Reset password'}
         </button>
       </form>
 
@@ -70,4 +110,6 @@ export default function ResetPasswordPage() {
       </p>
     </div>
   );
-}
+};
+
+export default Resetpbd;

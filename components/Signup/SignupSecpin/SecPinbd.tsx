@@ -1,12 +1,13 @@
 'use client';
 
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { useRouter } from 'next/navigation';
 import { useSignup } from '@/context/SignupContext';
 
-const SecPinBd: React.FC = () => {
+const SecPinbd: React.FC = () => {
   const [pin, setPin] = useState<string[]>(["", "", "", ""]);
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState('');
   const router = useRouter();
   const { setCurrentStep } = useSignup();
 
@@ -21,28 +22,95 @@ const SecPinBd: React.FC = () => {
     if (val && nextInput) (nextInput as HTMLInputElement).focus();
   };
 
-  useEffect(() => {
-    const fullPin = pin.join('');
-    if (fullPin.length === 4) {
-      setIsLoading(true);
-      
-      // Store the temporary PIN to compare later in confirm step
-      localStorage.setItem('tempPin', fullPin);
+  const handleSubmit = async () => {
+    const pinValue = pin.join('');
+    setError('');
 
-      setTimeout(() => {
-        setCurrentStep('confirm-pin');
-        router.push('/Signups/Sconfirm');
-      }, 1000);
+    // Get token from localStorage
+    const token = localStorage.getItem('access_token') || '';
+
+    // Get email from userProfile in localStorage
+    const userProfile = localStorage.getItem('userProfile');
+    let email = '';
+    if (userProfile) {
+      try {
+        email = JSON.parse(userProfile).email || '';
+      } catch {
+        email = '';
+      }
     }
-  }, [pin, router, setCurrentStep]);
+    if (!email) {
+      setError('Email is missing. Please complete registration.');
+      return;
+    }
+
+    // Validate all required fields before making the request
+    if (!token) {
+      setError('Session expired. Please log in again.');
+      return;
+    }
+    if (!/^\d{4}$/.test(pinValue)) {
+      setError('PIN must be a 4-digit number.');
+      return;
+    }
+
+    setIsLoading(true);
+
+    // Log for debugging
+    console.log("Access token used for authorization:", token);
+    console.log("Sending to backend (as string):", pinValue, "with email as query param:", email);
+
+    try {
+      const res = await fetch(
+        `https://evolve2p-backend.onrender.com/api/update-user?email=${encodeURIComponent(email)}`,
+        {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'text/plain',
+            'Authorization': `Bearer ${token}`,
+          },
+          body: pinValue, // Send only the pin as a plain string
+        }
+      );
+
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        setError(data.detail || data.message || 'Failed to update PIN. Please try again.');
+        setIsLoading(false);
+        return;
+      }
+
+      // Optionally update localStorage with new pin
+      let updatedProfile = {};
+      if (userProfile) {
+        try {
+          updatedProfile = { ...JSON.parse(userProfile), pin: pinValue };
+        } catch {
+          updatedProfile = { pin: pinValue };
+        }
+      } else {
+        updatedProfile = { pin: pinValue };
+      }
+      localStorage.setItem('userProfile', JSON.stringify(updatedProfile));
+
+      setCurrentStep('confirm-pin');
+      router.push('/Signups/Sconfirm');
+    } catch (err: any) {
+      setError("Failed to set PIN");
+      setPin(["", "", "", ""]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   return (
     <div className="text-white ml-[95px] mt-[30px]">
       <h2 className="text-[24px] text-[#FCFCFC] font-[700]">Setup security PIN</h2>
       <p className="text-[16px] font-[400] mt-[-10px] mb-6 text-[#8F8F8F]">
-      Your PIN helps you log in faster and approve transactions <br /> securely.
+        Your PIN helps you log in faster and approve transactions <br /> securely.
       </p>
-    
+
       <div className="flex gap-1 ml-[20px]">
         {pin.map((digit, idx) => (
           <input
@@ -55,11 +123,25 @@ const SecPinBd: React.FC = () => {
             type="password"
             inputMode="numeric"
             disabled={isLoading}
+            autoFocus={idx === 0}
           />
         ))}
       </div>
 
-      {/* Loader positioned below PIN inputs */}
+      {error && (
+        <div className="text-[#F5918A] text-[14px] font-[500] mt-4">{error}</div>
+      )}
+
+      {pin.join('').length === 4 && (
+        <button
+          className="w-[300px] h-[48px] mt-[30px] bg-[#4DF2BE] text-[#0F1012] rounded-[100px] font-[700] disabled:opacity-50"
+          onClick={handleSubmit}
+          disabled={isLoading}
+        >
+          {isLoading ? 'Setting PIN...' : 'Continue'}
+        </button>
+      )}
+
       {isLoading && (
         <div className="flex justify-center mt-[30px] ml-[-40px]">
           <div className="loader"></div>
@@ -93,4 +175,4 @@ const SecPinBd: React.FC = () => {
   );
 };
 
-export default SecPinBd;
+export default SecPinbd;

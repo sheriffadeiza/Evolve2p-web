@@ -22,7 +22,7 @@ const page = () => {
      
       </div>
        
-       {/* Right side content */}
+       {/* Right side content */}   
 
       <div className="w-1/2 mt-[20px]  min-h-[calc(150vh-64px)]">
           <ImageContent />
