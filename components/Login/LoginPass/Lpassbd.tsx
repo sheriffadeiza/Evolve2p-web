@@ -43,36 +43,26 @@ const Lpassbd = () => {
     setIsLoading(true);
 
     try {
+      // Get email from localStorage for forgot password endpoint
       const email = typeof window !== 'undefined' ? localStorage.getItem('reset_email') || '' : '';
+
       if (!email) {
-        setError("No email found for password reset.");
+        setError("No email found for password reset. Please start the reset process again.");
         setIsLoading(false);
         return;
       }
 
-      // Fetch user details (username, country, phone, verified) from backend
-      const userRes = await fetch(`https://evolve2p-backend.onrender.com/api/get-user?email=${encodeURIComponent(email)}`);
-      const userData = await userRes.json();
-
-      if (!userRes.ok) {
-        setError(userData.detail || userData.message || 'Failed to fetch user details.');
-        setIsLoading(false);
-        return;
-      }
-
-      // Prepare request body for update
+      // Use forgot-password endpoint with email and password
       const updateBody = {
-        email: email,
-        username: userData.username || "",
-        password: password,
-        country: userData.country || "",
-        verified: true,
-        phone: userData.phone || ""
+        email,
+        password,
       };
 
-      const res = await fetch('https://evolve2p-backend.onrender.com/api/update-user', {
+      const res = await fetch('https://evolve2p-backend.onrender.com/api/forgot-password', {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+        },
         body: JSON.stringify(updateBody),
       });
 
@@ -85,6 +75,20 @@ const Lpassbd = () => {
       }
 
       setShowSuccessModal(true);
+
+      // Update userProfile in localStorage with new password
+      const userProfile = localStorage.getItem('userProfile');
+      if (userProfile) {
+        try {
+          const parsed = JSON.parse(userProfile);
+          parsed.password = password;
+          localStorage.setItem('userProfile', JSON.stringify(parsed));
+        } catch {
+          localStorage.setItem('userProfile', JSON.stringify({ password }));
+        }
+      } else {
+        localStorage.setItem('userProfile', JSON.stringify({ password }));
+      }
     } catch {
       setError('Network error. Please try again.');
     } finally {
@@ -127,7 +131,7 @@ const Lpassbd = () => {
         </div>
       )}
 
-      <h1 className="text-[24px] ml-[-20%] text-[#FCFCFC] font-[700]">Create password</h1>
+      <h1 className="text-[24px] ml-[-20%] text-[#FCFCFC] font-[700]">Create new password</h1>
       <p className="text-[16px] font-[400] mt-[-10px] ml-[-25px] text-[#8F8F8F] whitespace-nowrap">
         Create a strong password to protect your trades and funds.
       </p>

@@ -29,14 +29,25 @@ const Confirmbd: React.FC = () => {
     const fullPin = pin.join('');
     if (fullPin.length !== 4) return;
 
-    const tempPin = localStorage.getItem('tempPin');
-    if (!tempPin) {
+    // Get the PIN from userProfile (set by SecPinbd)
+    const userProfile = localStorage.getItem('userProfile');
+    let savedPin = '';
+    if (userProfile) {
+      try {
+        const parsed = JSON.parse(userProfile);
+        savedPin = parsed.pin || '';
+      } catch {
+        savedPin = '';
+      }
+    }
+
+    if (!savedPin) {
       setError("No PIN to confirm. Please set your PIN first.");
       setPin(["", "", "", ""]);
       return;
     }
 
-    if (fullPin !== tempPin) {
+    if (fullPin !== savedPin) {
       setError("PINs do not match. Please try again.");
       setPin(["", "", "", ""]);
       return;
@@ -44,7 +55,6 @@ const Confirmbd: React.FC = () => {
 
     // Save the confirmed PIN permanently in localStorage
     localStorage.setItem('userSecPin', fullPin);
-    localStorage.removeItem('tempPin');
     setShowSuccess(true);
   };
 

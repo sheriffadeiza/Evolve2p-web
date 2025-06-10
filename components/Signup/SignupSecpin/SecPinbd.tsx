@@ -26,8 +26,9 @@ const SecPinbd: React.FC = () => {
     const pinValue = pin.join('');
     setError('');
 
-    // Get token from localStorage
-    const token = localStorage.getItem('access_token') || '';
+    // Always get the latest accessToken from localStorage right before submitting
+    // This will match the token set after registration/profile step
+    const latestToken = localStorage.getItem('accessToken') || '';
 
     // Get email from userProfile in localStorage
     const userProfile = localStorage.getItem('userProfile');
@@ -44,11 +45,11 @@ const SecPinbd: React.FC = () => {
       return;
     }
 
-    // Validate all required fields before making the request
-    if (!token) {
-      setError('Session expired. Please log in again.');
+    if (!latestToken) {
+      setError('Session expired. Please log in to generate token.');
       return;
     }
+
     if (!/^\d{4}$/.test(pinValue)) {
       setError('PIN must be a 4-digit number.');
       return;
@@ -56,20 +57,16 @@ const SecPinbd: React.FC = () => {
 
     setIsLoading(true);
 
-    // Log for debugging
-    console.log("Access token used for authorization:", token);
-    console.log("Sending to backend (as string):", pinValue, "with email as query param:", email);
-
     try {
       const res = await fetch(
-        `https://evolve2p-backend.onrender.com/api/update-user?email=${encodeURIComponent(email)}`,
+        'https://evolve2p-backend.onrender.com/api/update-user',
         {
           method: 'PUT',
           headers: {
-            'Content-Type': 'text/plain',
-            'Authorization': `Bearer ${token}`,
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${latestToken}`,
           },
-          body: pinValue, // Send only the pin as a plain string
+          body: JSON.stringify({ pin: pinValue }),
         }
       );
 
@@ -81,7 +78,7 @@ const SecPinbd: React.FC = () => {
         return;
       }
 
-      // Optionally update localStorage with new pin
+      // Optionally update localStorage with new pin, and keep the token as is
       let updatedProfile = {};
       if (userProfile) {
         try {
@@ -93,6 +90,7 @@ const SecPinbd: React.FC = () => {
         updatedProfile = { pin: pinValue };
       }
       localStorage.setItem('userProfile', JSON.stringify(updatedProfile));
+      // The accessToken remains the same as profile step
 
       setCurrentStep('confirm-pin');
       router.push('/Signups/Sconfirm');

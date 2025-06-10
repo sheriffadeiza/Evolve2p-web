@@ -43,12 +43,12 @@ const Loginbd: React.FC = () => {
         return;
       }
 
-      // Try to get the token from the response or from localStorage
-      let token = data.access_token || data.token;
+      // Always use accessToken for consistency
+      let token = data.accessToken || data.access_token || data.token;
       if (!token) {
-        token = localStorage.getItem('access_token');
+        token = localStorage.getItem('accessToken');
       } else {
-        localStorage.setItem('access_token', token);
+        localStorage.setItem('accessToken', token);
       }
 
       if (token) {

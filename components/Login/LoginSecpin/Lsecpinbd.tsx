@@ -13,7 +13,7 @@ const Lsecpinbd: React.FC = () => {
   const router = useRouter();
 
   useEffect(() => {
-    const token = localStorage.getItem('access_token');
+    const token = localStorage.getItem('accessToken');
     if (!token) {
       setError('Please login first');
       setTimeout(() => router.push('/Logins/login'), 1500);
@@ -40,15 +40,14 @@ const Lsecpinbd: React.FC = () => {
   const handleSubmit = async () => {
     setError('');
     setSuccess('');
-    const tempPin= pin.join('');
+    const tempPin = pin.join('');
     if (tempPin.length !== 4) {
       setError('Please enter your 4-digit PIN');
       return;
     }
 
-
-    const token = localStorage.getItem('access_token');
-    const email = localStorage.getItem('reset_email') || ''; // Use the correct key for your flow
+    const token = localStorage.getItem('accessToken');
+    const email = localStorage.getItem('loginEmail') || '';
     if (!token) {
       setError('Session expired. Please login again.');
       setTimeout(() => router.push('/Logins/login'), 1500);

@@ -98,10 +98,6 @@ const VerifyEmailbd: React.FC = () => {
       const nextInput = document.getElementById(`pin-${idx + 1}`);
       if (nextInput) (nextInput as HTMLInputElement).focus();
     }
-
-    if (newPin.every((d) => d !== "")) {
-      verifyCode(newPin.join(""));
-    }
   };
 
   // Verify OTP
@@ -173,6 +169,9 @@ const VerifyEmailbd: React.FC = () => {
     await sendOTP(email);
   };
 
+  // Check if all pin fields are filled
+  const isPinComplete = pin.every((d) => d !== "");
+
   return (
     <div className="max-w-md mx-auto ml-[120px] mt-10 px-4 text-white">
       <h1 className="text-[24px] text-[#FCFCFC] font-[700] mb-2">Verify Email</h1>
@@ -201,6 +200,16 @@ const VerifyEmailbd: React.FC = () => {
           />
         ))}
       </div>
+
+      {isPinComplete && (
+        <button
+          className="w-[300px] h-[48px] mt-[10px] bg-[#4DF2BE] text-[#0F1012] rounded-[100px] font-[700] disabled:opacity-50"
+          onClick={() => verifyCode(pin.join(""))}
+          disabled={isLoading}
+        >
+          {isLoading ? "Verifying..." : "Verify Email"}
+        </button>
+      )}
 
       <div className="text-center text-[14px] font-[400] text-[#DBDBDB] ml-[-25%] mt-[20px]">
         Didn't receive code?{" "}

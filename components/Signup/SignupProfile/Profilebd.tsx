@@ -126,13 +126,12 @@ const Profilebd = () => {
         country: formData.country,
         verified: true,
         phone: phoneNumber,
-        
       };
 
       // Get token if it exists (for example, if user is updating profile)
-      const token = localStorage.getItem('access_token') || '';
-      if (token) {
-        console.log("Sending profile with token:", token);
+      const accessToken = localStorage.getItem('accessToken') || '';
+      if (accessToken) {
+        console.log("Sending profile with token:", accessToken);
       }
 
       // Send profile data to backend with Authorization header if token exists
@@ -140,7 +139,7 @@ const Profilebd = () => {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          ...(token && { 'Authorization': `Bearer ${token}` }),
+          ...(accessToken && { 'Authorization': `Bearer ${accessToken}` }),
         },
         body: JSON.stringify(userData),
       });
@@ -148,10 +147,10 @@ const Profilebd = () => {
       const responseData = await res.json().catch(() => ({}));
 
       if (res.status === 201) {
-        // Store access_token if present in response
-        if (responseData.access_token) {
-          localStorage.setItem('access_token', responseData.access_token);
-          console.log("Access token saved:", responseData.access_token);
+        // Store accessToken if present in response
+        if (responseData.accessToken) {
+          localStorage.setItem('accessToken', responseData.accessToken);
+          console.log("Access token saved:", responseData.accessToken);
         }
         updateSignupData(userData);
         // Save the full user profile including email
