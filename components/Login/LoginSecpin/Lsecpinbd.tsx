@@ -84,7 +84,7 @@ const Lsecpinbd: React.FC = () => {
 
       setSuccess('PIN verified!');
       setTimeout(() => {
-        router.push('/Logins/Loader');
+        router.push('/Loader');
       }, 1000);
     } catch (err: any) {
       setError('Network error. Please try again.');
