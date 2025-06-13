@@ -35,7 +35,9 @@ const Lverifybd: React.FC = () => {
       const res = await fetch('https://evolve2p-backend.onrender.com/api/verify-email', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, code }),
+        body: JSON.stringify({  
+          email: email,
+          otp: code,}),
       });
       const data = await res.json();
 
@@ -61,7 +63,7 @@ const Lverifybd: React.FC = () => {
     setError('');
     setResendLoading(true);
     try {
-      const otpRes = await fetch('https://evolve2p-backend.onrender.com/api/sent-otp', {
+      const otpRes = await fetch('https://evolve2p-backend.onrender.com/api/send-otp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email }),
@@ -80,15 +82,15 @@ const Lverifybd: React.FC = () => {
   const allFilled = pin.every(digit => digit.length === 1);
 
   return (
-    <div className="max-w-md mx-auto ml-[-80px] text-center mt-10 px-4 text-white">
+    <div className="max-w-md mx-auto ml-[-100px] text-center mt-10 px-4 text-white">
       <h1 className="text-[24px] ml-[-15%] text-[#FCFCFC] font-[700] mb-2">Verify Email</h1>
-      <p className="text-[16px] ml-[-7%] font-[400] text-[#8F8F8F] mb-6">
+      <p className="text-[16px] ml-[-8%]  font-[400] text-[#8F8F8F] mb-6">
         Please enter the 6-digit code sent to <br />
-        <span className="text-[#DBDBDB] ml-[-3.5%]">{email}</span>
+        <span className="text-[#DBDBDB] ml-[20px] ">{email}</span>
       </p>
 
       <form onSubmit={handleVerify}>
-        <div className="flex gap-[10px] ml-[10%] border-none justify-center mb-6">
+        <div className="flex gap-[10px] ml-[100px] border-none justify-center mb-6">
           {pin.map((digit, idx) => (
             <input
               key={idx}

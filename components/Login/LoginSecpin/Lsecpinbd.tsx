@@ -123,7 +123,7 @@ const Lsecpinbd: React.FC = () => {
             value={pin[idx]}
             onChange={(e) => handleChange(e.target.value, idx)}
             onKeyDown={(e) => handleKeyDown(e, idx)}
-            className="w-[83.5px] h-[56px] ml-[15px] rounded-[10px] border-none bg-[#222222] text-center text-xl text-[#8F8F8F] focus:outline-none focus:ring-1 focus:ring-[#1ECB84]"
+            className="w-[83.5px] h-[56px] ml-[15px] rounded-[10px] border-none bg-[#222222] text-center text-xl text-[#FCFCFC] focus:outline-none focus:ring-1 focus:ring-[#1ECB84]"
             type="password"
             disabled={loading}
             autoFocus={idx === 0}

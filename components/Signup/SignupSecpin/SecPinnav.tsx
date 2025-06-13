@@ -24,7 +24,7 @@ const SecPinnav = () => {
         <Image 
           src={image} 
           alt="Go back" 
-          width={50} 
+          width={60} 
           height={25}
         />
       </button>

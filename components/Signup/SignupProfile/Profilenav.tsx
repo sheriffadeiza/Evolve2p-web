@@ -12,7 +12,7 @@ const Profilenav = () => {
 
   const handleGoBack = () => {
     setCurrentStep('verify');
-    router.push('/Signups/Verify');
+    router.push('/Signups/VerifyEmail');
   };
 
   return (
@@ -24,7 +24,7 @@ const Profilenav = () => {
         <Image 
           src={image} 
           alt="Go back" 
-          width={50} 
+          width={60} 
           height={25}
         />
       </button>

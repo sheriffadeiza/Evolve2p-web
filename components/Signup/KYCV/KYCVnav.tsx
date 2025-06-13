@@ -12,7 +12,7 @@ const KYCVnav = () => {
 
   const handleGoBack = () => {
     setCurrentStep('email');
-    router.push('/Signups/Email');
+    router.push('/Signups/Sconfirm');
   };
 
   return (

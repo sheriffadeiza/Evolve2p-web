@@ -16,6 +16,7 @@ const Profilebd = () => {
   });
 
   const [countries, setCountries] = useState<any[]>([]);
+  const [countrySearch, setCountrySearch] = useState('');
   const [usernameStatus, setUsernameStatus] = useState('');
   const [isValidUsername, setIsValidUsername] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -195,6 +196,15 @@ const Profilebd = () => {
     }
   };
 
+  // --- Country Search State ---
+  const [showCountrySearch, setShowCountrySearch] = useState(false);
+  const [countrySearchInput, setCountrySearchInput] = useState('');
+
+  // Filtered countries for search
+  const filteredCountries = countries.filter(country =>
+    country.name.toLowerCase().includes(countrySearchInput.toLowerCase())
+  );
+
   return (
     <div className="flex flex-col px-8 py-16 ml-[100px] gap-2 w-full max-w-[400px] text-white">
       {/* Success Modal */}
@@ -271,29 +281,57 @@ const Profilebd = () => {
                   />
                 )}
               </div>
-              <select
-                className="w-[385px] h-[56px] bg-[#222222] mt-[10px] pl-[35px] pr-12 border border-[#2E2E2E] rounded-[10px] text-[14px] font-[500] text-[#FCFCFC] appearance-none"
-                value={formData.countryCode}
-                onChange={(e) => {
-                  const selected = countries.find(c => c.code === e.target.value);
-                  if (selected) {
-                    setFormData(prev => ({
-                      ...prev,
-                      country: selected.name,
-                      countryCode: selected.code
-                    }));
-                  }
-                }}
-                required
-                disabled={isLoadingCountries}
-              >
-                <option value="">Select Country</option>
-                {countries.map((country) => (
-                  <option key={country.code} value={country.code}>
-                    {country.name}
-                  </option>
-                ))}
-              </select>
+              <div className="relative">
+                <input
+                  type="text"
+                  className="w-[365px] h-[56px] bg-[#222222] mt-[10px] pl-[20px] pr-12 border border-[#2E2E2E] rounded-[10px] text-[14px] font-[500] text-[#FCFCFC] focus:outline-none"
+                  placeholder="Type to search country..."
+                  value={countrySearch}
+                  onChange={e => setCountrySearch(e.target.value)}
+                  onFocus={() => setShowCountrySearch(true)}
+                  required
+                  disabled={isLoadingCountries}
+                />
+                {showCountrySearch && (
+                  <div className="absolute top-[60px]   left-0 w-full z-20 bg-[#222222] border border-[#2E2E2E] rounded-[10px] p-2">
+                    <div className="max-h-[200px] ml-[10px] overflow-y-auto">
+                      {countries.filter(country =>
+                        country.name.toLowerCase().includes(countrySearch.toLowerCase())
+                      ).length === 0 && (
+                        <div className="text-[#8F8F8F] px-2 py-1">No country found</div>
+                      )}
+                      {countries
+                        .filter(country =>
+                          country.name.toLowerCase().includes(countrySearch.toLowerCase())
+                        )
+                        .map((country) => (
+                          <div
+                            key={country.code}
+                            className="flex items-center mb-[10px]  gap-2 px-2 py-2 cursor-pointer hover:bg-[#333] rounded"
+                            onClick={() => {
+                              setFormData(prev => ({
+                                ...prev,
+                                country: country.name,
+                                countryCode: country.code
+                              }));
+                              setCountrySearch(country.name);
+                              setShowCountrySearch(false);
+                            }}
+                          >
+                            <img
+                              src={`https://flagcdn.com/w20/${country.code.toLowerCase()}.png`}
+                              alt={`${country.name} flag`}
+                              width={20}
+                              height={20}
+                              className="rounded-sm"
+                            />
+                            <span className="text-[#FCFCFC]">{country.name}</span>
+                          </div>
+                        ))}
+                    </div>
+                  </div>
+                )}
+              </div>
             </>
           )}
         </div>

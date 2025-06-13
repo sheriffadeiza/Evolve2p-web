@@ -131,8 +131,8 @@ const Lpassbd = () => {
         </div>
       )}
 
-      <h1 className="text-[24px] ml-[-20%] text-[#FCFCFC] font-[700]">Create new password</h1>
-      <p className="text-[16px] font-[400] mt-[-10px] ml-[-25px] text-[#8F8F8F] whitespace-nowrap">
+      <h1 className="text-[24px] ml-[-16%] text-[#FCFCFC] font-[700]">Create new password</h1>
+      <p className="text-[16px] font-[400] mt-[-10px] ml-[-48px] text-[#8F8F8F] whitespace-nowrap">
         Create a strong password to protect your trades and funds.
       </p>
 
@@ -142,13 +142,13 @@ const Lpassbd = () => {
         </div>
       )}
 
-      <label className="block text-[14px] ml-[-30.5%] mt-[30px] font-[500] text-[#8F8F8F] mb-[10px]">Password</label>
+      <label className="block text-[14px] ml-[-29%] mt-[30px] font-[500] text-[#8F8F8F] mb-[10px]">Password</label>
       <div className="relative">
         <input
           type={showPassword ? "text" : "password"}
           value={password}
           onChange={handlePasswordChange}
-          className={`w-[380px] h-[56px] bg-[#222222] text-[#DBDBDB] text-[14px] font-[500] border mb-4 pl-[15px] pr-10 rounded-[10px] ${
+          className={`w-[380px] h-[56px] bg-[#222222] ml-[-25px] text-[#DBDBDB] text-[14px] font-[500] border mb-4 pl-[15px] pr-10 rounded-[10px] ${
             error && (!isMinLength || !hasNumber || !hasSpecialChar || !hasUpperLower)
               ? "border-[#F5918A]"
               : "border-[#2E2E2E]"
@@ -218,13 +218,13 @@ const Lpassbd = () => {
         </li>
       </ul>
 
-      <label className="block text-[14px] mt-[10px] font-[500] ml-[-26.5%] text-[#8F8F8F] mb-[10px]">Confirm password</label>
+      <label className="block text-[14px] mt-[10px] font-[500] ml-[-26%] text-[#8F8F8F] mb-[10px]">Confirm password</label>
       <div className="relative inline-block">
         <input
           type={showConfirm ? "text" : "password"}
           value={confirmPassword}
           onChange={handleConfirmPasswordChange}
-          className={`w-[380px] h-[56px] bg-[#222222] text-[#DBDBDB] text-[14px] font-[500] border text-white mb-4 pl-[15px] pr-10 rounded-[10px] ${
+          className={`w-[380px] h-[56px] bg-[#222222] text-[#DBDBDB] ml-[-30px] text-[14px] font-[500] border text-white mb-4 pl-[15px] pr-10 rounded-[10px] ${
             error && !passwordsMatch ? "border-[#F5918A]" : "border-[#2E2E2E]"
           }`}
           placeholder="Re-enter your password"
@@ -241,7 +241,7 @@ const Lpassbd = () => {
       </div>
 
       <button 
-        className={`w-[400px] h-[56px] border-none mt-[40px] bg-[#4DF2BE] text-[#0F1012] py-3 rounded-[100px] hover:bg-[#1a5d50] transition ${
+        className={`w-[400px] h-[56px] ml-[-30px] border-none mt-[40px] bg-[#4DF2BE] text-[#0F1012] py-3 rounded-[100px] hover:bg-[#1a5d50] transition ${
           !allFieldsValid() || isLoading ? 'opacity-50 cursor-not-allowed' : ''
         }`}
         onClick={handleSubmit}

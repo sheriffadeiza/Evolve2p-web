@@ -3,14 +3,15 @@
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 
-const VERIFY_EMAIL_ENDPOINT = "https://evolve2p-backend.onrender.com/api/verify-email";
 const SEND_OTP_ENDPOINT = "https://evolve2p-backend.onrender.com/api/send-otp";
+const VERIFY_EMAIL_ENDPOINT = "https://evolve2p-backend.onrender.com/api/verify-email";
 
 const VerifyEmailbd: React.FC = () => {
   const router = useRouter();
   const [pin, setPin] = useState<string[]>(["", "", "", "", "", ""]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
+  const [success, setSuccess] = useState(false);
   const [email, setEmail] = useState("");
   const [resendTimer, setResendTimer] = useState(30);
   const [canResend, setCanResend] = useState(false);
@@ -58,21 +59,10 @@ const VerifyEmailbd: React.FC = () => {
         body: JSON.stringify({ email }),
       });
 
-      let data;
-      try {
-        data = await response.json();
-      } catch {
-        data = {};
-      }
+      await response.json();
 
       if (!response.ok) {
-        let msg =
-          typeof data.message === "string"
-            ? data.message
-            : typeof data.detail === "string"
-            ? data.detail
-            : JSON.stringify(data);
-        throw new Error(msg || "Failed to send code");
+        throw new Error("Failed to send code");
       }
     } catch (err: any) {
       setError(
@@ -100,10 +90,11 @@ const VerifyEmailbd: React.FC = () => {
     }
   };
 
-  // Verify OTP
+  // Always verify with backend
   const verifyCode = async (code: string) => {
     setIsLoading(true);
     setError("");
+    setSuccess(false);
 
     try {
       const response = await fetch(VERIFY_EMAIL_ENDPOINT, {
@@ -114,7 +105,7 @@ const VerifyEmailbd: React.FC = () => {
         },
         body: JSON.stringify({
           email: email,
-          otp_code: code,
+          otp: code,
         }),
       });
 
@@ -136,11 +127,19 @@ const VerifyEmailbd: React.FC = () => {
         } else {
           msg = JSON.stringify(data);
         }
-        throw new Error(msg);
+        setError(msg);
+        setPin(["", "", "", "", "", ""]);
+        const firstInput = document.getElementById("pin-0");
+        if (firstInput) (firstInput as HTMLInputElement).focus();
+        setIsLoading(false);
+        return;
       }
 
+      // Success
       localStorage.setItem("email_verified", "true");
       setError("");
+      setSuccess(true);
+      setIsLoading(false);
       setTimeout(() => {
         router.push("/Signups/Profile");
       }, 1000);
@@ -153,7 +152,6 @@ const VerifyEmailbd: React.FC = () => {
       setPin(["", "", "", "", "", ""]);
       const firstInput = document.getElementById("pin-0");
       if (firstInput) (firstInput as HTMLInputElement).focus();
-    } finally {
       setIsLoading(false);
     }
   };
@@ -182,6 +180,10 @@ const VerifyEmailbd: React.FC = () => {
 
       {error && (
         <div className="text-[#F5918A] text-[14px] font-[500] mb-4">{error}</div>
+      )}
+
+      {success && (
+        <div className="text-[#1ECB84] text-[14px] font-[500] mb-4">Email verified successfully! Redirecting...</div>
       )}
 
       <div className="flex gap-[5px] ml-[-150px] border-none justify-center mb-6">
