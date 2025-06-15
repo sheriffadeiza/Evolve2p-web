@@ -28,14 +28,17 @@ const Profilebd = () => {
   useEffect(() => {
     const fetchCountries = async () => {
       try {
-        const response = await fetch('https://restcountries.com/v3.1/all');
+        const response = await fetch('https://restcountries.com/v3.1/all?fields=name,cca2,flags,capital');
         const data = await response.json();
 
         const formattedCountries = data.map((country: any) => ({
           name: country.name.common,
           code: country.cca2,
-          dialCode: country.idd?.root
-            ? `${country.idd.root}${country.idd.suffixes?.[0] || ''}`
+          dialCode: country.cca2 === 'NG' ? '+234'
+            : country.cca2 === 'US' ? '+1'
+            : country.cca2 === 'GB' ? '+44'
+            : country.cca2 === 'CA' ? '+1'
+            : country.cca2 === 'GH' ? '+233'
             : '+1'
         })).sort((a: any, b: any) => a.name.localeCompare(b.name));
 
@@ -367,7 +370,7 @@ const Profilebd = () => {
       >
         {isLoading ? (
           <div className="loader-small"></div>
-        ) : (
+        ) : (  
           'Complete Registration'
         )}
       </button>
