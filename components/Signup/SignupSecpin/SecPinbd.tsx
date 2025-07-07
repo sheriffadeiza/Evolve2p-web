@@ -8,6 +8,7 @@ const SecPinbd: React.FC = () => {
   const [pin, setPin] = useState<string[]>(["", "", "", ""]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
+  const [deleteLoading, setDeleteLoading] = useState(false);
   const router = useRouter();
   const { setCurrentStep } = useSignup();
 
@@ -27,7 +28,6 @@ const SecPinbd: React.FC = () => {
     setError('');
 
     // Always get the latest accessToken from localStorage right before submitting
-    // This will match the token set after registration/profile step
     const latestToken = localStorage.getItem('accessToken') || '';
 
     // Get email from userProfile in localStorage
@@ -90,7 +90,6 @@ const SecPinbd: React.FC = () => {
         updatedProfile = { pin: pinValue };
       }
       localStorage.setItem('userProfile', JSON.stringify(updatedProfile));
-      // The accessToken remains the same as profile step
 
       setCurrentStep('confirm-pin');
       router.push('/Signups/Sconfirm');
@@ -99,6 +98,55 @@ const SecPinbd: React.FC = () => {
       setPin(["", "", "", ""]);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  // --- Delete Account Handler ---
+  const handleDeleteAccount = async () => {
+    const userProfile = localStorage.getItem('userProfile');
+    let email = '';
+    if (userProfile) {
+      try {
+        email = JSON.parse(userProfile).email || '';
+      } catch {
+        email = '';
+      }
+    }
+    const accessToken = localStorage.getItem('accessToken') || '';
+    if (!email) {
+      alert('No user email found.');
+      return;
+    }
+    if (!accessToken) {
+      alert('You are not authorized. Please log in again.');
+      router.push('/Logins/login');
+      return;
+    }
+    if (!window.confirm('Are you sure you want to delete your account? This action cannot be undone.')) {
+      return;
+    }
+    setDeleteLoading(true);
+    try {
+      const res = await fetch('https://evolve2p-backend.onrender.com/api/delete-account', {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify({}), // If your backend expects an empty object
+      });
+      if (res.ok) {
+        localStorage.clear();
+        alert('Account deleted successfully.');
+        router.push('/Logins/login');
+      } else {
+        const data = await res.json();
+        alert(data.message || 'Failed to delete account.');
+      }
+    } catch (err) {
+      alert('Error deleting account.');
+    } finally {
+      setDeleteLoading(false);
     }
   };
 
@@ -145,6 +193,17 @@ const SecPinbd: React.FC = () => {
           <div className="loader"></div>
         </div>
       )}
+
+      {/* Delete Account Button */}
+      <div className="mt-[30px] text-center">
+        <button
+          onClick={handleDeleteAccount}
+          className="px-6 py-2 bg-[#000] text-[#fff] rounded-full hover:bg-red-700 transition"
+          disabled={deleteLoading}
+        >
+          {deleteLoading ? 'Deleting...' : 'Delete Account'}
+        </button>
+      </div>
 
       <style jsx global>{`
         .loader {

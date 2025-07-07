@@ -27,7 +27,7 @@ const Ev2pnav = () => {
       />
 
       <button className="w-[84px] h-[24px] flex items-center justify-center border-0 transition-colors rounded-full text-[14px] font-[500] bg-[#3A3A3A] text-[#DBDBDB]">
-        Step {stepNumbers[currentStep]} of 6
+        Step {stepNumbers[currentStep as keyof typeof stepNumbers] ?? 1} of 6
       </button>
     </div>
   );

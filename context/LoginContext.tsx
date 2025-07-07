@@ -24,20 +24,46 @@ interface LoginContextType {
 const LoginContext = createContext<LoginContextType | undefined>(undefined);
 
 export const LoginProvider = ({ children }: { children: ReactNode }) => {
-  const [user, setUserState] = useState<UserData | null>(() => {
-    if (typeof window !== 'undefined') {
-      try {
-        const storedUser = localStorage.getItem('user');
-        return storedUser ? JSON.parse(storedUser) : null;
-      } catch (error) {
-        console.error('Failed to parse user data:', error);
-        return null;
-      }
-    }
-    return null;
-  });
-
+  const [user, setUserState] = useState<UserData | null>(null);
   const [currentStep, setCurrentStep] = useState<LoginStep>('LoginE&P');
+
+  // Sync user state with localStorage on mount and when localStorage changes
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const storedUser = localStorage.getItem('user');
+      if (storedUser) {
+        try {
+          setUserState(JSON.parse(storedUser));
+        } catch (error) {
+          console.error('Failed to parse user data:', error);
+          setUserState(null);
+        }
+      } else {
+        setUserState(null);
+      }
+
+      // Listen for changes to localStorage from other tabs/windows
+      const handleStorage = (event: StorageEvent) => {
+        if (event.key === 'user') {
+          if (event.newValue) {
+            setUserState(JSON.parse(event.newValue));
+          } else {
+            setUserState(null);
+          }
+        }
+      };
+      window.addEventListener('storage', handleStorage);
+      return () => window.removeEventListener('storage', handleStorage);
+    }
+  }, []);
+
+  // Save user to localStorage whenever it changes (except password)
+  useEffect(() => {
+    if (typeof window !== 'undefined' && user) {
+      const { password, ...userToStore } = user;
+      localStorage.setItem('user', JSON.stringify(userToStore));
+    }
+  }, [user]);
 
   const setUser = (newUser: UserData | Partial<UserData>) => {
     try {
@@ -48,19 +74,10 @@ export const LoginProvider = ({ children }: { children: ReactNode }) => {
       if ('email' in newUser) {
         // Complete user object
         const updatedUser = userToStore as UserData;
-        if (typeof window !== 'undefined') {
-          localStorage.setItem('user', JSON.stringify(updatedUser));
-        }
-        setUserState(updatedUser);
+        setUserState(prev => ({ ...prev, ...updatedUser }));
       } else {
         // Partial update
-        setUserState(prev => {
-          const updatedUser = prev ? { ...prev, ...userToStore } : null;
-          if (updatedUser && typeof window !== 'undefined') {
-            localStorage.setItem('user', JSON.stringify(updatedUser));
-          }
-          return updatedUser;
-        });
+        setUserState(prev => (prev ? { ...prev, ...userToStore } : null));
       }
     } catch (error) {
       console.error('Error setting user:', error);
@@ -73,22 +90,11 @@ export const LoginProvider = ({ children }: { children: ReactNode }) => {
       const dataToStore = { ...data };
       delete dataToStore.password;
 
-      setUserState(prev => {
-        const updatedUser = prev ? { ...prev, ...dataToStore } : null;
-        if (updatedUser && typeof window !== 'undefined') {
-          localStorage.setItem('user', JSON.stringify(updatedUser));
-        }
-        return updatedUser;
-      });
+      setUserState(prev => (prev ? { ...prev, ...dataToStore } : null));
     } catch (error) {
       console.error('Error updating user:', error);
     }
   };
-
-  useEffect(() => {
-    // For debugging: log user context changes
-    // console.log('User context updated:', user);
-  }, [user]);
 
   return (
     <LoginContext.Provider value={{ user, setUser, updateUser, currentStep, setCurrentStep }}>

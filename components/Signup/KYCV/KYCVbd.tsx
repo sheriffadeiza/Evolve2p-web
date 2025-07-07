@@ -39,7 +39,7 @@ const KYCVbd = () => {
       const data = await res.json();
 
       if (data.inquiry_id) {
-        const personaLink = `https://withpersona.com/verify?inquiry-id=${data.inquiry_id}&redirect-uri=http://localhost:3000/Loader`;
+        const personaLink = `https://withpersona.com/verify?inquiry-id=${data.inquiry_id}&redirect-uri=http://evolve2p-91v6inm68-sheriffadeizas-projects.vercel.app/Loader`;
         window.location.href = personaLink;
         return;
       }

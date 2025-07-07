@@ -24,6 +24,14 @@ const Profilebd = () => {
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
 
+  // Ensure username is stored in localStorage for dashboard recognition
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const user = localStorage.getItem('user');
+      console.log('Profilebd: user in localStorage at mount:', user);
+    }
+  }, []);
+
   // Fetch countries
   useEffect(() => {
     const fetchCountries = async () => {
@@ -159,6 +167,11 @@ const Profilebd = () => {
         updateSignupData(userData);
         // Save the full user profile including email
         localStorage.setItem('userProfile', JSON.stringify(userData));
+        // --- Ensure dashboard/context gets username ---
+        localStorage.setItem('user', JSON.stringify(userData));
+        // --- Debug: log what was just saved ---
+        console.log('Profilebd: userData saved to localStorage user:', userData);
+        // ---------------------------------------------
         localStorage.removeItem('userEmail');
         localStorage.removeItem('userPassword');
         setShowSuccessModal(true);
