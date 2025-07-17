@@ -1,42 +1,45 @@
 "use client";
 
-import React, { useState } from 'react';
-import Head from 'next/head';
-import Evolve_ee from '../../../public/Assets/Evolve_ee/Clip path group.png';
-import Image from 'next/image';
-import { useRouter } from 'next/navigation';
-import Times from '../../../public/Assets/Evolve2p_times/Icon container.png';
+import React, { useState } from "react";
+import Head from "next/head";
+import Evolve_ee from "../../../public/Assets/Evolve_ee/Clip path group.png";
+import Image from "next/image";
+import { useRouter } from "next/navigation";
+import Times from "../../../public/Assets/Evolve2p_times/Icon container.png";
 
 const KYCVbd = () => {
   const [loading, setLoading] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const router = useRouter();
 
-  // Get accessToken from localStorage
-  const getAccessToken = () => {
-    if (typeof window === 'undefined') return null;
-    return localStorage.getItem('accessToken');
-  };
+  const user = localStorage.getItem("UserData")
+    ? JSON.parse(localStorage.getItem("UserData") as string)
+    : null;
 
   const handleVerifyClick = async () => {
     setLoading(true);
     try {
-      const accessToken = getAccessToken();
-      if (!accessToken) {
-        console.log('Session expired. Please log in again.');
+      if (!user) {
+        console.log("Session expired. Please log in again.");
         setLoading(false);
         return;
       }
 
-      const res = await fetch('https://evolve2p-backend.onrender.com/api/kyc-get-link', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${accessToken}`,
-        },
-      });
+      const res = await fetch(
+        "https://evolve2p-backend.onrender.com/api/kyc-get-link",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${user.accessToken}`,
+          },
+        }
+      );
 
       const data = await res.json();
+
+      console.log(data);
+      return;
 
       if (data.inquiry_id) {
         const personaLink = `https://withpersona.com/verify?inquiry-id=${data.inquiry_id}&redirect-uri=http://evolve2p-91v6inm68-sheriffadeizas-projects.vercel.app/Loader`;
@@ -49,16 +52,16 @@ const KYCVbd = () => {
         return;
       }
 
-      console.log('Backend error:', data);
+      console.log("Backend error:", data);
       setLoading(false);
     } catch (err) {
-      console.log('Network error:', err);
+      console.log("Network error:", err);
       setLoading(false);
     }
   };
 
   const handleVerifyLater = () => {
-    router.push('/Loader');
+    router.push("/Loader");
   };
 
   // Improved modal toggle: closes when clicking outside modal content
@@ -75,29 +78,43 @@ const KYCVbd = () => {
       </Head>
       <div className="min-h-screen flex items-center justify-center bg-[#0F1012] text-white px-4">
         <div className="absolute top-[250px] left-[15%]">
-          <Image src={Evolve_ee} alt="Evolve2p Logo" width={138.728} height={33.045} />
+          <Image
+            src={Evolve_ee}
+            alt="Evolve2p Logo"
+            width={138.728}
+            height={33.045}
+          />
         </div>
 
         {/* Main Content */}
         <div className="max-w-md w-full ml-[80px] space-y-6">
-          <h1 className="text-[24px] mt-[25%] text-[#ffffff] font-[700]">Verify Your Identity</h1>
+          <h1 className="text-[24px] mt-[25%] text-[#ffffff] font-[700]">
+            Verify Your Identity
+          </h1>
           <p className="text-[16px] font-[400] text-[#8F8F8F]">
-            For security and compliance, we need to verify your identity <br /> before you can start trading.
+            For security and compliance, we need to verify your identity <br />{" "}
+            before you can start trading.
           </p>
 
           {/* Info Cards */}
           <div className="bg-[#2D2D2D] w-[72%] h-[10vh] pt-[5px] pl-[15px] rounded-[8px]">
-            <p className="font-[500] text-[14px] text-[#FCFCFC]">Required for regulation</p>
+            <p className="font-[500] text-[14px] text-[#FCFCFC]">
+              Required for regulation
+            </p>
             <p className="text-[#DBDBDB] mt-[-10px] text-[12px] font-[400]">
               We are required to verify your identity.
             </p>
           </div>
 
           <div className="bg-[#2D2D2D] mt-[20px] w-[72%] h-[10vh] pt-[5px] pl-[15px] rounded-[8px]">
-            <p className="font-[500] text-[14px] text-[#FCFCFC]">We value your privacy</p>
+            <p className="font-[500] text-[14px] text-[#FCFCFC]">
+              We value your privacy
+            </p>
             <p className="text-[#DBDBDB] mt-[-10px] text-[12px] font-[400]">
-              This helps us protect your Evolve2p account. See{' '}
-              <span className="text-[#4DF2BE] underline cursor-pointer">privacy policy.</span>
+              This helps us protect your Evolve2p account. See{" "}
+              <span className="text-[#4DF2BE] underline cursor-pointer">
+                privacy policy.
+              </span>
             </p>
           </div>
 
@@ -118,7 +135,7 @@ const KYCVbd = () => {
                 disabled={loading}
               >
                 {loading ? (
-                  'Getting link...'
+                  "Getting link..."
                 ) : (
                   <>
                     Verify with
@@ -166,20 +183,30 @@ const KYCVbd = () => {
             className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[1000]"
             onClick={handleModalBackgroundClick}
           >
-           
-            <div className="bg-[#000] ml-[50px] pl-[20px] pr-[20px] h-[70vh] mt-[-60%] rounded-lg p-6 max-w-md w-[50%] mx-4" onClick={e => e.stopPropagation()}>
-               <div className='text-[#FFFFFF]    mt-[15px] text-[16px] font-[700]'>Identity Verifiaction
-                
-                <Image src={Times} alt={'times'} width={20} height={20} className="absolute top-4 ml-[28%] cursor-pointer" onClick={toggleModal} />
-               </div>
+            <div
+              className="bg-[#000] ml-[50px] pl-[20px] pr-[20px] h-[70vh] mt-[-60%] rounded-lg p-6 max-w-md w-[50%] mx-4"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="text-[#FFFFFF]    mt-[15px] text-[16px] font-[700]">
+                Identity Verifiaction
+                <Image
+                  src={Times}
+                  alt={"times"}
+                  width={20}
+                  height={20}
+                  className="absolute top-4 ml-[28%] cursor-pointer"
+                  onClick={toggleModal}
+                />
+              </div>
               <div className="flex justify-between mt-[20px] items-center mb-4">
-                
-                <h2 className="text-[20px] font-[700]  text-[#FFFFFF]">How verifying your identity works</h2>
-              
+                <h2 className="text-[20px] font-[700]  text-[#FFFFFF]">
+                  How verifying your identity works
+                </h2>
               </div>
 
               <p className="text-[#8F8F8F] mb-4">
-                To verify your identity, Portions will ask you to scan a government-level ID (Request, Direct) License or National ID.
+                To verify your identity, Portions will ask you to scan a
+                government-level ID (Request, Direct) License or National ID.
               </p>
 
               <p className="text-[#8F8F8F] mb-4 font-[500]">
@@ -192,13 +219,16 @@ const KYCVbd = () => {
                 <li>Your Date of Birth</li>
                 <li>City & Country of Issuance</li>
                 <li>ID Type & Issuing Authority</li>
-                <li>A Secure, Reliable Copy of Your ID (No sensitive details are shared)
-</li>
+                <li>
+                  A Secure, Reliable Copy of Your ID (No sensitive details are
+                  shared)
+                </li>
               </ul>
 
               <p className="text-[#8F8F8F] mb-4">
-              This process ensures a safe and trusted trading experience for all users.              </p>
-              
+                This process ensures a safe and trusted trading experience for
+                all users.{" "}
+              </p>
             </div>
           </div>
         )}

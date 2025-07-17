@@ -1,22 +1,26 @@
-'use client';
+"use client";
 
-import React, { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import React, { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 
-const CHECK_PIN_ENDPOINT = 'https://evolve2p-backend.onrender.com/api/check-pin';
+const CHECK_PIN_ENDPOINT =
+  "https://evolve2p-backend.onrender.com/api/check-pin";
 
 const Lsecpinbd: React.FC = () => {
-  const [pin, setPin] = useState<string[]>(['', '', '', '']);
+  const [pin, setPin] = useState<string[]>(["", "", "", ""]);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string>('');
-  const [success, setSuccess] = useState<string>('');
+  const [error, setError] = useState<string>("");
+  const [success, setSuccess] = useState<string>("");
   const router = useRouter();
 
+  const userData = localStorage.getItem("UserData")
+    ? JSON.parse(localStorage.getItem("UserData") as string)
+    : null;
+
   useEffect(() => {
-    const token = localStorage.getItem('accessToken');
-    if (!token) {
-      setError('Please login first');
-      setTimeout(() => router.push('/Logins/login'), 1500);
+    if (!userData) {
+      setError("Please login first");
+      setTimeout(() => router.push("/Logins/login"), 1500);
     }
   }, [router]);
 
@@ -25,90 +29,85 @@ const Lsecpinbd: React.FC = () => {
     const newPin = [...pin];
     newPin[idx] = val;
     setPin(newPin);
-    setError('');
+    setError("");
     if (val && idx < 3) {
       document.getElementById(`pin-${idx + 1}`)?.focus();
     }
   };
 
   const handleKeyDown = (e: React.KeyboardEvent, idx: number) => {
-    if (e.key === 'Backspace' && !pin[idx] && idx > 0) {
+    if (e.key === "Backspace" && !pin[idx] && idx > 0) {
       document.getElementById(`pin-${idx - 1}`)?.focus();
     }
   };
 
   const handleSubmit = async () => {
-    setError('');
-    setSuccess('');
-    const tempPin = pin.join('');
+    setError("");
+    setSuccess("");
+    const tempPin = pin.join("");
     if (tempPin.length !== 4) {
-      setError('Please enter your 4-digit PIN');
+      setError("Please enter your 4-digit PIN");
       return;
     }
 
-    const token = localStorage.getItem('accessToken');
-    const email = localStorage.getItem('loginEmail') || '';
-    if (!token) {
-      setError('Session expired. Please login again.');
-      setTimeout(() => router.push('/Logins/login'), 1500);
-      return;
-    }
-    if (!email) {
-      setError('No email found. Please login again.');
-      setTimeout(() => router.push('/Logins/login'), 1500);
+    if (!userData?.accessToken) {
+      setError("Session expired. Please login again.");
+      setTimeout(() => router.push("/Logins/login"), 1500);
       return;
     }
 
     setLoading(true);
     try {
       const response = await fetch(CHECK_PIN_ENDPOINT, {
-        method: 'POST',
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${userData?.accessToken}`,
         },
-        body: JSON.stringify({ email, pin: tempPin }),
+        body: JSON.stringify({
+          email: userData?.userData?.email,
+          pin: tempPin,
+        }),
       });
 
-      const data = await response.json().catch(() => ({}));
+      const data = await response.json();
 
-      let msg = '';
-      if (!response.ok) {
-        if (typeof data.message === 'string') msg = data.message;
-        else if (typeof data.detail === 'string') msg = data.detail;
-        else msg = 'Invalid PIN. Please try again.';
-        setError(msg);
-        setPin(['', '', '', '']);
+      if (!data?.success) {
+        setError(data?.message);
+        setPin(["", "", "", ""]);
         return;
       }
 
-      setSuccess('PIN verified!');
+      setSuccess("PIN verified!");
       setTimeout(() => {
-        router.push('/Loader');
+        router.push("/Loader");
       }, 1000);
     } catch (err: any) {
-      setError('Network error. Please try again.');
+      setError("Network error. Please try again.");
     } finally {
       setLoading(false);
     }
   };
 
-  const isPinComplete = pin.every((digit) => digit !== '');
+  const isPinComplete = pin.every((digit) => digit !== "");
 
   return (
     <div className="text-white ml-[95px] mt-[30px]">
-      <h2 className="text-[24px] text-[#FCFCFC] font-[700]">Enter security PIN</h2>
+      <h2 className="text-[24px] text-[#FCFCFC] font-[700]">
+        Enter security PIN
+      </h2>
       <p className="text-[16px] font-[400] mt-[-10px] mb-6 text-[#8F8F8F]">
-        Your PIN helps you log in faster and approve transactions <br /> securely.
+        Your PIN helps you log in faster and approve transactions <br />{" "}
+        securely.
       </p>
 
-      {error && typeof error === 'string' && (
+      {error && typeof error === "string" && (
         <div className="p-4 mb-4 text-[#F5918A] bg-[#332222] rounded w-[90%] border border-[#553333]">
           <p className="text-sm mt-1">{error}</p>
         </div>
       )}
 
-      {success && typeof success === 'string' && (
+      {success && typeof success === "string" && (
         <div className="p-3 mb-4 text-[#4DF2BE] bg-[#223322] rounded w-[90%]">
           <p>{success}</p>
         </div>
@@ -137,13 +136,13 @@ const Lsecpinbd: React.FC = () => {
           onClick={handleSubmit}
           disabled={loading}
         >
-          {loading ? 'Verifying...' : 'Continue'}
+          {loading ? "Verifying..." : "Continue"}
         </button>
       )}
 
       <div
         className="text-[14px] mt-[70px] ml-[-20%] font-[700] text-center text-[#FCFCFC] hover:underline cursor-pointer"
-        onClick={() => alert('Forgot PIN functionality coming soon')}
+        onClick={() => alert("Forgot PIN functionality coming soon")}
       >
         Forgot PIN
       </div>
@@ -161,20 +160,24 @@ const Lsecpinbd: React.FC = () => {
           position: relative;
         }
         .loader::after {
-          content: '';
+          content: "";
           position: absolute;
           top: 0;
           left: 0;
           width: 70%;
           height: 70%;
           border: 5px solid #333333;
-          border-top-color: #4DF2BE;
+          border-top-color: #4df2be;
           border-radius: 50%;
           animation: spin 1s linear infinite;
         }
         @keyframes spin {
-          0% { transform: rotate(0deg); }
-          100% { transform: rotate(360deg); }
+          0% {
+            transform: rotate(0deg);
+          }
+          100% {
+            transform: rotate(360deg);
+          }
         }
       `}</style>
     </div>

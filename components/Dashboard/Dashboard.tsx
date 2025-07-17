@@ -35,7 +35,6 @@ const Dashboard = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const router = useRouter();
-  const { user } = useLogin();
 
   const [showVerifyModal, setShowVerifyModal] = useState(false);
   const [showHowModal, setShowHowModal] = useState(false);
@@ -46,19 +45,15 @@ const Dashboard = () => {
 
   const toggleVerifyModal = () => setShowVerifyModal(!showVerifyModal);
   const toggleHowModal = () => setShowHowModal(!showHowModal);
-  console.log(user);
+
+  const user = localStorage.getItem("UserData")
+    ? JSON.parse(localStorage.getItem("UserData") as string)
+    : null;
 
   useEffect(() => {
     const checkAuth = async () => {
       try {
-        const token =
-          typeof window !== "undefined"
-            ? localStorage.getItem("accessToken")
-            : null;
-        const userData =
-          typeof window !== "undefined" ? localStorage.getItem("user") : null;
-
-        if (!token || !userData) {
+        if (!user) {
           setError("Please login first");
           setTimeout(() => router.push("/Logins/login"), 1500);
           return;
@@ -97,20 +92,19 @@ const Dashboard = () => {
   return (
     <main className="min-h-screen bg-[#0F1012] pr-[10px] mt-[30px] pl-[30px] text-white md:p-8">
       <div className="max-w-7xl mx-auto">
-         <Nav />
-          
-          {/* Main Content */}   
+        <Nav />
+
+        {/* Main Content */}
         {/* Header */}
         <div className="flex space-x-[5px]  text-[24px] font-[500] items-center mb-6">
           <p className="text-[#8F8F8F]">Hello,</p>
           <p className="text-[#FCFCFC]">
-            {user?.username
-              ? user.username.startsWith("@")
-                ? user.username
-                : `@${user.username}`
+            {user?.userData?.username
+              ? user?.userData?.username.startsWith("@")
+                ? user?.userData?.username
+                : `@${user?.userData?.username}`
               : "User"}
           </p>
-
         </div>
 
         <div
@@ -163,15 +157,27 @@ const Dashboard = () => {
               </p>
               <ul className="text-[14px] font-[400] ml-[-40px] text-[#DBDBDB] mt-[50px] mb-4 space-y-[15px] list-none">
                 <li className="flex items-center  gap-2">
-                  <Image src={checklistInactive} alt="checklist" className="mr-[10px]" />
+                  <Image
+                    src={checklistInactive}
+                    alt="checklist"
+                    className="mr-[10px]"
+                  />
                   Generate wallet address
                 </li>
                 <li className="flex items-center gap-2">
-                  <Image src={checklistInactive} alt="checklist" className="mr-[10px]" />
+                  <Image
+                    src={checklistInactive}
+                    alt="checklist"
+                    className="mr-[10px]"
+                  />
                   Access Buy/Sell offers
                 </li>
                 <li className="flex items-center  gap-2">
-                  <Image src={checklistInactive} alt="checklist" className="mr-[10px]" />
+                  <Image
+                    src={checklistInactive}
+                    alt="checklist"
+                    className="mr-[10px]"
+                  />
                   Send and receive crypto safely
                 </li>
               </ul>
@@ -189,7 +195,7 @@ const Dashboard = () => {
               <button
                 onClick={handleVerifyClick}
                 className="w-[496px] h-[48px] bg-[#4DF2BE] mt-[30px]  text-[#0F1012] py-2 rounded-full font-[700] text-[14px]"
-              style={{border: "1px solid #4DF2BE"}}
+                style={{ border: "1px solid #4DF2BE" }}
               >
                 Verify My Account
               </button>
@@ -944,7 +950,7 @@ const Dashboard = () => {
           </div>
         </div>
 
-         <Footer/>
+        <Footer />
       </div>
     </main>
   );
