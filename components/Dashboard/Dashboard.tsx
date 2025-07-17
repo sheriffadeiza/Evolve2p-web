@@ -5,8 +5,7 @@ import { useRouter } from "next/navigation";
 import { useLogin } from "@/context/LoginContext";
 import Image from "next/image";
 import Logo from "../../public/Assets/Evolve2p_logods/Dashboard/Logo.svg";
-import Bell from "../../public/Assets/Evolve2p_bell/elements.svg";
-import Profile from "../../public/Assets/Evolve2p_profile/Dashboard/elements.svg";
+import Nav from "../../components/NAV/Nav";
 import Parrow from "../../public/Assets/Evolve2p_pArrow/elements.svg";
 import icon_i from "../../public/Assets/Evolve2p_i/Dashboard/elements.svg";
 import SlashH from "../../public/Assets/Evolve2p_viewslash/view-off-slash.png";
@@ -28,15 +27,26 @@ import Limit from "../../public/Assets/Evolve2p_Limit/elements.svg";
 import Set from "../../public/Assets/Evolve2p_Set/elements.svg";
 import Refer from "../../public/Assets/Evolve2p_Refer/elements.svg";
 import G19 from "../../public/Assets/Evolve2p_group19/Group 19.svg";
+import Times from "../../public/Assets/Evolve2p_times/Icon container.png";
+import checklistInactive from "../../public/Assets/Evolve2p_checklist2/checklist-inactive.svg";
+import Footer from "../Footer/Footer";
+
 const Dashboard = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const router = useRouter();
   const { user } = useLogin();
 
-  // Debug: log user and username
-  console.log("Dashboard user:", user);
-  console.log("Dashboard username:", user?.username);
+  const [showVerifyModal, setShowVerifyModal] = useState(false);
+  const [showHowModal, setShowHowModal] = useState(false);
+
+  const handleVerifyClick = () => {
+    router.push("/Signups/KYC");
+  };
+
+  const toggleVerifyModal = () => setShowVerifyModal(!showVerifyModal);
+  const toggleHowModal = () => setShowHowModal(!showHowModal);
+  console.log(user);
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -87,37 +97,9 @@ const Dashboard = () => {
   return (
     <main className="min-h-screen bg-[#0F1012] pr-[10px] mt-[30px] pl-[30px] text-white md:p-8">
       <div className="max-w-7xl mx-auto">
-        <nav className="flex">
-          <div className=" mt-[8px] ">
-            <Image src={Logo} alt="logo" />
-          </div>
-          <ul className="flex space-x-[40px] text-[#FFFFFF] list-none mb-[25px]">
-            <li>Dashboard</li>
-            <li>Wallet</li>
-            <li>Marketplace</li>
-            <li>Trade history</li>
-            <li>Support</li>
-          </ul>
-          <div className="flex items-center space-x-[10px] ml-auto mr-[20px]">
-            <div
-              className="w-[30px] h-[25px] justify-center flex items-center bg-transparent mt-[10px] mr-[20px] mb-[10px] relative border rounded-full"
-              style={{ borderColor: "#2D2D2D", borderWidth: "1px" }}
-            >
-              <Image src={Bell} alt="bell" />
-              <span className="absolute text-[white] text-[10px] -top-[1.5px] -right-[-1.5px] w-[10px] h-[12px] bg-[red] font-[500] rounded-full text-xs flex items-center justify-center text-white">
-                0
-              </span>
-            </div>
-            <div
-              className="flex w-[40px] h-[25px] items-center bg-transparent mt-[10px]  pr-[5px] space-x-[15px] mr-[20px]  mb-[15px] border rounded-full"
-              style={{ borderColor: "#2D2D2D", borderWidth: "1px" }}
-            >
-              <Image src={Profile} alt="itsprofile" />
-              <Image src={Parrow} alt="itsprofile" />
-            </div>
-          </div>
-        </nav>
-
+         <Nav />
+          
+          {/* Main Content */}   
         {/* Header */}
         <div className="flex space-x-[5px]  text-[24px] font-[500] items-center mb-6">
           <p className="text-[#8F8F8F]">Hello,</p>
@@ -128,6 +110,7 @@ const Dashboard = () => {
                 : `@${user.username}`
               : "User"}
           </p>
+
         </div>
 
         <div
@@ -141,11 +124,134 @@ const Dashboard = () => {
           <p className="text-[14px] ml-[20px] font-[500px] text-[#FCFCFC]">
             Complete KYC and enjoy access to all features available on the app.
           </p>
-          <button className="text-[14px] w-[127px] h-[33px]  text-center ml-[25px] text-[#4DF2BE] font-[700] bg-[#2D2D2D] border border-[#222] rounded-full">
+          <button
+            className="text-[14px] w-[127px] h-[33px]  text-center ml-[25px] text-[#4DF2BE] font-[700] bg-[#2D2D2D] border border-[#222] rounded-full"
+            onClick={toggleVerifyModal}
+          >
             Complete KYC
           </button>
         </div>
 
+        {/* Verification Modal */}
+
+        {showVerifyModal && (
+          <div
+            className="fixed inset-0 bg-[#222222] flex items-center top-[100px]  ml-[25%]  justify-center z-[1000]"
+            onClick={toggleVerifyModal}
+            style={{ borderTop: "1px solid #222" }}
+          >
+            <div
+              className="bg-[#0F1012] rounded-lg p-6 w-[560px] h-[400px] pl-[25px]  relative text-white shadow-lg"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <Image
+                src={Times}
+                alt={"times"}
+                width={20}
+                height={20}
+                className="absolute top-[20px] w-[32px] h-[32px]  ml-[85%] cursor-pointer"
+                onClick={toggleVerifyModal}
+              />
+
+              <h2 className="text-[16px]  font-[700] mt-[25px] text-[#FCFCFC] mb-4">
+                Complete Your Verification First
+              </h2>
+              <p className="text-[#DBDBDB] text-[16px] mt-[60px] font-[400] mb-4">
+                To perform this action, you need to verify your identity. This
+                helps keep Evolve2p secure for everyone and aligns with global
+                compliance regulations.
+              </p>
+              <ul className="text-[14px] font-[400] ml-[-40px] text-[#DBDBDB] mt-[50px] mb-4 space-y-[15px] list-none">
+                <li className="flex items-center  gap-2">
+                  <Image src={checklistInactive} alt="checklist" className="mr-[10px]" />
+                  Generate wallet address
+                </li>
+                <li className="flex items-center gap-2">
+                  <Image src={checklistInactive} alt="checklist" className="mr-[10px]" />
+                  Access Buy/Sell offers
+                </li>
+                <li className="flex items-center  gap-2">
+                  <Image src={checklistInactive} alt="checklist" className="mr-[10px]" />
+                  Send and receive crypto safely
+                </li>
+              </ul>
+
+              <p
+                className="text-[#4DF2BE] text-[14px]  mb-6 font-[700] cursor-pointer"
+                onClick={() => {
+                  toggleVerifyModal();
+                  setTimeout(() => toggleHowModal(), 100);
+                }}
+              >
+                How does this works?
+              </p>
+
+              <button
+                onClick={handleVerifyClick}
+                className="w-[496px] h-[48px] bg-[#4DF2BE] mt-[30px]  text-[#0F1012] py-2 rounded-full font-[700] text-[14px]"
+              style={{border: "1px solid #4DF2BE"}}
+              >
+                Verify My Account
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* How It Works Modal */}
+        {showHowModal && (
+          <div
+            className="fixed inset-0 bg-black bg-opacity-50 mt-[30%] flex items-center justify-center z-[1000]"
+            onClick={toggleHowModal}
+          >
+            <div
+              className="bg-[#000] ml-[50px] pl-[20px] pr-[20px] h-[70vh] mt-[-60%] rounded-lg p-6 max-w-md w-[50%] mx-4"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="text-[#FFFFFF]    mt-[15px] text-[16px] font-[700]">
+                Identity Verifiaction
+                <Image
+                  src={Times}
+                  alt={"times"}
+                  width={20}
+                  height={20}
+                  className="absolute top-4 ml-[28%] cursor-pointer"
+                  onClick={toggleHowModal}
+                />
+              </div>
+              <div className="flex justify-between mt-[20px] items-center mb-4">
+                <h2 className="text-[20px] font-[700]  text-[#FFFFFF]">
+                  How verifying your identity works
+                </h2>
+              </div>
+
+              <p className="text-[#8F8F8F] mb-4">
+                To verify your identity, Portions will ask you to scan a
+                government-level ID (Request, Direct) License or National ID.
+              </p>
+
+              <p className="text-[#8F8F8F] mb-4 font-[500]">
+                For security and compliance, Evolve2p will receive:
+              </p>
+
+              <ul className="list-disc pl-5 text-[#8F8F8F] mb-4 space-y-2">
+                <li>Verification Status (Approved or Rejected)</li>
+                <li>Your Full Legal Name</li>
+                <li>Your Date of Birth</li>
+                <li>City & Country of Issuance</li>
+                <li>ID Type & Issuing Authority</li>
+                <li>
+                  A Secure, Reliable Copy of Your ID (No sensitive details are
+                  shared)
+                </li>
+              </ul>
+
+              <p className="text-[#8F8F8F] mb-4">
+                This process ensures a safe and trusted trading experience for
+                all users.{" "}
+              </p>
+            </div>
+          </div>
+        )}
         {/* Balance Cards */}
         <div className="flex md:flex-row justify-between pr-[30px] mt-[5px]">
           {/*left_side */}
@@ -577,27 +683,29 @@ const Dashboard = () => {
                     </p>
                   </div>
                 </div>
-                
               </div>
             </div>
-           <div className="w-[913px] h-[722px]">
-  <div className="flex items-center justify-between mt-[40%] w-[900px] h-[24px] rounded-[12px]">
-    <p className="text-[16px] font-[500] text-[#8F8F8F]">Transactions</p>
-    <div className="flex-1 flex flex-col items-center  mt-[30%] justify-center">
-      <Image src={G19} alt="group19" />
-      <p className="text-[14px] font-[400] text-[#8F8F8F] mt-2">
-        Your 10 most recent transactions will appear here
-      </p>
-    </div>
-    <div className="flex items-center space-x-[10px]">
-      <p className="text-[14px] font-[700] text-[#FCFCFC]">See all</p>
-      <Image src={R_arrow} alt="rarrow" />
-    </div>
-  </div>
-</div>
-</div>
-
-          
+            <div className="w-[913px] h-[722px]">
+              <div className="flex items-center justify-between mt-[40%] w-[900px] h-[24px] rounded-[12px]">
+                <p className="text-[16px] font-[500] text-[#8F8F8F]">
+                  Transactions
+                </p>
+                <div className="flex-1 flex flex-col items-center  mt-[30%] justify-center">
+                  <Image src={G19} alt="group19" />
+                  <p className="text-[14px] font-[400] text-[#8F8F8F] mt-2">
+                    Your 10 most recent transactions will appear here
+                  </p>
+                </div>
+                <div className="flex items-center space-x-[10px]">
+                  <p className="text-[14px] font-[700] text-[#FCFCFC]">
+                    See all
+                  </p>
+                  <Image src={R_arrow} alt="rarrow" />
+                </div>
+              </div>
+              <div className="w-[153.8%] ml-[-10%] h-[1px] bg-[#fff] mt-[40%] opacity-20 my-8"></div>
+            </div>
+          </div>
 
           {/* right_side */}
           <div className="flex flex-col space-y-[10px] ml-[20px] mt-[40px] pr-[25px]">
@@ -739,8 +847,7 @@ const Dashboard = () => {
                     wordBreak: "break-word",
                   }}
                 >
-                  Unlock higher trading limits by
-                  upgrading verification.
+                  Unlock higher trading limits by upgrading verification.
                 </small>
               </div>
 
@@ -772,7 +879,7 @@ const Dashboard = () => {
 
               <div className="flex flex-col justify-center ml-[16px] ">
                 <p className="text-[14px] font-[500] text-[#FCFCFC] mb-[5px] whitespace-nowrap ">
-                 Set Up 2FA
+                  Set Up 2FA
                 </p>
                 <small
                   className="text-[12px] text-[#DBDBDB] font-[400] leading-tight"
@@ -814,7 +921,7 @@ const Dashboard = () => {
 
               <div className="flex flex-col justify-center ml-[16px] ">
                 <p className="text-[14px] font-[500] text-[#FCFCFC] mb-[5px] whitespace-nowrap ">
-                Refer & Earn
+                  Refer & Earn
                 </p>
                 <small
                   className="text-[12px] text-[#DBDBDB] font-[400] leading-tight"
@@ -835,18 +942,9 @@ const Dashboard = () => {
               />
             </div>
           </div>
-          
         </div>
 
-        
-        {/* Footer */}
-        <div className="mt-6 text-center text-sm mt-[50%] text-gray-400">
-          <p>Your 10 most recent transactions will appear here</p>
-        </div>
-        <div className="mt-10 text-center text-xs text-gray-600">
-          <p>Features • Help • Privacy Policy • Terms of Service</p>
-          <p>© 2025 Evolve2p. All rights reserved.</p>
-        </div>
+         <Footer/>
       </div>
     </main>
   );
