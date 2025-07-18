@@ -3,14 +3,12 @@
 import React, { useState, useEffect } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { useSignup } from "@/context/SignupContext";
 import eyeIcon from "../../../public/Assets/Evolve2p_viewslash/view-off-slash.png";
 import checklistInactive from "../../../public/Assets/Evolve2p_checklist2/checklist-inactive.svg";
 import checklistActive from "../../../public/Assets/Evolve2p_checklist2/checklist-active.svg";
 
 const Passwordbd = () => {
   const router = useRouter();
-  const { updateSignupData, setCurrentStep } = useSignup();
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -22,7 +20,7 @@ const Passwordbd = () => {
   // Get email from localStorage on mount
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      setUserEmail(localStorage.getItem("userEmail") || "");
+      setUserEmail(localStorage.getItem("UserEmail") || "");
     }
   }, []);
 
@@ -59,11 +57,14 @@ const Passwordbd = () => {
     setIsLoading(true);
 
     try {
-      updateSignupData({ password });
+
+    const UserPassword = password;
+    
+    console.log(UserPassword)
       if (typeof window !== 'undefined') {
-        localStorage.setItem("userPassword", password);
+        localStorage.setItem("UserPassword", password);
       }
-      setCurrentStep("secpin");
+
       router.push("/Signups/VerifyEmail");
     } catch (err: any) {
       setError(

@@ -2,7 +2,6 @@
 
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
-import { useLogin } from "@/context/LoginContext";
 import Image from "next/image";
 import image from "../../../public/Assets/Evolve2p_viewslash/view-off-slash.png";
 
@@ -10,7 +9,6 @@ const BASE_URL = "https://evolve2p-backend.onrender.com/api/";
 
 const Loginbd: React.FC = () => {
   const router = useRouter();
-  const { setUser } = useLogin();
   const [showPassword, setShowPassword] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");

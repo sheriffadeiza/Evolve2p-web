@@ -3,15 +3,15 @@
 import React from 'react';
 import Image from 'next/image';
 import image from '../../../public/Assets/Evolve2p_goback/Content.png';
-import { useSignup } from '@/context/SignupContext';
 import { useRouter } from 'next/navigation';
 
 const Passnav = () => {
-  const { setCurrentStep } = useSignup();
   const router = useRouter();
 
   const handleGoBack = () => {
-    setCurrentStep('email');
+ localStorage.setItem('currentStep', '1');
+
+    localStorage.getItem('UserEmail');
     router.push('/Signups/Email');
   };
 

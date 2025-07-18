@@ -2,11 +2,9 @@
 
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { useSignup } from '@/context/SignupContext';
 
 const EmailForm = () => {
   const router = useRouter();
-  const { updateSignupData, setCurrentStep } = useSignup();
   const [email, setEmail] = useState('');
   const [error, setError] = useState<string>('');
   const [isLoading, setIsLoading] = useState(false);
@@ -24,21 +22,22 @@ const EmailForm = () => {
       return;
     }
 
-    if (isLoading) return;
-
     setIsLoading(true);
     setError('');
 
     try {
-      // Store email locally & in context, no API call here
-      updateSignupData({ email });
-      localStorage.setItem('userEmail', email);
+      // Simulate an API call or validation
+      console.log(email);
 
-      setCurrentStep('password');
-      router.push('/Signups/Password');
-    } catch (err: any) {
-      console.error('Error saving email:', err);
-      setError(err?.message || 'Something went wrong. Please try again.');
+      // Store the email in localStorage
+      localStorage.setItem("UserEmail", JSON.stringify({ email }));
+
+      // Navigate to next step
+      router.push("/Signups/Password");
+
+    } catch (error) {
+      console.error('Failed to continue:', error);
+      setError('Something went wrong. Please try again.');
     } finally {
       setIsLoading(false);
     }
@@ -52,9 +51,7 @@ const EmailForm = () => {
           Enter your email to start trading securely.
         </p>
 
-        <label className="text-[14px] mt-[10px] font-[500] text-[#8F8F8F]">
-          Email
-        </label>
+        <label className="text-[14px] mt-[10px] font-[500] text-[#8F8F8F]">Email</label>
 
         <input
           type="email"
@@ -97,7 +94,7 @@ const EmailForm = () => {
             and{' '}
             <a href="/privacy" className="text-[#DBDBDB] ml-[5px] no-underline hover:underline">
               Privacy Policy
-            </a>.
+            </a>
           </small>
         </div>
       </div>

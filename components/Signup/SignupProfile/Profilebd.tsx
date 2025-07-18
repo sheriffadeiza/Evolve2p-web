@@ -2,16 +2,16 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { useSignup } from '@/context/SignupContext';
+
+const BASE_URL = "https://evolve2p-backend.onrender.com/api/";
 
 const Profilebd = () => {
   const router = useRouter();
-  const { updateSignupData, setCurrentStep } = useSignup();
 
   const [formData, setFormData] = useState({
     username: '',
-    country: 'Nigeria',
-    countryCode: 'NG',
+    country: '',
+    countryCode: '',
     phone: ''
   });
 
@@ -22,12 +22,14 @@ const Profilebd = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingCountries, setIsLoadingCountries] = useState(true);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
+   const [error, setError] = useState('');
+
   const [errorMessage, setErrorMessage] = useState('');
 
   // Ensure username is stored in localStorage for dashboard recognition
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      const user = localStorage.getItem('user');
+      const user = localStorage.getItem('UserData');
       console.log('Profilebd: user in localStorage at mount:', user);
     }
   }, []);
@@ -108,7 +110,6 @@ const Profilebd = () => {
 
   const handleContinueToSecurityPin = () => {
     setShowSuccessModal(false);
-    setCurrentStep('secpin');
     router.push('/Signups/Secpin');
   };
 
@@ -119,19 +120,16 @@ const Profilebd = () => {
 
     try {
       // Get email and password from localStorage
-      const email = localStorage.getItem('userEmail') || '';
-      const password = localStorage.getItem('userPassword') || '';
+      const email = localStorage.getItem('UserEmail') || '';
+      const password = localStorage.getItem('UserPassword') || '';
 
-      // Validate email
-      const isValidEmail = (email: string) => /\S+@\S+\.\S+/.test(email);
-      if (!email || !isValidEmail(email)) {
-        throw new Error('Session expired or invalid email. Please start over.');
-      }
+      
+      
 
       const selectedCountry = countries.find(c => c.code === formData.countryCode);
       const phoneNumber = selectedCountry ? `${selectedCountry.dialCode}${formData.phone}` : formData.phone;
 
-      const userData = {
+      const UserData = {
         email: email,
         username: formData.username,
         password: password,
@@ -140,78 +138,75 @@ const Profilebd = () => {
         phone: phoneNumber,
       };
 
+      console.log(UserData)
       // Get token if it exists (for example, if user is updating profile)
-      const accessToken = localStorage.getItem('accessToken') || '';
-      if (accessToken) {
-        console.log("Sending profile with token:", accessToken);
-      }
-
+    
       // Send profile data to backend with Authorization header if token exists
-      const res = await fetch('https://evolve2p-backend.onrender.com/api/auth/register', {
+      const SignupResponse = await fetch( BASE_URL + 'auth/register', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          ...(accessToken && { 'Authorization': `Bearer ${accessToken}` }),
         },
-        body: JSON.stringify(userData),
+        body: JSON.stringify(UserData),
       });
 
-      const responseData = await res.json().catch(() => ({}));
+      const data = await SignupResponse.json();
 
-      if (res.status === 201) {
-        // Store accessToken if present in response
-        if (responseData.accessToken) {
-          localStorage.setItem('accessToken', responseData.accessToken);
-          console.log("Access token saved:", responseData.accessToken);
+      console.log(data)
+
+    if (data?.error) {
+        alert(data?.message);
+        return;
+      }
+
+      // Always use accessToken for consistency
+      let token = data?.accessToken;
+
+      const CheckTokenResponse = await fetch(BASE_URL + "check-token", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: "Bearer " + token,
+        },
+      });
+
+       const checkTokenData = await CheckTokenResponse.json();
+
+      if (checkTokenData?.success) {
+        // Get user data - exactly matches login flow
+        const userResponse = await fetch(`${BASE_URL}get-user`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: "Bearer " + token,
+          },
+        });
+
+        const userData = await userResponse.json();
+
+        if (userData?.success) {
+          // Store data in same format as login
+          localStorage.setItem(
+            "UserData",
+            JSON.stringify({ 
+              accessToken: token, 
+              userData: {
+                ...userData?.user,
+                username: formData.username,
+                country: formData.country,
+                phone: phoneNumber
+              }
+            })
+          );
+          router.push("/Signups/Secpin");
         }
-        updateSignupData(userData);
-        // Save the full user profile including email
-        localStorage.setItem('userProfile', JSON.stringify(userData));
-        // --- Ensure dashboard/context gets username ---
-        localStorage.setItem('user', JSON.stringify(userData));
-        // --- Debug: log what was just saved ---
-        console.log('Profilebd: userData saved to localStorage user:', userData);
-        // ---------------------------------------------
-        localStorage.removeItem('userEmail');
-        localStorage.removeItem('userPassword');
-        setShowSuccessModal(true);
-      } else {
-        let errorMessage = 'Failed to complete registration';
-
-        if (typeof responseData.message === 'string') {
-          errorMessage = responseData.message;
-        } else if (Array.isArray(responseData.message)) {
-          errorMessage = responseData.message.join(', ');
-        } else if (typeof responseData.detail === 'string') {
-          errorMessage = responseData.detail;
-        } else if (Array.isArray(responseData.detail)) {
-          errorMessage = responseData.detail.join(', ');
-        } else if (typeof responseData.detail === 'object' && responseData.detail !== null) {
-          errorMessage = Object.entries(responseData.detail)
-            .map(([field, errors]) => `${field}: ${Array.isArray(errors) ? errors.join(', ') : errors}`)
-            .join('; ');
-        } else if (typeof responseData === 'string') {
-          errorMessage = responseData;
-        } else if (Object.keys(responseData).length > 0) {
-          errorMessage = JSON.stringify(responseData);
-        }
-
-        if (
-          errorMessage.toLowerCase().includes('profile is already completed') ||
-          errorMessage.toLowerCase().includes('already registered')
-        ) {
-          errorMessage = "This email is already registered. Please log in instead.";
-        }
-
-        throw new Error(errorMessage);
       }
     } catch (error: any) {
-      setErrorMessage(error.message || 'Failed to complete registration. Please try again.');
+      setError(error.message || 'An error occurred during registration. Please try again.');
     } finally {
       setIsLoading(false);
     }
   };
-
   // --- Country Search State ---
   const [showCountrySearch, setShowCountrySearch] = useState(false);
   const [countrySearchInput, setCountrySearchInput] = useState('');
