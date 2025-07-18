@@ -1,7 +1,7 @@
-'use client';
+"use client";
 
-import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 
 const BASE_URL = "https://evolve2p-backend.onrender.com/api/";
 
@@ -9,61 +9,63 @@ const Profilebd = () => {
   const router = useRouter();
 
   const [formData, setFormData] = useState({
-    username: '',
-    country: '',
-    countryCode: '',
-    phone: ''
+    username: "",
+    country: "",
+    countryCode: "",
+    phone: "",
   });
 
   const [countries, setCountries] = useState<any[]>([]);
-  const [countrySearch, setCountrySearch] = useState('');
-  const [usernameStatus, setUsernameStatus] = useState('');
+  const [countrySearch, setCountrySearch] = useState("");
+  const [usernameStatus, setUsernameStatus] = useState("");
   const [isValidUsername, setIsValidUsername] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingCountries, setIsLoadingCountries] = useState(true);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
-   const [error, setError] = useState('');
+  const [error, setError] = useState("");
 
-  const [errorMessage, setErrorMessage] = useState('');
-
-  // Ensure username is stored in localStorage for dashboard recognition
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const user = localStorage.getItem('UserData');
-      console.log('Profilebd: user in localStorage at mount:', user);
-    }
-  }, []);
+  const [errorMessage, setErrorMessage] = useState("");
 
   // Fetch countries
   useEffect(() => {
     const fetchCountries = async () => {
       try {
-        const response = await fetch('https://restcountries.com/v3.1/all?fields=name,cca2,flags,capital');
+        const response = await fetch(
+          "https://restcountries.com/v3.1/all?fields=name,cca2,flags,capital"
+        );
         const data = await response.json();
 
-        const formattedCountries = data.map((country: any) => ({
-          name: country.name.common,
-          code: country.cca2,
-          dialCode: country.cca2 === 'NG' ? '+234'
-            : country.cca2 === 'US' ? '+1'
-            : country.cca2 === 'GB' ? '+44'
-            : country.cca2 === 'CA' ? '+1'
-            : country.cca2 === 'GH' ? '+233'
-            : '+1'
-        })).sort((a: any, b: any) => a.name.localeCompare(b.name));
+        const formattedCountries = data
+          .map((country: any) => ({
+            name: country.name.common,
+            code: country.cca2,
+            dialCode:
+              country.cca2 === "NG"
+                ? "+234"
+                : country.cca2 === "US"
+                ? "+1"
+                : country.cca2 === "GB"
+                ? "+44"
+                : country.cca2 === "CA"
+                ? "+1"
+                : country.cca2 === "GH"
+                ? "+233"
+                : "+1",
+          }))
+          .sort((a: any, b: any) => a.name.localeCompare(b.name));
 
         setCountries(formattedCountries);
 
-        const nigeria = formattedCountries.find((c: any) => c.code === 'NG');
+        const nigeria = formattedCountries.find((c: any) => c.code === "NG");
         if (nigeria) {
-          setFormData(prev => ({
+          setFormData((prev) => ({
             ...prev,
             country: nigeria.name,
-            countryCode: nigeria.code
+            countryCode: nigeria.code,
           }));
         }
       } catch (error) {
-        console.error('Failed to fetch countries:', error);
+        console.error("Failed to fetch countries:", error);
       } finally {
         setIsLoadingCountries(false);
       }
@@ -74,25 +76,25 @@ const Profilebd = () => {
 
   // Debounce username check
   useEffect(() => {
-    if (formData.username.trim() === '') {
-      setUsernameStatus('');
+    if (formData.username.trim() === "") {
+      setUsernameStatus("");
       setIsValidUsername(false);
       return;
     }
 
-    setUsernameStatus('checking');
+    setUsernameStatus("checking");
 
     const handler = setTimeout(() => {
       const lower = formData.username.toLowerCase();
       const isValid =
         formData.username.length >= 4 &&
-        !['admin', 'user', 'test'].includes(lower);
+        !["admin", "user", "test"].includes(lower);
 
       if (isValid) {
-        setUsernameStatus('valid');
+        setUsernameStatus("valid");
         setIsValidUsername(true);
       } else {
-        setUsernameStatus('invalid');
+        setUsernameStatus("invalid");
         setIsValidUsername(false);
       }
     }, 300);
@@ -101,60 +103,63 @@ const Profilebd = () => {
   }, [formData.username]);
 
   const handleUsernameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setFormData(prev => ({ ...prev, username: e.target.value }));
+    setFormData((prev) => ({ ...prev, username: e.target.value }));
   };
 
   const allFieldsValid = () => {
-    return isValidUsername && formData.phone.trim() !== '' && formData.country.trim() !== '';
+    return (
+      isValidUsername &&
+      formData.phone.trim() !== "" &&
+      formData.country.trim() !== ""
+    );
   };
 
   const handleContinueToSecurityPin = () => {
-    setShowSuccessModal(false);
-    router.push('/Signups/Secpin');
+    router.push("/Signups/Secpin");
   };
 
   const handleSubmit = async () => {
-    if (!allFieldsValid()) return;
     setIsLoading(true);
-    setErrorMessage('');
+
+    if (!allFieldsValid()) {
+      setErrorMessage("Please fill in all fields");
+      setIsLoading(false);
+      return;
+    }
 
     try {
-      // Get email and password from localStorage
-      const email = localStorage.getItem('UserEmail') || '';
-      const password = localStorage.getItem('UserPassword') || '';
+      const currentData = localStorage.getItem("UserReg")
+        ? JSON.parse(localStorage.getItem("UserReg") as string)
+        : null;
 
-      
-      
-
-      const selectedCountry = countries.find(c => c.code === formData.countryCode);
-      const phoneNumber = selectedCountry ? `${selectedCountry.dialCode}${formData.phone}` : formData.phone;
+      const selectedCountry = countries.find(
+        (c) => c.code === formData.countryCode
+      );
+      const phoneNumber = selectedCountry
+        ? `${selectedCountry.dialCode}${formData.phone}`
+        : formData.phone;
 
       const UserData = {
-        email: email,
+        email: currentData?.email,
         username: formData.username,
-        password: password,
+        password: currentData?.password,
         country: formData.country,
-        verified: true,
+        emailVerified: currentData?.isEmailVerified,
         phone: phoneNumber,
       };
 
-      console.log(UserData)
-      // Get token if it exists (for example, if user is updating profile)
-    
       // Send profile data to backend with Authorization header if token exists
-      const SignupResponse = await fetch( BASE_URL + 'auth/register', {
-        method: 'POST',
+      const SignupResponse = await fetch(BASE_URL + "auth/register", {
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
         body: JSON.stringify(UserData),
       });
 
       const data = await SignupResponse.json();
 
-      console.log(data)
-
-    if (data?.error) {
+      if (data?.error) {
         alert(data?.message);
         return;
       }
@@ -162,19 +167,9 @@ const Profilebd = () => {
       // Always use accessToken for consistency
       let token = data?.accessToken;
 
-      const CheckTokenResponse = await fetch(BASE_URL + "check-token", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: "Bearer " + token,
-        },
-      });
-
-       const checkTokenData = await CheckTokenResponse.json();
-
-      if (checkTokenData?.success) {
+      if (token) {
         // Get user data - exactly matches login flow
-        const userResponse = await fetch(`${BASE_URL}get-user`, {
+        const userResponse = await fetch(BASE_URL + "get-user", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -186,33 +181,33 @@ const Profilebd = () => {
 
         if (userData?.success) {
           // Store data in same format as login
+          localStorage.removeItem("UserReg");
           localStorage.setItem(
             "UserData",
-            JSON.stringify({ 
-              accessToken: token, 
-              userData: {
-                ...userData?.user,
-                username: formData.username,
-                country: formData.country,
-                phone: phoneNumber
-              }
+            JSON.stringify({
+              accessToken: token,
+              userData: userData?.user,
             })
           );
-          router.push("/Signups/Secpin");
+          setShowSuccessModal(true);
+          // router.push("/Signups/Secpin");
         }
       }
     } catch (error: any) {
-      setError(error.message || 'An error occurred during registration. Please try again.');
+      setError(
+        error.message ||
+          "An error occurred during registration. Please try again."
+      );
     } finally {
       setIsLoading(false);
     }
   };
   // --- Country Search State ---
   const [showCountrySearch, setShowCountrySearch] = useState(false);
-  const [countrySearchInput, setCountrySearchInput] = useState('');
+  const [countrySearchInput, setCountrySearchInput] = useState("");
 
   // Filtered countries for search
-  const filteredCountries = countries.filter(country =>
+  const filteredCountries = countries.filter((country) =>
     country.name.toLowerCase().includes(countrySearchInput.toLowerCase())
   );
 
@@ -222,8 +217,12 @@ const Profilebd = () => {
       {showSuccessModal && (
         <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50">
           <div className="bg-[#222222] h-[30vh] p-6 rounded-[10px] w-[300px] text-center">
-            <h3 className="text-[#4DF2BE] text-[18px] font-bold mb-2">Success!</h3>
-            <p className="text-[#FCFCFC]">Registration completed successfully</p>
+            <h3 className="text-[#4DF2BE] text-[18px] font-bold mb-2">
+              Success!
+            </h3>
+            <p className="text-[#FCFCFC]">
+              Registration completed successfully
+            </p>
             <button
               onClick={handleContinueToSecurityPin}
               className="w-[250px] mt-[40px] border-none bg-[#4DF2BE] text-[#000] py-2 rounded-[100px] font-bold hover:bg-[#3dd9ab] transition"
@@ -234,8 +233,12 @@ const Profilebd = () => {
         </div>
       )}
 
-      <h1 className="text-[24px] text-[#FCFCFC] font-[700]">Complete Your Profile</h1>
-      <p className="text-[16px] font-[400] mt-[-5px] text-[#8F8F8F] mb-6">This helps personalize your experience.</p>
+      <h1 className="text-[24px] text-[#FCFCFC] font-[700]">
+        Complete Your Profile
+      </h1>
+      <p className="text-[16px] font-[400] mt-[-5px] text-[#8F8F8F] mb-6">
+        This helps personalize your experience.
+      </p>
 
       {errorMessage && (
         <div className="w-[370px] p-3 mb-4 text-[#F5918A] text-sm">
@@ -245,9 +248,17 @@ const Profilebd = () => {
 
       {/* Username Input */}
       <div className="mt-[20px]">
-        <label className="text-[14px] mt-2 font-[500] text-[#8F8F8F]">Username</label>
-        <div className={`relative w-[388px] rounded-t-[10px] ${usernameStatus === 'invalid' ? 'border border-[#F5918A]' : 'border border-[#2E2E2E]'}`}>
-          <span className='text-[#DBDBDB] absolute ml-[10px] mt-[18px]'>@</span>
+        <label className="text-[14px] mt-2 font-[500] text-[#8F8F8F]">
+          Username
+        </label>
+        <div
+          className={`relative w-[388px] rounded-t-[10px] ${
+            usernameStatus === "invalid"
+              ? "border border-[#F5918A]"
+              : "border border-[#2E2E2E]"
+          }`}
+        >
+          <span className="text-[#DBDBDB] absolute ml-[10px] mt-[18px]">@</span>
           <input
             type="text"
             value={formData.username}
@@ -257,15 +268,31 @@ const Profilebd = () => {
             disabled={isLoadingCountries}
           />
         </div>
-        <div className={`w-[368px] h-[30px] pl-[20px] flex items-center px-4 bg-[#222222] rounded-b-[10px] ${usernameStatus === 'invalid' ? 'border border-[#F5918A] border-t-0' : 'border border-[#2E2E2E] border-t-0'}`}>
-          {usernameStatus === 'checking' && <span className="text-[12px] text-[#8F8F8F]">Checking username...</span>}
-          {usernameStatus === 'valid' && <span className="text-[12px] text-[#1ECB84]">Username available</span>}
-          {usernameStatus === 'invalid' && (
-            <span className="text-[12px] text-[#F5918A]">
-              {formData.username.length < 4 ? 'Minimum 4 characters' : 'Username not available'}
+        <div
+          className={`w-[368px] h-[30px] pl-[20px] flex items-center px-4 bg-[#222222] rounded-b-[10px] ${
+            usernameStatus === "invalid"
+              ? "border border-[#F5918A] border-t-0"
+              : "border border-[#2E2E2E] border-t-0"
+          }`}
+        >
+          {usernameStatus === "checking" && (
+            <span className="text-[12px] text-[#8F8F8F]">
+              Checking username...
             </span>
           )}
-          {usernameStatus === '' && formData.username.trim() === '' && (
+          {usernameStatus === "valid" && (
+            <span className="text-[12px] text-[#1ECB84]">
+              Username available
+            </span>
+          )}
+          {usernameStatus === "invalid" && (
+            <span className="text-[12px] text-[#F5918A]">
+              {formData.username.length < 4
+                ? "Minimum 4 characters"
+                : "Username not available"}
+            </span>
+          )}
+          {usernameStatus === "" && formData.username.trim() === "" && (
             <span className="text-[12px] text-[#8F8F8F]">Enter a username</span>
           )}
         </div>
@@ -273,7 +300,9 @@ const Profilebd = () => {
 
       {/* Country Dropdown */}
       <div className="mt-[20px]">
-        <label className="text-[14px] font-[500] text-[#8F8F8F] mb-2 block">Country</label>
+        <label className="text-[14px] font-[500] text-[#8F8F8F] mb-2 block">
+          Country
+        </label>
         <div className="relative w-[350px]">
           {isLoadingCountries ? (
             <div className="w-[370px] h-[56px] bg-[#222222] mt-[10px] pl-[15px] pr-12 border border-[#2E2E2E] rounded-[10px] flex items-center">
@@ -298,7 +327,7 @@ const Profilebd = () => {
                   className="w-[365px] h-[56px] bg-[#222222] mt-[10px] pl-[20px] pr-12 border border-[#2E2E2E] rounded-[10px] text-[14px] font-[500] text-[#FCFCFC] focus:outline-none"
                   placeholder="Type to search country..."
                   value={countrySearch}
-                  onChange={e => setCountrySearch(e.target.value)}
+                  onChange={(e) => setCountrySearch(e.target.value)}
                   onFocus={() => setShowCountrySearch(true)}
                   required
                   disabled={isLoadingCountries}
@@ -306,24 +335,30 @@ const Profilebd = () => {
                 {showCountrySearch && (
                   <div className="absolute top-[60px]   left-0 w-full z-20 bg-[#222222] border border-[#2E2E2E] rounded-[10px] p-2">
                     <div className="max-h-[200px] ml-[10px] overflow-y-auto">
-                      {countries.filter(country =>
-                        country.name.toLowerCase().includes(countrySearch.toLowerCase())
+                      {countries.filter((country) =>
+                        country.name
+                          .toLowerCase()
+                          .includes(countrySearch.toLowerCase())
                       ).length === 0 && (
-                        <div className="text-[#8F8F8F] px-2 py-1">No country found</div>
+                        <div className="text-[#8F8F8F] px-2 py-1">
+                          No country found
+                        </div>
                       )}
                       {countries
-                        .filter(country =>
-                          country.name.toLowerCase().includes(countrySearch.toLowerCase())
+                        .filter((country) =>
+                          country.name
+                            .toLowerCase()
+                            .includes(countrySearch.toLowerCase())
                         )
                         .map((country) => (
                           <div
                             key={country.code}
                             className="flex items-center mb-[10px]  gap-2 px-2 py-2 cursor-pointer hover:bg-[#333] rounded"
                             onClick={() => {
-                              setFormData(prev => ({
+                              setFormData((prev) => ({
                                 ...prev,
                                 country: country.name,
-                                countryCode: country.code
+                                countryCode: country.code,
                               }));
                               setCountrySearch(country.name);
                               setShowCountrySearch(false);
@@ -336,7 +371,9 @@ const Profilebd = () => {
                               height={20}
                               className="rounded-sm"
                             />
-                            <span className="text-[#FCFCFC]">{country.name}</span>
+                            <span className="text-[#FCFCFC]">
+                              {country.name}
+                            </span>
                           </div>
                         ))}
                     </div>
@@ -349,17 +386,24 @@ const Profilebd = () => {
       </div>
 
       {/* Phone Input */}
-      <label className="text-[14px] mt-[30px] font-[500] text-[#8F8F8F] mb-2">Phone number</label>
-      <div className={`flex items-center pl-[10px] w-[375px] mt-[10px] bg-[#222222] border rounded-[10px] ${formData.phone.trim() === '' ? 'border-[#F5918A]' : 'border-[#2E2E2E]'}`}>
+      <label className="text-[14px] mt-[30px] font-[500] text-[#8F8F8F] mb-2">
+        Phone number
+      </label>
+      <div
+        className={`flex items-center pl-[10px] w-[375px] mt-[10px] bg-[#222222] border rounded-[10px] ${
+          formData.phone.trim() === "" ? "border-[#F5918A]" : "border-[#2E2E2E]"
+        }`}
+      >
         <span className="text-[#DBDBDB] w-[51px] h-[24px] pt-[5px] text-center text-[14px] font-[500] bg-[#3A3A3A] px-4 py-4 rounded-[100px]">
-          {countries.find(c => c.code === formData.countryCode)?.dialCode || '+234'}
+          {countries.find((c) => c.code === formData.countryCode)?.dialCode ||
+            "+234"}
         </span>
         <input
           type="tel"
           value={formData.phone}
           onChange={(e) => {
-            const value = e.target.value.replace(/\D/g, '');
-            setFormData(prev => ({ ...prev, phone: value }));
+            const value = e.target.value.replace(/\D/g, "");
+            setFormData((prev) => ({ ...prev, phone: value }));
           }}
           className="flex-1 h-[56px] bg-transparent border-none outline-none text-[#FCFCFC] pl-4"
           placeholder="Phone number"
@@ -372,14 +416,14 @@ const Profilebd = () => {
       <button
         onClick={handleSubmit}
         className={`w-[388px] h-[48px] border-none bg-[#2DE3A3] text-[#0F1012] text-[14px] font-[700] mt-[40px] py-3 rounded-full font-medium hover:opacity-90 transition flex items-center justify-center ${
-          !allFieldsValid() || isLoading ? 'opacity-50 cursor-not-allowed' : ''
+          !allFieldsValid() || isLoading ? "opacity-50 cursor-not-allowed" : ""
         }`}
         disabled={!allFieldsValid() || isLoading}
       >
         {isLoading ? (
           <div className="loader-small"></div>
-        ) : (  
-          'Complete Registration'
+        ) : (
+          "Complete Registration"
         )}
       </button>
 
@@ -397,7 +441,7 @@ const Profilebd = () => {
           width: 100%;
           height: 100%;
           border: 3px solid #333333;
-          border-top-color: #4DF2BE;
+          border-top-color: #4df2be;
           border-radius: 50%;
           animation: spin 0.8s linear infinite;
         }

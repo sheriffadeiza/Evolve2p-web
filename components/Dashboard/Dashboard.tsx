@@ -35,7 +35,6 @@ const Dashboard = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const router = useRouter();
-
   const [showVerifyModal, setShowVerifyModal] = useState(false);
   const [showHowModal, setShowHowModal] = useState(false);
 
@@ -90,7 +89,7 @@ const Dashboard = () => {
   }
 
   return (
-    <main className="min-h-screen bg-[#0F1012] pr-[10px] mt-[30px] pl-[30px] text-white md:p-8">
+    <main className="min-h-screen bg-[#0F1012] pr-[10px] mt-[30px] pl-[30px] text-white md:p-8 relative">
       <div className="max-w-7xl mx-auto">
         <Nav />
 
@@ -308,7 +307,10 @@ const Dashboard = () => {
                   className="ml-[10px]"
                 />
               </div>
-              <div className="flex w-[122px] h-[40px]  items-center bg-[#2D2D2D] text-[#4DF2BE] space-x-[10px]  mt-4 rounded-full">
+              <button
+                onClick={() => router.push("/receive-crypto")}
+                className="flex w-[122px] h-[40px]  items-center bg-[#2D2D2D] text-[#4DF2BE] space-x-[10px]  mt-4 rounded-full"
+              >
                 <Image src={Rarrowd} alt="Rd" className="ml-[10px]" />
                 <p className="px-4 py-1    rounded-full font-[700] text-[14px] ml-2">
                   Receive
@@ -319,7 +321,7 @@ const Dashboard = () => {
                   sizes="20px"
                   className="mr-[20px]"
                 />
-              </div>
+              </button>
               <div className="flex w-[122px] h-[40px]  items-center bg-[#2D2D2D] text-[#4DF2BE] space-x-[10px] mt-4 rounded-full">
                 <Image src={Swap} alt="swap" className="ml-[10px]" />
                 <p className="px-4 py-1 ml-[5px]   rounded-full font-[700] text-[14px] ml-2">

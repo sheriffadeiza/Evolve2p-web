@@ -1,10 +1,11 @@
-'use client';
+"use client";
 
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 
 const SEND_OTP_ENDPOINT = "https://evolve2p-backend.onrender.com/api/send-otp";
-const VERIFY_EMAIL_ENDPOINT = "https://evolve2p-backend.onrender.com/api/verify-email";
+const VERIFY_EMAIL_ENDPOINT =
+  "https://evolve2p-backend.onrender.com/api/verify-email";
 
 const VerifyEmailbd: React.FC = () => {
   const router = useRouter();
@@ -17,16 +18,16 @@ const VerifyEmailbd: React.FC = () => {
   const [canResend, setCanResend] = useState(false);
 
   // On mount: get email and send OTP
-  useEffect(() => {
-    const userEmail = localStorage.getItem("userEmail");
-    if (userEmail) {
-      setEmail(userEmail);
-      sendOTP(userEmail);
-    } else {
-      router.push("/Signups/Email");
-    }
-    // eslint-disable-next-line
-  }, [router]);
+  // useEffect(() => {
+  //   const userEmail = localStorage.getItem("userEmail");
+  //   if (userEmail) {
+  //     setEmail(userEmail);
+  //     sendOTP(userEmail);
+  //   } else {
+  //     router.push("/Signups/Email");
+  //   }
+  //   // eslint-disable-next-line
+  // }, [router]);
 
   // Timer for resend button
   useEffect(() => {
@@ -54,7 +55,7 @@ const VerifyEmailbd: React.FC = () => {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Accept": "application/json",
+          Accept: "application/json",
         },
         body: JSON.stringify({ email }),
       });
@@ -101,7 +102,7 @@ const VerifyEmailbd: React.FC = () => {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Accept": "application/json",
+          Accept: "application/json",
         },
         body: JSON.stringify({
           email: email,
@@ -118,7 +119,11 @@ const VerifyEmailbd: React.FC = () => {
 
       if (!response.ok) {
         let msg = "Verification failed";
-        if (Array.isArray(data.detail) && data.detail.length > 0 && data.detail[0].msg) {
+        if (
+          Array.isArray(data.detail) &&
+          data.detail.length > 0 &&
+          data.detail[0].msg
+        ) {
           msg = data.detail[0].msg;
         } else if (typeof data.message === "string") {
           msg = data.message;
@@ -136,17 +141,27 @@ const VerifyEmailbd: React.FC = () => {
       }
 
       // Success
-      localStorage.setItem("email_verified", "true");
+      const currentLocalData = localStorage.getItem("UserReg")
+        ? JSON.parse(localStorage.getItem("UserReg") as string)
+        : null;
+
+      localStorage.setItem(
+        "UserReg",
+        JSON.stringify({ ...currentLocalData, isEmailVerified: true })
+      );
       setError("");
       setSuccess(true);
       setIsLoading(false);
       setTimeout(() => {
-        router.push("/Signups/Profile");
+        router.push("/Signups/Password");
       }, 1000);
     } catch (err: any) {
       let msg = "Invalid verification code. Please try again.";
       if (err?.message) {
-        msg = typeof err.message === "string" ? err.message : JSON.stringify(err.message);
+        msg =
+          typeof err.message === "string"
+            ? err.message
+            : JSON.stringify(err.message);
       }
       setError(msg);
       setPin(["", "", "", "", "", ""]);
@@ -172,18 +187,24 @@ const VerifyEmailbd: React.FC = () => {
 
   return (
     <div className="max-w-md mx-auto ml-[120px] mt-10 px-4 text-white">
-      <h1 className="text-[24px] text-[#FCFCFC] font-[700] mb-2">Verify Email</h1>
+      <h1 className="text-[24px] text-[#FCFCFC] font-[700] mb-2">
+        Verify Email
+      </h1>
       <p className="text-[16px] font-[400] text-[#8F8F8F] mb-6">
         Please enter the 6-digit code sent to <br />
         <span className="text-[#DBDBDB]">{email || "your email"}</span>
       </p>
 
       {error && (
-        <div className="text-[#F5918A] text-[14px] font-[500] mb-4">{error}</div>
+        <div className="text-[#F5918A] text-[14px] font-[500] mb-4">
+          {error}
+        </div>
       )}
 
       {success && (
-        <div className="text-[#1ECB84] text-[14px] font-[500] mb-4">Email verified successfully! Redirecting...</div>
+        <div className="text-[#1ECB84] text-[14px] font-[500] mb-4">
+          Email verified successfully! Redirecting...
+        </div>
       )}
 
       <div className="flex gap-[5px] ml-[-150px] border-none justify-center mb-6">

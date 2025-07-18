@@ -1,15 +1,14 @@
-'use client';
+"use client";
 
 import React, { useState } from "react";
-import { useRouter } from 'next/navigation';
-import { useSignup } from '@/context/SignupContext';
+import { useRouter } from "next/navigation";
 
 const Confirmbd: React.FC = () => {
   const [pin, setPin] = useState<string[]>(["", "", "", ""]);
   const [error, setError] = useState("");
   const [showSuccess, setShowSuccess] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
-  const { setCurrentStep } = useSignup();
 
   const handleChange = (val: string, idx: number) => {
     if (!/^\d?$/.test(val)) return;
@@ -25,42 +24,77 @@ const Confirmbd: React.FC = () => {
     }
   };
 
-  const handleSubmit = () => {
-    const fullPin = pin.join('');
-    if (fullPin.length !== 4) return;
+  const handleSubmit = async () => {
+    const pinValue = pin.join("");
+    setError("");
 
-    // Get the PIN from userProfile (set by SecPinbd)
-    const userProfile = localStorage.getItem('userProfile');
-    let savedPin = '';
-    if (userProfile) {
-      try {
-        const parsed = JSON.parse(userProfile);
-        savedPin = parsed.pin || '';
-      } catch {
-        savedPin = '';
+    // Always get the latest accessToken from localStorage right before submitting
+    const user = localStorage.getItem("UserData")
+      ? JSON.parse(localStorage.getItem("UserData") as string)
+      : null;
+
+    const currentPin = localStorage.getItem("currentPin")
+      ? JSON.parse(localStorage.getItem("currentPin") as string)
+      : null;
+
+    if (!user?.userData?.email) {
+      setError("Email is missing. Please complete registration.");
+      return;
+    }
+
+    if (!user?.accessToken) {
+      setError("Session expired. Please log in to generate token.");
+      return;
+    }
+
+    if (!/^\d{4}$/.test(pinValue)) {
+      setError("PIN must be a 4-digit number.");
+      return;
+    }
+
+    if (!(currentPin?.pin == pinValue)) {
+      alert("Pins do not match.");
+      return;
+    }
+
+    setIsLoading(true);
+
+    try {
+      const res = await fetch(
+        "https://evolve2p-backend.onrender.com/api/update-user",
+        {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${user?.accessToken}`,
+          },
+          body: JSON.stringify({ pin: pinValue }),
+        }
+      );
+
+      const data = await res.json();
+
+      if (data.error) {
+        setError(data?.message);
+        setIsLoading(false);
+        return;
       }
-    }
 
-    if (!savedPin) {
-      setError("No PIN to confirm. Please set your PIN first.");
+      if (data?.success) {
+        localStorage.removeItem("currentPin");
+        setShowSuccess(true);
+        router.push("/Signups/Sconfirm");
+      }
+    } catch (err: any) {
+      setError("Failed to set PIN");
       setPin(["", "", "", ""]);
-      return;
+    } finally {
+      setIsLoading(false);
     }
-
-    if (fullPin !== savedPin) {
-      setError("PINs do not match. Please try again.");
-      setPin(["", "", "", ""]);
-      return;
-    }
-
-    // Save the confirmed PIN permanently in localStorage
-    localStorage.setItem('userSecPin', fullPin);
-    setShowSuccess(true);
   };
 
   const handleContinue = () => {
-    setCurrentStep('kYC');
-    router.push('/Signups/KYC');
+    router.push("/Signups/KYC");
   };
 
   return (
@@ -69,7 +103,9 @@ const Confirmbd: React.FC = () => {
       {showSuccess && (
         <div className="fixed inset-0 bg-[#333333] bg-opacity-70 flex items-center justify-center z-50">
           <div className="bg-black text-white w-[250px] p-6 rounded-[10px] text-center shadow-lg">
-            <h3 className="text-[#4DF2BE] text-[18px] font-bold mb-2">Success!</h3>
+            <h3 className="text-[#4DF2BE] text-[18px] font-bold mb-2">
+              Success!
+            </h3>
             <p className="mb-4 text-[#FCFCFC]">PIN confirmed successfully</p>
             <button
               onClick={handleContinue}
@@ -81,15 +117,15 @@ const Confirmbd: React.FC = () => {
         </div>
       )}
 
-      <h2 className="text-[24px] text-[#FCFCFC] font-[700]">Confirm your PIN</h2>
+      <h2 className="text-[24px] text-[#FCFCFC] font-[700]">
+        Confirm your PIN
+      </h2>
       <p className="text-[16px] font-[400] mt-[-10px] mb-6 text-[#8F8F8F]">
         Re-enter your PIN to make sure it's correct.
       </p>
 
       {error && (
-        <div className="text-[#F5918A] text-[14px] mb-4 w-[350px]">
-          {error}
-        </div>
+        <div className="text-[#F5918A] text-[14px] mb-4 w-[350px]">{error}</div>
       )}
 
       <div className="flex gap-1">
@@ -108,12 +144,13 @@ const Confirmbd: React.FC = () => {
         ))}
       </div>
 
-      {pin.join('').length === 4 && !showSuccess && (
+      {pin.join("").length === 4 && (
         <button
+          className="w-[300px] h-[48px] mt-[30px] bg-[#4DF2BE] text-[#0F1012] rounded-[100px] font-[700] disabled:opacity-50"
           onClick={handleSubmit}
-          className="w-[300px] h-[48px] mt-[30px] bg-[#4DF2BE] text-[#0F1012] rounded-[100px] font-[700]"
+          disabled={isLoading}
         >
-          Confirm PIN
+          {isLoading ? "Setting PIN..." : "Continue"}
         </button>
       )}
 
@@ -131,13 +168,17 @@ const Confirmbd: React.FC = () => {
           width: 70%;
           height: 70%;
           border: 5px solid #333333;
-          border-top-color: #4DF2BE;
+          border-top-color: #4df2be;
           border-radius: 50%;
           animation: spin 1s linear infinite;
         }
         @keyframes spin {
-          0% { transform: rotate(0deg); }
-          100% { transform: rotate(360deg); }
+          0% {
+            transform: rotate(0deg);
+          }
+          100% {
+            transform: rotate(360deg);
+          }
         }
       `}</style>
     </div>
