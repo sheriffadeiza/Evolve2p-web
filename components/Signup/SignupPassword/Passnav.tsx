@@ -9,7 +9,6 @@ const Passnav = () => {
   const router = useRouter();
 
   const handleGoBack = () => {
- localStorage.setItem('currentStep', '1');
 
     localStorage.getItem('UserEmail');
     router.push('/Signups/Email');

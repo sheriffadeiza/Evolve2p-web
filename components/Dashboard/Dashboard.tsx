@@ -2,9 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { useLogin } from "@/context/LoginContext";
 import Image from "next/image";
-import Logo from "../../public/Assets/Evolve2p_logods/Dashboard/Logo.svg";
 import Nav from "../../components/NAV/Nav";
 import Parrow from "../../public/Assets/Evolve2p_pArrow/elements.svg";
 import icon_i from "../../public/Assets/Evolve2p_i/Dashboard/elements.svg";
@@ -29,14 +27,33 @@ import Refer from "../../public/Assets/Evolve2p_Refer/elements.svg";
 import G19 from "../../public/Assets/Evolve2p_group19/Group 19.svg";
 import Times from "../../public/Assets/Evolve2p_times/Icon container.png";
 import checklistInactive from "../../public/Assets/Evolve2p_checklist2/checklist-inactive.svg";
+import { QRCodeCanvas } from "qrcode.react";
+import Yellow_i from "../../public/Assets/Evolve2p_yellowi/elements.svg";
+import Copy from "../../public/Assets/Evolve2p_code/elements.svg";
+import Share from "../../public/Assets/Evolve2p_share/elements.svg";
 import Footer from "../Footer/Footer";
 
-const Dashboard = () => {
+interface QRCodeBoxProps {
+  value?: string;
+}
+
+interface wallet {
+  id: string;
+}
+
+const Dashboard: React.FC<QRCodeBoxProps> = ({ value }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const router = useRouter();
   const [showVerifyModal, setShowVerifyModal] = useState(false);
   const [showHowModal, setShowHowModal] = useState(false);
+  const [showReceiveModal, setShowReceiveModal] = useState(false);
+  const [open, setOpen] = useState(false);
+  const [isReceiveOpen, setIsReceiveOpen] = useState(false);
+  const [myDate, setMyDate] = useState("");
+  const [clientUser, setClientUser] = useState<any>(null);
+  const [currentWallet, setCurrentWallet] = useState<wallet | null>(null);
+  const [currentCoin, setCurrentCoin] = useState("");
 
   const handleVerifyClick = () => {
     router.push("/Signups/KYC");
@@ -44,10 +61,29 @@ const Dashboard = () => {
 
   const toggleVerifyModal = () => setShowVerifyModal(!showVerifyModal);
   const toggleHowModal = () => setShowHowModal(!showHowModal);
+  const toggleDropdown = () => {
+    setOpen((prev) => !prev);
+  };
+  const toggleReceiveDropdown = () => {
+    setIsReceiveOpen((prev) => !prev);
+  };
 
-  const user = localStorage.getItem("UserData")
-    ? JSON.parse(localStorage.getItem("UserData") as string)
-    : null;
+  const handleReceiveClick = (symbol: string) => {
+    setCurrentCoin(symbol);
+    setShowReceiveModal(true);
+    setIsReceiveOpen(false);
+  };
+
+  const closeReceiveModal = () => setShowReceiveModal(false);
+  let user: any = null;
+
+  if (typeof window !== "undefined") {
+    const stored = localStorage.getItem("UserData");
+    if (stored) {
+      user = JSON.parse(stored);
+    }
+    console.log(user);
+  }
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -68,6 +104,29 @@ const Dashboard = () => {
 
     checkAuth();
   }, [router]);
+
+  useEffect(() => {
+    setClientUser(user);
+  }, []);
+
+  useEffect(() => {
+    if (currentCoin !== "") {
+      if (clientUser && clientUser.wallets) {
+        const wallet = clientUser.wallets.find(
+          (wallet: any) => wallet.currency == currentCoin
+        );
+        setCurrentWallet(wallet || null); // Set to null if not found
+        console.log(wallet);
+      } else {
+        console.warn("Client user or wallets data is not available yet.");
+        setCurrentWallet(null); //set current wallet to null to avoid future errors
+      }
+    }
+  }, [currentCoin, clientUser]);
+
+  useEffect(() => {
+    setMyDate(new Date().toLocaleString());
+  }, []);
 
   if (error) {
     return (
@@ -98,10 +157,10 @@ const Dashboard = () => {
         <div className="flex space-x-[5px]  text-[24px] font-[500] items-center mb-6">
           <p className="text-[#8F8F8F]">Hello,</p>
           <p className="text-[#FCFCFC]">
-            {user?.userData?.username
-              ? user?.userData?.username.startsWith("@")
-                ? user?.userData?.username
-                : `@${user?.userData?.username}`
+            {clientUser?.userData?.username
+              ? clientUser?.userData?.username.startsWith("@")
+                ? clientUser?.userData?.username
+                : `@${clientUser?.userData?.username}`
               : "User"}
           </p>
         </div>
@@ -109,8 +168,9 @@ const Dashboard = () => {
         <div
           className="flex pl-[15px] bg-[#342827] h-[68px] w-[1224px]  items-center gap-2 mb-6 "
           style={{
-            borderLeft: "2px solid var(--Text---text-danger, #FE857D)",
+            borderLeft: "2px solid #FE857D",
             borderRadius: "0px 12px 12px 0px",
+            padding: "16px 32px 16px 8px",
           }}
         >
           <Image src={icon_i} alt="i" sizes="24px" />
@@ -291,48 +351,292 @@ const Dashboard = () => {
                 />
               </div>
             </div>
-            <div
-              className="flex items-center space-x-[10px] ml-[40%] mt-[10px]"
-              style={{ padding: "10px 16px" }}
-            >
-              <div className="flex w-[122px] h-[40px]  items-center bg-[#2D2D2D] text-[#4DF2BE] space-x-[5px] ml-[5px] mt-4 rounded-full">
+            <div className="flex items-center space-x-[10px] ml-[40%] mt-[10px]   ">
+              <div
+                className="flex w-[122px] h-[40px]  items-center bg-[#2D2D2D] relative text-[#4DF2BE] space-x-[5px] ml-[5px] mt-4 rounded-full"
+                style={{ padding: "10px 16px" }}
+              >
                 <Image src={Send} alt="send" className="ml-[10px]" />
-                <p className="px-4 py-1 ml-[5px]   rounded-full font-[700] text-[14px] ml-2">
+                <p className="   rounded-full font-[700] text-[14px] pl-[10px] ">
                   Send
                 </p>
                 <Image
+                  onClick={toggleDropdown}
                   src={Barrow}
                   alt="arrow"
                   sizes="20px"
                   className="ml-[10px]"
                 />
               </div>
-              <button
-                onClick={() => router.push("/receive-crypto")}
-                className="flex w-[122px] h-[40px]  items-center bg-[#2D2D2D] text-[#4DF2BE] space-x-[10px]  mt-4 rounded-full"
+
+              {showReceiveModal && (
+                <div className="fixed inset-0  top-[38px]    justify-center  items-center z-50">
+                  <div className="bg-[#0F1012] w-[560px] max-h-[85vh] pb-[20px]  pl-[20px] rounded-[20px] p-6 relative text-white overflow-y-auto ">
+                    <Image
+                      src={Times}
+                      alt={"times"}
+                      width={20}
+                      height={20}
+                      className="absolute top-[20px] w-[32px] h-[32px]  ml-[85%] cursor-pointer"
+                      onClick={closeReceiveModal}
+                    />
+                    <h2 className="text-[16px]  font-[700] text-[#FCFCFC] mt-[30px] mb-2">
+                      Receive {currentCoin}
+                    </h2>
+
+                    <div className="mt-[50px]">
+                      <p className="text-[#FCFCFC] text-[18px] font-[700]">
+                        Your {currentCoin} Address
+                      </p>
+                      <p className="text-[#DBDBDB] text-[14px] font-[400]">
+                        Use this address to deposit{" "}
+                        <small className="font-[700]  text-[14px]">
+                          {currentCoin}
+                        </small>{" "}
+                        to your Evolve2p wallet.
+                      </p>
+                    </div>
+
+                    {/* QR Code */}
+                    <div className="flex justify-center mt-[30px]">
+                      <QRCodeCanvas
+                        value={currentWallet?.id || ""}
+                        size={206}
+                        bgColor="#3A3A3A"
+                        fgColor="#FFFFFF"
+                        level="H"
+                        includeMargin={true}
+                      />
+                    </div>
+
+                    <div className="mt-[20px]">
+                      <div className="flex items-center p-[12px] justify-between bg-[#2D2D2D] w-[496px] h-[44px] rounded-[8px]">
+                        <p className="text-[14px] text-[#DBDBDB] font-[400] ">
+                          Network
+                        </p>
+                        <strong className="text-[14px] font-[500] text-[#FCFCFC]">
+                          {currentCoin === "USDC" || currentCoin === "USDT"
+                            ? "ERC-20"
+                            : currentCoin}
+                        </strong>
+                      </div>
+                      <div className="flex items-center mt-[20px] p-[12px] justify-between bg-[#2D2D2D] w-[496px] h-[44px] rounded-[8px]">
+                        <p className="text-[14px] text-[#DBDBDB] font-[400] ">
+                          Created
+                        </p>
+                        <strong className="text-[14px] font-[500] text-[#FCFCFC]">
+                          {myDate}
+                        </strong>
+                      </div>
+                    </div>
+
+                    <div
+                      className="flex  items-start w-[496px] h-[92px] bg-[#2D2D2D] space-x-[10px] mt-[30px]"
+                      style={{
+                        borderRadius: "0px 12px 12px 0px",
+                        borderLeft: "2px solid  #FFC051",
+                        padding: "16px 16px 16px 8px",
+                      }}
+                    >
+                      <Image
+                        src={Yellow_i}
+                        alt="yellow"
+                        className="mt-[15px]"
+                      />
+                      <p className="text-[#DBDBDB] text-[14px] font-[400]">
+                        Make sure to only send {currentCoin} through the
+                        selected network: <br />
+                        {currentCoin === "USDC" || currentCoin === "USDT"
+                          ? "ERC-20"
+                          : currentCoin}{" "}
+                        . Sending incompatible cryptocurrencies or sending
+                        through a <br />
+                        different network may result in irreversible loss.
+                      </p>
+                    </div>
+                    <div className="ml-[-30%]">
+                      <div className="w-[100%] h-[1px]  bg-[#2D2D2D] mt-[30px]"></div>
+                    </div>
+
+                    <div className="flex space-x-[15px]">
+                      <div className=" flex items-center space-x-[10px] w-[242px] h-[48px] bg-[#2D2D2D] justify-center mt-[10px] rounded-full">
+                        <p className="text-[14px] font-[700] text-[#FCFCFC] ">
+                          {" "}
+                          {currentWallet?.id
+                            ? `${currentWallet.id.substring(
+                                0,
+                                4
+                              )}...${currentWallet.id.substring(
+                                currentWallet.id.length - 4
+                              )}`
+                            : "Generating address..."}{" "}
+                        </p>
+                        <Image src={Copy} alt="copy " sizes="16.667" />
+                      </div>
+
+                      <div className=" flex items-center space-x-[10px] w-[242px] h-[48px] bg-[#2D2D2D] justify-center mt-[10px] rounded-full">
+                        <p className="text-[14px] font-[700] text-[#4DF2BE] ">
+                          Share
+                        </p>
+                        <Image src={Share} alt="copy" />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/*Drop_down */}
+
+              {open && (
+                <div className="absolute mt-[350px] p-[8px] pl-[30px] w-[251px] h-[272px] bg-[#222222] rounded-[12px] shadow-lg z-50 py-4 px-6">
+                  <div className="flex flex-col space-y-[40px] text-white text-[16px] font-medium">
+                    {[
+                      {
+                        icon: BTC,
+                        label: "Send Bitcoin",
+                        width: 27.997,
+                        height: 28,
+                        symbol: BTC,
+                      },
+                      {
+                        icon: ETH,
+                        label: "Send Ethereum",
+                        width: 28,
+                        height: 28,
+                        symbol: ETH,
+                      },
+                      {
+                        icon: USDT,
+                        label: "Send Tether",
+                        width: 27.997,
+                        height: 28,
+                        symbol: USDT,
+                      },
+                      {
+                        icon: USDC,
+                        label: "Send USDC",
+                        width: 28,
+                        height: 28,
+                        symbol: USDC,
+                      },
+                    ].map((item, idx) => (
+                      <div
+                        key={idx}
+                        className="flex justify-between items-center cursor-pointer hover:opacity-80"
+                      >
+                        <div className="flex items-center space-x-[20px]">
+                          <Image
+                            src={item.icon}
+                            alt={item.label}
+                            width={item.width}
+                            height={item.height}
+                          />
+                          <span className="font-[400] text-[#FCFCFC] text-[14px]">
+                            {item.label}
+                          </span>
+                        </div>
+                        <span>
+                          <Image
+                            src={Larrow}
+                            alt="arrow"
+                            className=" w-[24px] h-[24px] mt-[10px] pr-[20px]"
+                          />
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div
+                className="flex w-[130px] h-[40px] bor items-center bg-[#2D2D2D] text-[#4DF2BE] space-x-[10px] relative  mt-4 rounded-full"
+                style={{ padding: "10px 16px" }}
               >
-                <Image src={Rarrowd} alt="Rd" className="ml-[10px]" />
-                <p className="px-4 py-1    rounded-full font-[700] text-[14px] ml-2">
+                <Image src={Rarrowd} alt="Rd" className="ml-[15px]" />
+                <p className="    rounded-full font-[700] text-[14px] pl-[10px]">
                   Receive
                 </p>
                 <Image
+                  onClick={toggleReceiveDropdown}
                   src={Barrow}
                   alt="arrow"
                   sizes="20px"
-                  className="mr-[20px]"
+                  className=" ml-[15px]"
                 />
-              </button>
-              <div className="flex w-[122px] h-[40px]  items-center bg-[#2D2D2D] text-[#4DF2BE] space-x-[10px] mt-4 rounded-full">
-                <Image src={Swap} alt="swap" className="ml-[10px]" />
-                <p className="px-4 py-1 ml-[5px]   rounded-full font-[700] text-[14px] ml-2">
+              </div>
+
+              {/*Drop_down */}
+
+              {isReceiveOpen && (
+                <div className="absolute right-[550px]  mt-[350px] p-[8px]  pl-[30px] w-[251px] h-[272px] bg-[#222222] rounded-[12px] shadow-lg z-50 ">
+                  <div className="flex flex-col space-y-[40px]  text-white text-[16px] font-medium">
+                    {[
+                      {
+                        icon: BTC,
+                        label: "Send Bitcoin",
+                        width: 27.997,
+                        height: 28,
+                        symbol: "BTC",
+                      },
+                      {
+                        icon: ETH,
+                        label: "Send Ethereum",
+                        width: 28,
+                        height: 28,
+                        symbol: "ETH",
+                      },
+                      {
+                        icon: USDT,
+                        label: "Send Tether",
+                        width: 27.997,
+                        height: 28,
+                        symbol: "USDT",
+                      },
+                      {
+                        icon: USDC,
+                        label: "Send USDC",
+                        width: 28,
+                        height: 28,
+                        symbol: "USDC",
+                      },
+                    ].map((item, idx) => (
+                      <div
+                        key={idx}
+                        className="flex justify-between  items-center cursor-pointer hover:opacity-80"
+                        onClick={() => handleReceiveClick(item.symbol)}
+                      >
+                        <div className="flex items-center  space-x-[20px]">
+                          <Image
+                            src={item.icon}
+                            alt={item.label}
+                            width={item.width}
+                            height={item.height}
+                          />
+                          <span className="font-[400] text-[#FCFCFC] text-[14px]">
+                            {item.label}
+                          </span>
+                        </div>
+                        <span>
+                          <Image
+                            src={Larrow}
+                            alt="arrow"
+                            className=" w-[24px] h-[24px] mt-[10px] pr-[20px]"
+                          />
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div
+                className="flex w-[122px] h-[40px]  items-center bg-[#2D2D2D] text-[#4DF2BE] space-x-[10px] mt-4 rounded-full"
+                style={{ padding: "10px 16px" }}
+              >
+                <Image src={Swap} alt="swap" className="ml-[20px]" />
+                <p className="px-4 py-1 ml-[5px]   rounded-full font-[700] text-[14px]">
                   Swap
                 </p>
-                <Image
-                  src={Barrow}
-                  alt="arrow"
-                  sizes="20px"
-                  className="ml-[5px]"
-                />
               </div>
             </div>
           </div>
@@ -377,10 +681,10 @@ const Dashboard = () => {
               </div>
             </div>
 
-            <div className="flex ml-[70px] space-x-[21%] text-[#8F8F8F] text-[14px] font-[400]">
-              <p>Currency</p>
-              <p>Balance</p>
-              <p className="ml-[-78px]">In USD</p>
+            <div className="flex ml-[70px] space-x-[80px] text-[#8F8F8F] text-[14px] font-[400]">
+              <p className="pl-[25px]">Currency</p>
+              <p className="pl-[75px]">Balance</p>
+              <p className="pl-[15px]">In USD</p>
             </div>
 
             <div className="w-[913px] h-[64px] ">
@@ -426,9 +730,9 @@ const Dashboard = () => {
                     <Image
                       src={Send}
                       alt="send"
-                      className=" w-[16px] ml-[15px] h-[16px]"
+                      className=" w-[16px] pl-[5px] h-[16px]"
                     />
-                    <p className="text-[#DBDBDB] text-[14px] font-[500]">
+                    <p className="text-[#DBDBDB] pl-[10px] text-[14px] font-[500]">
                       Send
                     </p>
                   </div>
@@ -440,9 +744,9 @@ const Dashboard = () => {
                     <Image
                       src={Rarrowd}
                       alt="arrow"
-                      className="w-[16px] h-[16px] ml-[15px]"
+                      className="w-[16px] h-[16px] pl-[5px]"
                     />
-                    <p className="text-[14px] font-[500] text-[#DBDBDB]">
+                    <p className="text-[14px] pl-[10px] font-[500] text-[#DBDBDB]">
                       Receive
                     </p>
                   </div>
@@ -454,9 +758,9 @@ const Dashboard = () => {
                     <Image
                       src={Swap}
                       alt="swap"
-                      className="w-[16px] h-[16px] ml-[15px]"
+                      className="w-[16px] h-[16px] pl-[5px]"
                     />
-                    <p className="text-[14px] font-[500] text-[#DBDBDB]">
+                    <p className="text-[14px] pl-[10px] font-[500] text-[#DBDBDB]">
                       Swap
                     </p>
                   </div>
@@ -504,9 +808,9 @@ const Dashboard = () => {
                     <Image
                       src={Send}
                       alt="send"
-                      className=" w-[16px] ml-[15px] h-[16px]"
+                      className=" w-[16px] pl-[5px] h-[16px]"
                     />
-                    <p className="text-[#DBDBDB] text-[14px] font-[500]">
+                    <p className="text-[#DBDBDB] pl-[10px] text-[14px] font-[500]">
                       Send
                     </p>
                   </div>
@@ -518,9 +822,9 @@ const Dashboard = () => {
                     <Image
                       src={Rarrowd}
                       alt="arrow"
-                      className="w-[16px] h-[16px] ml-[15px]"
+                      className="w-[16px] h-[16px] pl-[5px]"
                     />
-                    <p className="text-[14px] font-[500] text-[#DBDBDB]">
+                    <p className="text-[14px] pl-[10px] font-[500] text-[#DBDBDB]">
                       Receive
                     </p>
                   </div>
@@ -532,9 +836,9 @@ const Dashboard = () => {
                     <Image
                       src={Swap}
                       alt="swap"
-                      className="w-[16px] h-[16px] ml-[15px]"
+                      className="w-[16px] h-[16px] pl-[5px]"
                     />
-                    <p className="text-[14px] font-[500] text-[#DBDBDB]">
+                    <p className="text-[14px] pl-[10px] font-[500] text-[#DBDBDB]">
                       Swap
                     </p>
                   </div>
@@ -580,9 +884,9 @@ const Dashboard = () => {
                     <Image
                       src={Send}
                       alt="send"
-                      className=" w-[16px] ml-[15px] h-[16px]"
+                      className=" w-[16px] pl-[5px] h-[16px]"
                     />
-                    <p className="text-[#DBDBDB] text-[14px] font-[500]">
+                    <p className="text-[#DBDBDB] pl-[10px] text-[14px] font-[500]">
                       Send
                     </p>
                   </div>
@@ -594,9 +898,9 @@ const Dashboard = () => {
                     <Image
                       src={Rarrowd}
                       alt="arrow"
-                      className="w-[16px] h-[16px] ml-[15px]"
+                      className="w-[16px] h-[16px] pl-[5px]"
                     />
-                    <p className="text-[14px] font-[500] text-[#DBDBDB]">
+                    <p className="text-[14px] pl-[10px] font-[500] text-[#DBDBDB]">
                       Receive
                     </p>
                   </div>
@@ -608,9 +912,9 @@ const Dashboard = () => {
                     <Image
                       src={Swap}
                       alt="swap"
-                      className="w-[16px] h-[16px] ml-[15px]"
+                      className="w-[16px] h-[16px] pl-[5px]"
                     />
-                    <p className="text-[14px] font-[500] text-[#DBDBDB]">
+                    <p className="text-[14px] pl-[10px] font-[500] text-[#DBDBDB]">
                       Swap
                     </p>
                   </div>
@@ -656,9 +960,9 @@ const Dashboard = () => {
                     <Image
                       src={Send}
                       alt="send"
-                      className=" w-[16px] ml-[15px] h-[16px]"
+                      className=" w-[16px] pl-[5px] h-[16px]"
                     />
-                    <p className="text-[#DBDBDB] text-[14px] font-[500]">
+                    <p className="text-[#DBDBDB] pl-[10px] text-[14px] font-[500]">
                       Send
                     </p>
                   </div>
@@ -670,9 +974,9 @@ const Dashboard = () => {
                     <Image
                       src={Rarrowd}
                       alt="arrow"
-                      className="w-[16px] h-[16px] ml-[15px]"
+                      className="w-[16px] h-[16px] pl-[5px]"
                     />
-                    <p className="text-[14px] font-[500] text-[#DBDBDB]">
+                    <p className="text-[14px] pl-[10px] font-[500] text-[#DBDBDB]">
                       Receive
                     </p>
                   </div>
@@ -684,9 +988,9 @@ const Dashboard = () => {
                     <Image
                       src={Swap}
                       alt="swap"
-                      className="w-[16px] h-[16px] ml-[15px]"
+                      className="w-[16px] h-[16px] pl-[5px]"
                     />
-                    <p className="text-[14px] font-[500] text-[#DBDBDB]">
+                    <p className="text-[14px] pl-[10px] font-[500] text-[#DBDBDB]">
                       Swap
                     </p>
                   </div>
