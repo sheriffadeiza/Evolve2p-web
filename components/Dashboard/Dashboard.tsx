@@ -39,7 +39,28 @@ interface QRCodeBoxProps {
 
 interface wallet {
   id: string;
+  currency: string; // "BTC", "ETH", etc
+  address: string;
 }
+
+type Currency = {
+  name: string;
+  symbol: string;
+};
+
+const currencies: Currency[] = [
+  { name: "USD", symbol: "$" },
+  { name: "NGN", symbol: "₦" },
+  { name: "BTC", symbol: "₿" },
+  { name: "ETH", symbol: "Ξ" },
+];
+
+const conversionRates: { [key: string]: number } = {
+  USD: 1,
+  NGN: 1500,
+  BTC: 0.000015,
+  ETH: 0.00022,
+};
 
 const Dashboard: React.FC<QRCodeBoxProps> = ({ value }) => {
   const [loading, setLoading] = useState(true);
@@ -54,9 +75,19 @@ const Dashboard: React.FC<QRCodeBoxProps> = ({ value }) => {
   const [clientUser, setClientUser] = useState<any>(null);
   const [currentWallet, setCurrentWallet] = useState<wallet | null>(null);
   const [currentCoin, setCurrentCoin] = useState("");
+  const [showBalance, setShowBalance] = useState(true);
+
+  const [isTransOpen, setIsTransOpen] = useState(false);
 
   const handleVerifyClick = () => {
     router.push("/Signups/KYC");
+  };
+
+  const balance = 1000; // 🔁 This is the static amount in USD
+
+  const handleSelect = (currency: Currency) => {
+    setSelectedCurrency(currency);
+    setIsTransOpen(false);
   };
 
   const toggleVerifyModal = () => setShowVerifyModal(!showVerifyModal);
@@ -67,6 +98,20 @@ const Dashboard: React.FC<QRCodeBoxProps> = ({ value }) => {
   const toggleReceiveDropdown = () => {
     setIsReceiveOpen((prev) => !prev);
   };
+
+  const toggleVissibility = () => setShowBalance(!showBalance);
+
+  const toggleTransDropdown = () => {
+    setIsTransOpen((prev) => !prev);
+  };
+
+  const [selectedCurrency, setSelectedCurrency] = useState<Currency>(
+    currencies[0]
+  );
+
+  const convertedAmount = (
+    balance * conversionRates[selectedCurrency.name]
+  ).toFixed(2);
 
   const handleReceiveClick = (symbol: string) => {
     setCurrentCoin(symbol);
@@ -82,7 +127,6 @@ const Dashboard: React.FC<QRCodeBoxProps> = ({ value }) => {
     if (stored) {
       user = JSON.parse(stored);
     }
-    console.log(user);
   }
 
   useEffect(() => {
@@ -112,17 +156,19 @@ const Dashboard: React.FC<QRCodeBoxProps> = ({ value }) => {
   useEffect(() => {
     if (currentCoin !== "") {
       if (clientUser && clientUser.wallets) {
+        console.log("Client User", clientUser)
         const wallet = clientUser.wallets.find(
-          (wallet: any) => wallet.currency == currentCoin
+          (w: any) => String( w.currency).toUpperCase() == currentCoin?.toUpperCase()
         );
         setCurrentWallet(wallet || null); // Set to null if not found
-        console.log(wallet);
       } else {
         console.warn("Client user or wallets data is not available yet.");
         setCurrentWallet(null); //set current wallet to null to avoid future errors
       }
     }
   }, [currentCoin, clientUser]);
+
+  console.log(currentWallet)
 
   useEffect(() => {
     setMyDate(new Date().toLocaleString());
@@ -327,31 +373,69 @@ const Dashboard: React.FC<QRCodeBoxProps> = ({ value }) => {
             <div className="flex items-center  mt-[5px] gap-2 mb-6  space-x-[10px]">
               <p className="text-[16px] font-[400] text-[#DBDBDB]">
                 Available Balance
+               
               </p>
-              <Image
+
+              <p> <Image
+                onClick={toggleVissibility}
                 src={SlashH}
                 alt="slash"
-                sizes="20"
-                className="text-[#DBDBDB]"
-              />
+                width={25}
+                height={25}
+                className="cursor-pointer"
+              /></p>
+              
             </div>
             <div className="flex  space-x-[10px] mt-[-35px]">
               <p className="text-[36px] font-[700] text-[#FCFCFC]">
-                <span className="text-[28px]">$</span>0
+                <span className="text-[28px]">{selectedCurrency.symbol}</span>
+                {showBalance ? convertedAmount : "****"}
               </p>
               <div className="flex items-center  mt-[40px] w-[82px] h-[36px] ml-[5px] bg-[#2D2D2D]  font-[700] text-[16px] rounded-full">
                 <p className="text-[14px] font-[700] ml-[20px]  text-[#DBDBDB]">
-                  USD
+                  {selectedCurrency.name}
                 </p>
                 <Image
                   src={Parrow}
                   alt="arrow"
                   sizes="16px"
                   className="ml-[10px] text-[#8F8F8F]"
+                  onClick={toggleTransDropdown}
                 />
               </div>
             </div>
-            <div className="flex items-center space-x-[10px] ml-[40%] mt-[10px]   ">
+
+            {/* Dropdown */}
+            {isTransOpen && (
+              <div className="absolute w-[181px] h-[176px] space-y-[25px] top-[25%]  p-[8px] bg-[#222] rounded-[12px] shadow-lg z-50"
+              style={{border: '1px solid #2D2D2D'}}
+              >
+                {currencies.map((currency) => (
+                  <div
+                    key={currency.name}
+                    onClick={() => handleSelect(currency)}
+                    className={`flex justify-between items-center mt-[10px] px-4 py-3 cursor-pointer hover:bg-[#2D2D2D] ${
+                      currency.name === selectedCurrency.name
+                        ? "bg-[#2D2D2D]"
+                        : ""
+                    }`}
+                  >
+                    <span className="text-[#FCFCFC] text-[16px] font-[500]">
+                      {currency.name}
+                    </span>
+                    <span
+                      className={`w-[16px] h-[16px] rounded-full border-[2px] ${
+                        currency.name === selectedCurrency.name
+                          ? "border-[#4DF2BE] bg-[#4DF2BE]"
+                          : "border-[#5C5C5C]"
+                      }`}
+                    ></span>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <div className="flex items-center space-x-[10px] ml-[40%]    ">
               <div
                 className="flex w-[122px] h-[40px]  items-center bg-[#2D2D2D] relative text-[#4DF2BE] space-x-[5px] ml-[5px] mt-4 rounded-full"
                 style={{ padding: "10px 16px" }}
@@ -371,7 +455,7 @@ const Dashboard: React.FC<QRCodeBoxProps> = ({ value }) => {
 
               {showReceiveModal && (
                 <div className="fixed inset-0  top-[38px]    justify-center  items-center z-50">
-                  <div className="bg-[#0F1012] w-[560px] max-h-[85vh] pb-[20px]  pl-[20px] rounded-[20px] p-6 relative text-white overflow-y-auto ">
+                  <div className="bg-[#0F1012] w-[560px] max-h-[85vh] pb-[20px]  pl-[20px] rounded-[20px] p-6 relative text-white overflow-y-auto scrollbar-thin scrollbar-thumb-[#DBDBDB] scrollbar-track-[#2D2D2D] ">
                     <Image
                       src={Times}
                       alt={"times"}
@@ -380,6 +464,7 @@ const Dashboard: React.FC<QRCodeBoxProps> = ({ value }) => {
                       className="absolute top-[20px] w-[32px] h-[32px]  ml-[85%] cursor-pointer"
                       onClick={closeReceiveModal}
                     />
+
                     <h2 className="text-[16px]  font-[700] text-[#FCFCFC] mt-[30px] mb-2">
                       Receive {currentCoin}
                     </h2>
@@ -471,7 +556,16 @@ const Dashboard: React.FC<QRCodeBoxProps> = ({ value }) => {
                               )}`
                             : "Generating address..."}{" "}
                         </p>
-                        <Image src={Copy} alt="copy " sizes="16.667" />
+                        <div
+                          onClick={() => {
+                            navigator.clipboard.writeText(
+                              currentWallet?.id ?? ""
+                            );
+                            alert("Address copied");
+                          }}
+                        >
+                          <Image src={Copy} alt="copy " sizes="16.667" />
+                        </div>
                       </div>
 
                       <div className=" flex items-center space-x-[10px] w-[242px] h-[48px] bg-[#2D2D2D] justify-center mt-[10px] rounded-full">
