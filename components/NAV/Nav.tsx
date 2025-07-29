@@ -89,7 +89,7 @@ const Nav: React.FC = () => {
         </div>
 
         {isProfileOpen && (
-          <div className="absolute top-[55px] left-[80%] w-[234px] h-[337px] bg-[#222222] space-y-[20px]  rounded-[12px] shadow-lg p-[8px] z-50 text-white space-y-4"
+          <div className="absolute top-[100px] left-[80%] w-[234px] h-[337px] bg-[#222222] space-y-[20px]  rounded-[12px] shadow-lg p-[8px] z-50 text-white space-y-4"
           style={{border: '1px solid #2D2D2D'}}
           >
             {profileOptions.map((item, index) => (
@@ -103,7 +103,7 @@ const Nav: React.FC = () => {
                   <span  className={`ml-[10px] text-[16px] font-[500] ${ item.name === "Verify me" ? "text-[#FE857D]"  : "text-[#FCFCFC]"}`}>{item.name}</span>
                 </span>
                 {item.tier && (
-                  <span className="bg-[#3A3A3A] ml-[-20%] flex items-center w-[43px] h-[22px] text-[12px] font-[500] text-[#DBDBDB]  rounded-[16px]"
+                  <span className="bg-[#3A3A3A]  flex items-center w-[43px] h-[22px] text-[12px] font-[500] text-[#DBDBDB]  rounded-[16px]"
                   style={{padding: '2px 8px'}}
                   >{item.tier}</span>
                 )}
