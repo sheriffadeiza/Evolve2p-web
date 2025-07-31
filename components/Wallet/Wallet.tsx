@@ -23,6 +23,7 @@ import Yellow_i from "../../public/Assets/Evolve2p_yellowi/elements.svg";
 import Copy from "../../public/Assets/Evolve2p_code/elements.svg";
 import Share from "../../public/Assets/Evolve2p_share/elements.svg";
 import Footer from "../Footer/Footer";
+import TabsNav from "../TabsNav/TabsNav";
 
 
 interface QRCodeBoxProps {
@@ -56,8 +57,6 @@ const conversionRates: { [key: string]: number } = {
 
 
 const Wallet: React.FC<QRCodeBoxProps> = ({ value }) => {
-  const [activeTab, setActiveTab] = useState("Balance");
-  const tabs = ["Balance", "Transactions", "Swap"];
 
   const [showReceiveModal, setShowReceiveModal] = useState(false);
     const [open, setOpen] = useState(false);
@@ -150,22 +149,7 @@ const Wallet: React.FC<QRCodeBoxProps> = ({ value }) => {
         <Nav />
        
         <div className="flex bg-[#2D2D2D] rounded-[56px] mt-8 w-[296px] h-[48px] p-1 items-center justify-between">
-          {tabs.map((tab) => (
-            <div
-              key={tab}
-              onClick={() => setActiveTab(tab)}
-              className={`flex items-center justify-center rounded-[56px] text-[16px] transition
-                ${
-                  activeTab === tab
-                    ? "bg-[#4A4A4A] text-[#FCFCFC] font-[500] w-[90px] h-[40px]"
-                    : "bg-transparent text-[#DBDBDB] font-[400] w-[90px] h-[40px]"
-                }
-              `}
-              style={{ minWidth: "90px", minHeight: "40px" }}
-            >
-              {tab}
-            </div>
-          ))}
+          <TabsNav /> 
         </div>
 
         <div className="flex md:flex-row justify-between pr-[30px] mt-[5px]">
