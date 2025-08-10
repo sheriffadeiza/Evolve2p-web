@@ -120,45 +120,51 @@ const Dashboard: React.FC<QRCodeBoxProps> = ({ value }) => {
   };
 
   const closeReceiveModal = () => setShowReceiveModal(false);
-  let user: any = null;
-
-  if (typeof window !== "undefined") {
-    const stored = localStorage.getItem("UserData");
-    if (stored) {
-      user = JSON.parse(stored);
-    }
-  }
+  // let user: any = null;
 
   useEffect(() => {
-    const checkAuth = async () => {
-      try {
-        if (!user) {
-          setError("Please login first");
-          setTimeout(() => router.push("/Logins/login"), 1500);
-          return;
-        }
-
-        setTimeout(() => setLoading(false), 1000);
-      } catch (e) {
-        console.error("Error accessing localStorage:", e);
-        setError("Unable to access authentication data. Please try again.");
-        setTimeout(() => router.push("/Logins/login"), 2000);
+    if (typeof window !== "undefined") {
+      const stored = localStorage.getItem("UserData");
+      if (!stored) {
+        setError("Please login first");
+        setTimeout(() => router.push("/Logins/login"), 1500);
+        return;
       }
-    };
+      if (stored) {
+        setClientUser(JSON.parse(stored)?.userData);
+      }
+    }
+  }, [window]);
 
-    checkAuth();
-  }, [router]);
+  // console.log(currentWallet);
 
-  useEffect(() => {
-    setClientUser(user);
-  }, []);
+  // useEffect(() => {
+  //   const checkAuth = async () => {
+  //     try {
+  //       if (!clientUser) {
+  //         setError("Please login first");
+  //         setTimeout(() => router.push("/Logins/login"), 1500);
+  //         return;
+  //       }
+
+  //       setTimeout(() => setLoading(false), 1000);
+  //     } catch (e) {
+  //       console.error("Error accessing localStorage:", e);
+  //       setError("Unable to access authentication data. Please try again.");
+  //       setTimeout(() => router.push("/Logins/login"), 2000);
+  //     }
+  //   };
+
+  //   checkAuth();
+  // }, [clientUser]);
 
   useEffect(() => {
     if (currentCoin !== "") {
       if (clientUser && clientUser.wallets) {
-        console.log("Client User", clientUser)
+        console.log("Client User", clientUser);
         const wallet = clientUser.wallets.find(
-          (w: any) => String( w.currency).toUpperCase() == currentCoin?.toUpperCase()
+          (w: any) =>
+            String(w.currency).toUpperCase() == currentCoin?.toUpperCase()
         );
         setCurrentWallet(wallet || null); // Set to null if not found
       } else {
@@ -167,8 +173,6 @@ const Dashboard: React.FC<QRCodeBoxProps> = ({ value }) => {
       }
     }
   }, [currentCoin, clientUser]);
-
-  console.log(currentWallet)
 
   useEffect(() => {
     setMyDate(new Date().toLocaleString());
@@ -197,7 +201,6 @@ const Dashboard: React.FC<QRCodeBoxProps> = ({ value }) => {
     <main className="min-h-screen bg-[#0F1012] pr-[10px] mt-[30px] pl-[30px] text-white md:p-8 relative">
       <div className="max-w-7xl mx-auto">
         <Nav />
-
         {/* Main Content */}
         {/* Header */}
         <div className="flex space-x-[5px]  text-[24px] font-[500] items-center mb-6">
@@ -210,7 +213,6 @@ const Dashboard: React.FC<QRCodeBoxProps> = ({ value }) => {
               : "User"}
           </p>
         </div>
-
         <div
           className="flex pl-[15px] bg-[#342827] h-[68px] w-[1224px]  items-center gap-2 mb-6 "
           style={{
@@ -230,9 +232,8 @@ const Dashboard: React.FC<QRCodeBoxProps> = ({ value }) => {
             Complete KYC
           </button>
         </div>
-cl
+        cl
         {/* Verification Modal */}
-
         {showVerifyModal && (
           <div
             className="fixed inset-0 bg-[#222222] flex items-center top-[100px]  ml-[25%]  justify-center z-[1000]"
@@ -307,7 +308,6 @@ cl
             </div>
           </div>
         )}
-
         {/* How It Works Modal */}
         {showHowModal && (
           <div
@@ -373,18 +373,19 @@ cl
             <div className="flex items-center  mt-[5px] gap-2 mb-6  space-x-[10px]">
               <p className="text-[16px] font-[400] text-[#DBDBDB]">
                 Available Balance
-               
               </p>
 
-              <p> <Image
-                onClick={toggleVissibility}
-                src={SlashH}
-                alt="slash"
-                width={25}
-                height={25}
-                className="cursor-pointer"
-              /></p>
-              
+              <p>
+                {" "}
+                <Image
+                  onClick={toggleVissibility}
+                  src={SlashH}
+                  alt="slash"
+                  width={25}
+                  height={25}
+                  className="cursor-pointer"
+                />
+              </p>
             </div>
             <div className="flex  space-x-[10px] mt-[-35px]">
               <p className="text-[36px] font-[700] text-[#FCFCFC]">
@@ -407,8 +408,9 @@ cl
 
             {/* Dropdown */}
             {isTransOpen && (
-              <div className="absolute w-[181px] h-[176px] space-y-[25px] top-[25%]  p-[8px] bg-[#222] rounded-[12px] shadow-lg z-50"
-              style={{border: '1px solid #2D2D2D'}}
+              <div
+                className="absolute w-[181px] h-[176px] space-y-[25px] top-[25%]  p-[8px] bg-[#222] rounded-[12px] shadow-lg z-50"
+                style={{ border: "1px solid #2D2D2D" }}
               >
                 {currencies.map((currency) => (
                   <div
@@ -485,7 +487,7 @@ cl
                     {/* QR Code */}
                     <div className="flex justify-center mt-[30px]">
                       <QRCodeCanvas
-                        value={currentWallet?.id || ""}
+                        value={currentWallet?.address || ""}
                         size={206}
                         bgColor="#3A3A3A"
                         fgColor="#FFFFFF"
@@ -548,18 +550,18 @@ cl
                         <p className="text-[14px] font-[700] text-[#FCFCFC] ">
                           {" "}
                           {currentWallet?.id
-                            ? `${currentWallet.id.substring(
+                            ? `${currentWallet?.address.substring(
                                 0,
                                 4
-                              )}...${currentWallet.id.substring(
-                                currentWallet.id.length - 4
+                              )}...${currentWallet?.address.substring(
+                                currentWallet.address.length - 4
                               )}`
                             : "Generating address..."}{" "}
                         </p>
                         <div
                           onClick={() => {
                             navigator.clipboard.writeText(
-                              currentWallet?.id ?? ""
+                              currentWallet?.address ?? ""
                             );
                             alert("Address copied");
                           }}
@@ -762,7 +764,6 @@ cl
             </div>
           </div>
         </div>
-
         {/* Assets & Todo */}
         <div className="flex">
           {/* left_side */}
@@ -1349,7 +1350,6 @@ cl
             </div>
           </div>
         </div>
-
         <Footer />
       </div>
     </main>
