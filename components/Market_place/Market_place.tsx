@@ -4,7 +4,6 @@ import React, { useState } from "react";
 import Nav from "../../components/NAV/Nav";
 import Image from "next/image";
 import Arrow_d from "../../public/Assets/Evolve2p_arrowd/arrow-down-01.png";
-import Bitcoin from "../../public/Assets/Evolve2p_BTC/Bitcoin (BTC).svg";
 import Globe from "../../public/Assets/Evolve2p_globe/Makretplace/elements.svg";
 import Funnel from "../../public/Assets/Evolve2p_funnel/elements.svg";
 import Vector from "../../public/Assets/Evolve2p_vector/vector.svg";
@@ -18,11 +17,30 @@ import Dyellow from "../../public/Assets/Evolve2p_Dyellow/Divider.svg";
 import Dpurple from "../../public/Assets/Evolve2p_Dpurple/Divider.svg";
 import Dpink from "../../public/Assets/Evolve2p_Dpink/Divider.svg";
 import Dgreen from "../../public/Assets/Evolve2p_Dgreen/Divider.svg";
+import BTC from "../../public/Assets/Evolve2p_BTC/Bitcoin (BTC).svg";
+import ETH from "../../public/Assets/Evolve2p_ETH/Ethereum (ETH).svg";
+import USDT from "../../public/Assets/Evolve2p_USDT/Tether (USDT).svg";
+import USDC from "../../public/Assets/Evolve2p_USDC/USD Coin (USDC).svg";
 import Footer from "../../components/Footer/Footer";
 
-const Market_place = () => {
+const Market_place: React.FC = () => {
   const [activeTab, setActiveTab] = useState("Buy");
   const tabs = ["Buy", "Sell"];
+  const [isMarketDropdownOpen, setIsMarketDropdownOpen] = useState(false);
+  const [selectedCoin, setSelectedCoin] = useState({ name: "BTC", icon: BTC });
+
+
+  const toggleMarketDropdown = () => {
+    setIsMarketDropdownOpen((prev) => !prev);
+  };
+
+
+   const coins = [
+      { name: "BTC", icon: BTC },
+      { name: "ETH", icon: ETH },
+      { name: "USDT", icon: USDT },
+      { name: "USDC", icon: USDC },
+    ];
 
   return (
     <main className="min-h-screen bg-[#0F1012] pr-[10px] mt-[30px] pl-[30px] text-white md:p-8">
@@ -57,7 +75,7 @@ const Market_place = () => {
               <div className="w-[355px] h-[43.2px] mt-[10px] bg-[#2D2D2D] flex items-center justify-between px-4 py-3 rounded-lg cursor-pointer">
                 <span className="flex items-center pl-[15px]  text-[#FCFCFC] text-[14px] font-[500]">
                   <Image
-                    src={Bitcoin}
+                    src={BTC}
                     alt="bitcoin"
                     className="w-[19.998px] h-[20px]  "
                   />
@@ -143,7 +161,7 @@ const Market_place = () => {
 
                 </div>
 
-               
+               {/*drop_down coins */}
                  <div
                 className=" flex items-center  ml-[50px] w-[115px] h-[40px] space-x-[20px] bg-[#2D2D2D] rounded-full 
            "
@@ -151,17 +169,58 @@ const Market_place = () => {
               >
                 <div className="ml-[10px] flex items-center space-x-[15px]">
                   <Image
-                    src={Bitcoin}
-                  alt="btc"
-                    className="w-[19.998px] h-[20px] p"
+                    src={selectedCoin.icon}
+                  alt={selectedCoin.name}
+                    className="w-[19.998px] h-[20px]"
                   />
-                  <p className="text-[14px] font-[400] text-[#FCFCFC] ">BTC</p>
+                  <p className="text-[14px] font-[400] text-[#FCFCFC] ">{selectedCoin.name}</p>
                   <Image
                     src={Arrow_d}
                     alt="arrow"
                     className="w-[20px] h-[20px] text-[#8F8F8F] "
+                    onClick={toggleMarketDropdown}
                   />
                 </div>
+               
+               {isMarketDropdownOpen && (
+                <div className="absolute w-[250px] bg-[#222222] top-[200px] rounded-[16px] shadow-lg z-[1500] p-8 space-y-4">
+                      {coins.map((coin) => (
+
+                        <div
+                        key={coin.name}
+                        onClick={() => {
+                          setSelectedCoin(coin);
+                          setIsMarketDropdownOpen(false);
+                        }}
+                        className="flex items-center justify-between cursor-pointer hover:bg-[#2D2D2D] px-4 py-2 rounded-[12px]"
+                        >
+
+                          <div
+                          className="flex items-center pl-[20px] space-x-[10px]"
+                          >
+                            <Image src={coin.icon} alt={coin.name} className="w-[19.998px] h-[20px]" />
+
+                            <p className="text-[16px] font-[500] text-[#FFFFFF]">{coin.name}</p>
+
+                          </div>
+
+                          {/*selection indicator */}
+
+                           <div
+                          className={`w-[20px] h-[20px] mr-[10px] rounded-full border-2 ${
+                            selectedCoin.name === coin.name
+                              ? "border-[#4DF2BE] bg-[#4DF2BE]"
+                              : "border-[#8F8F8F]"
+                          } flex items-center justify-center`}
+                        >
+                          {selectedCoin.name === coin.name && (
+                            <div className="w-[10px] h-[10px]  rounded-full bg-[#0F1012]"></div>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
                <div
                 className=" flex    w-[146px] h-[40px] whitespace-nowrap space-x-[20px] bg-[#2D2D2D] rounded-full 

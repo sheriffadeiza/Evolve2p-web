@@ -230,7 +230,7 @@ const Dashboard: React.FC<QRCodeBoxProps> = ({ value }) => {
             Complete KYC
           </button>
         </div>
-
+cl
         {/* Verification Modal */}
 
         {showVerifyModal && (
