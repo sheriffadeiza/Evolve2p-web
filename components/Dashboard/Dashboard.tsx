@@ -134,7 +134,7 @@ const Dashboard: React.FC<QRCodeBoxProps> = ({ value }) => {
         setClientUser(JSON.parse(stored)?.userData);
       }
     }
-  }, [window]);
+  }, []);
 
   // console.log(currentWallet);
 
@@ -206,10 +206,10 @@ const Dashboard: React.FC<QRCodeBoxProps> = ({ value }) => {
         <div className="flex space-x-[5px]  text-[24px] font-[500] items-center mb-6">
           <p className="text-[#8F8F8F]">Hello,</p>
           <p className="text-[#FCFCFC]">
-            {clientUser?.userData?.username
-              ? clientUser?.userData?.username.startsWith("@")
-                ? clientUser?.userData?.username
-                : `@${clientUser?.userData?.username}`
+            {clientUser?.username
+              ? clientUser?.username.startsWith("@")
+                ? clientUser?.username
+                : `@${clientUser?.username}`
               : "User"}
           </p>
         </div>
@@ -728,6 +728,7 @@ const Dashboard: React.FC<QRCodeBoxProps> = ({ value }) => {
               <div
                 className="flex w-[122px] h-[40px]  items-center bg-[#2D2D2D] text-[#4DF2BE] space-x-[10px] mt-4 rounded-full"
                 style={{ padding: "10px 16px" }}
+                onClick={() => router.push("/swap")}
               >
                 <Image src={Swap} alt="swap" className="ml-[20px]" />
                 <p className="px-4 py-1 ml-[5px]   rounded-full font-[700] text-[14px]">

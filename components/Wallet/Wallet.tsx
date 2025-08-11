@@ -24,6 +24,7 @@ import Copy from "../../public/Assets/Evolve2p_code/elements.svg";
 import Share from "../../public/Assets/Evolve2p_share/elements.svg";
 import Footer from "../Footer/Footer";
 import TabsNav from "../TabsNav/TabsNav";
+import { useRouter } from "next/navigation";
 
 
 interface QRCodeBoxProps {
@@ -66,6 +67,9 @@ const Wallet: React.FC<QRCodeBoxProps> = ({ value }) => {
     const [currentWallet, setCurrentWallet] = useState<wallet | null>(null);
     const [currentCoin, setCurrentCoin] = useState("");
     const [showBalance, setShowBalance] = useState(true);
+    const [error, setError] = useState("");
+    const router = useRouter();
+
   
     const [isTransOpen, setIsTransOpen] = useState(false);
 
@@ -105,21 +109,23 @@ const Wallet: React.FC<QRCodeBoxProps> = ({ value }) => {
      };
    
      const closeReceiveModal = () => setShowReceiveModal(false);
-     let user: any = null;
-   
-     if (typeof window !== "undefined") {
-       const stored = localStorage.getItem("UserData");
-       if (stored) {
-         user = JSON.parse(stored);
-       }
-     }
-   
      
    
      useEffect(() => {
-       setClientUser(user);
-     }, []);
-   
+         if (typeof window !== "undefined") {
+           const stored = localStorage.getItem("UserData");
+           if (!stored) {
+             setError("Please login first");
+             setTimeout(() => router.push("/Logins/login"), 1500);
+             return;
+           }
+           if (stored) {
+             setClientUser(JSON.parse(stored)?.userData);
+           }
+         }
+       }, []);
+
+
      useEffect(() => {
        if (currentCoin !== "") {
          if (clientUser && clientUser.wallets) {
@@ -514,6 +520,7 @@ const Wallet: React.FC<QRCodeBoxProps> = ({ value }) => {
                      <div
                        className="flex w-[122px] h-[40px]  items-center bg-[#2D2D2D] text-[#4DF2BE] space-x-[10px] mt-4 rounded-full"
                        style={{ padding: "10px 16px" }}
+                       onClick={() => {router.push("/swap")}}
                      >
                        <Image src={Swap} alt="swap" className="ml-[20px]" />
                        <p className="px-4 py-1 ml-[5px]   rounded-full font-[700] text-[14px]">
