@@ -24,13 +24,13 @@ import Offer from "../../public/Assets/Evolve2p_Offer/elements.svg";
 import Limit from "../../public/Assets/Evolve2p_Limit/elements.svg";
 import Set from "../../public/Assets/Evolve2p_Set/elements.svg";
 import Refer from "../../public/Assets/Evolve2p_Refer/elements.svg";
-import G19 from "../../public/Assets/Evolve2p_group19/Group 19.svg";
 import Times from "../../public/Assets/Evolve2p_times/Icon container.png";
 import checklistInactive from "../../public/Assets/Evolve2p_checklist2/checklist-inactive.svg";
 import { QRCodeCanvas } from "qrcode.react";
 import Yellow_i from "../../public/Assets/Evolve2p_yellowi/elements.svg";
 import Copy from "../../public/Assets/Evolve2p_code/elements.svg";
 import Share from "../../public/Assets/Evolve2p_share/elements.svg";
+import DashboardTransactions from "@/app/dashboardTransaction/dashboardTrans";
 import Footer from "../Footer/Footer";
 
 interface QRCodeBoxProps {
@@ -311,7 +311,7 @@ const Dashboard: React.FC<QRCodeBoxProps> = ({ value }) => {
         {/* How It Works Modal */}
         {showHowModal && (
           <div
-            className="fixed inset-0 bg-black bg-opacity-50 mt-[30%] flex items-center justify-center z-[1000]"
+            className="fixed inset-0 bg-black bg-opacity-50 mt-[22%] ml-[10%] flex items-center justify-center z-[1000]"
             onClick={toggleHowModal}
           >
             <div
@@ -1093,26 +1093,10 @@ const Dashboard: React.FC<QRCodeBoxProps> = ({ value }) => {
                 </div>
               </div>
             </div>
-            <div className="w-[913px] h-[722px]">
-              <div className="flex items-center justify-between mt-[40%] w-[900px] h-[24px] rounded-[12px]">
-                <p className="text-[16px] font-[500] text-[#8F8F8F]">
-                  Transactions
-                </p>
-                <div className="flex-1 flex flex-col items-center  mt-[30%] justify-center">
-                  <Image src={G19} alt="group19" />
-                  <p className="text-[14px] font-[400] text-[#8F8F8F] mt-2">
-                    Your 10 most recent transactions will appear here
-                  </p>
-                </div>
-                <div className="flex items-center space-x-[10px]">
-                  <p className="text-[14px] font-[700] text-[#FCFCFC]">
-                    See all
-                  </p>
-                  <Image src={R_arrow} alt="rarrow" />
-                </div>
-              </div>
-              <div className="w-[153.8%] ml-[-10%] h-[1px] bg-[#fff] mt-[40%] opacity-20 my-8"></div>
-            </div>
+            <div className="w-[913px] h-[722px] mt-[40%]">
+              <DashboardTransactions />
+
+          </div>
           </div>
 
           {/* right_side */}
@@ -1351,7 +1335,9 @@ const Dashboard: React.FC<QRCodeBoxProps> = ({ value }) => {
             </div>
           </div>
         </div>
+        <div className="mt-[20%] ">
         <Footer />
+        </div>
       </div>
     </main>
   );
