@@ -15,11 +15,21 @@ const Passwordbd = () => {
   const [showConfirm, setShowConfirm] = useState(false);
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [currentUserData, setCurrentUserData] = useState<any>(null);
 
-  // Get email from localStorage on mount
-  const currentUserData = localStorage.getItem("UserReg")
-    ? JSON.parse(localStorage.getItem("UserReg") as string)
-    : null;
+  // ✅ Safely read localStorage on the client only
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const stored = window.localStorage.getItem("UserReg");
+      if (stored) {
+        try {
+          setCurrentUserData(JSON.parse(stored));
+        } catch (e) {
+          console.error("Failed to parse UserReg", e);
+        }
+      }
+    }
+  }, []);
 
   // Validation checks
   const isMinLength = password.length >= 6;
@@ -37,7 +47,6 @@ const Passwordbd = () => {
       setError("Please meet all password requirements");
       return;
     }
-
     if (!passwordsMatch) {
       setError("Passwords don't match");
       return;
@@ -48,18 +57,17 @@ const Passwordbd = () => {
 
     try {
       if (typeof window !== "undefined") {
-        localStorage.setItem(
+        window.localStorage.setItem(
           "UserReg",
           JSON.stringify({ ...currentUserData, password })
         );
       }
-
       router.push("/Signups/Profile");
     } catch (err: any) {
       setError(
-        typeof err.message === "string"
+        typeof err?.message === "string"
           ? err.message
-          : JSON.stringify(err.message) || "Something went wrong"
+          : JSON.stringify(err?.message || "Something went wrong")
       );
     } finally {
       setIsLoading(false);
@@ -123,9 +131,7 @@ const Passwordbd = () => {
             width={16}
             height={16}
           />
-          <span
-            className={`${isMinLength ? "text-[#FCFCFC]" : "text-[#8F8F8F]"}`}
-          >
+          <span className={isMinLength ? "text-[#FCFCFC]" : "text-[#8F8F8F]"}>
             Minimum 6 characters
           </span>
         </li>
@@ -136,9 +142,7 @@ const Passwordbd = () => {
             width={16}
             height={16}
           />
-          <span
-            className={`${hasNumber ? "text-[#FCFCFC]" : "text-[#8F8F8F]"}`}
-          >
+          <span className={hasNumber ? "text-[#FCFCFC]" : "text-[#8F8F8F]"}>
             At least 1 number
           </span>
         </li>
@@ -149,11 +153,7 @@ const Passwordbd = () => {
             width={16}
             height={16}
           />
-          <span
-            className={`${
-              hasSpecialChar ? "text-[#FCFCFC]" : "text-[#8F8F8F]"
-            }`}
-          >
+          <span className={hasSpecialChar ? "text-[#FCFCFC]" : "text-[#8F8F8F]"}>
             At least 1 special character
           </span>
         </li>
@@ -164,9 +164,7 @@ const Passwordbd = () => {
             width={16}
             height={16}
           />
-          <span
-            className={`${hasUpperLower ? "text-[#FCFCFC]" : "text-[#8F8F8F]"}`}
-          >
+          <span className={hasUpperLower ? "text-[#FCFCFC]" : "text-[#8F8F8F]"}>
             1 uppercase and 1 lowercase letter
           </span>
         </li>

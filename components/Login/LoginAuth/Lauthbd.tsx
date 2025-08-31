@@ -2,14 +2,12 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { useLogin } from '@/context/LoginContext';
 
 const Lauthbd: React.FC = () => {
   const [pin, setPin] = useState<string[]>(["", "", "", "", "", ""]);
   const [error, setError] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(false);
   const router = useRouter();
-  const { user } = useLogin();
 
   // Check if user is authenticated
   useEffect(() => {

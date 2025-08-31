@@ -11,7 +11,7 @@ const Passnav = () => {
   const handleGoBack = () => {
 
     localStorage.getItem('UserEmail');
-    router.push('/Signups/Email');
+    router.push('/Signups/VerifyEmail');
   };
 
   return (
@@ -31,7 +31,7 @@ const Passnav = () => {
       <button
         className="w-[84px] h-[24px] flex items-center justify-center border-0 transition-colors rounded-full text-[14px] font-[500] bg-[#3A3A3A] text-[#DBDBDB]"
       >
-        Step 2 of 6
+        Step 3 of 6
       </button>
     </div>
   );

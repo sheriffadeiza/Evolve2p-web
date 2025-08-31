@@ -17,17 +17,27 @@ const VerifyEmailbd: React.FC = () => {
   const [resendTimer, setResendTimer] = useState(30);
   const [canResend, setCanResend] = useState(false);
 
-  // On mount: get email and send OTP
-  // useEffect(() => {
-  //   const userEmail = localStorage.getItem("userEmail");
-  //   if (userEmail) {
-  //     setEmail(userEmail);
-  //     sendOTP(userEmail);
-  //   } else {
-  //     router.push("/Signups/Email");
-  //   }
-  //   // eslint-disable-next-line
-  // }, [router]);
+  // ✅ On mount: get email from localStorage (UserReg) and send OTP
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const stored = localStorage.getItem("UserReg");
+      if (stored) {
+        try {
+          const parsed = JSON.parse(stored);
+          if (parsed?.email) {
+            setEmail(parsed.email);
+            sendOTP(parsed.email);
+          } else {
+            router.push("/Signups/Email");
+          }
+        } catch {
+          router.push("/Signups/Email");
+        }
+      } else {
+        router.push("/Signups/Email");
+      }
+    }
+  }, [router]);
 
   // Timer for resend button
   useEffect(() => {
@@ -46,7 +56,7 @@ const VerifyEmailbd: React.FC = () => {
     }
   }, [canResend, resendTimer]);
 
-  // Send or Resend OTP
+  // Send OTP
   const sendOTP = async (email: string) => {
     setIsLoading(true);
     setError("");
@@ -66,11 +76,7 @@ const VerifyEmailbd: React.FC = () => {
         throw new Error("Failed to send code");
       }
     } catch (err: any) {
-      setError(
-        typeof err.message === "string"
-          ? err.message
-          : JSON.stringify(err.message) || "Failed to send code"
-      );
+      setError(err?.message || "Failed to send code");
     } finally {
       setIsLoading(false);
     }
@@ -91,7 +97,7 @@ const VerifyEmailbd: React.FC = () => {
     }
   };
 
-  // Always verify with backend
+  // Verify code
   const verifyCode = async (code: string) => {
     setIsLoading(true);
     setError("");
@@ -104,51 +110,30 @@ const VerifyEmailbd: React.FC = () => {
           "Content-Type": "application/json",
           Accept: "application/json",
         },
-        body: JSON.stringify({
-          email: email,
-          otp: code,
-        }),
+        body: JSON.stringify({ email, otp: code }),
       });
 
-      let data;
-      try {
-        data = await response.json();
-      } catch {
-        data = {};
-      }
+      const data = await response.json().catch(() => ({}));
 
       if (!response.ok) {
-        let msg = "Verification failed";
-        if (
-          Array.isArray(data.detail) &&
-          data.detail.length > 0 &&
-          data.detail[0].msg
-        ) {
-          msg = data.detail[0].msg;
-        } else if (typeof data.message === "string") {
-          msg = data.message;
-        } else if (typeof data.detail === "string") {
-          msg = data.detail;
-        } else {
-          msg = JSON.stringify(data);
-        }
+        const msg =
+          data?.message || data?.detail || "Verification failed. Try again.";
         setError(msg);
         setPin(["", "", "", "", "", ""]);
-        const firstInput = document.getElementById("pin-0");
-        if (firstInput) (firstInput as HTMLInputElement).focus();
+        document.getElementById("pin-0")?.focus();
         setIsLoading(false);
         return;
       }
 
-      // Success
+      // ✅ Success → mark verified in localStorage
       const currentLocalData = localStorage.getItem("UserReg")
         ? JSON.parse(localStorage.getItem("UserReg") as string)
-        : null;
-
+        : {};
       localStorage.setItem(
         "UserReg",
         JSON.stringify({ ...currentLocalData, isEmailVerified: true })
       );
+
       setError("");
       setSuccess(true);
       setIsLoading(false);
@@ -156,17 +141,9 @@ const VerifyEmailbd: React.FC = () => {
         router.push("/Signups/Password");
       }, 1000);
     } catch (err: any) {
-      let msg = "Invalid verification code. Please try again.";
-      if (err?.message) {
-        msg =
-          typeof err.message === "string"
-            ? err.message
-            : JSON.stringify(err.message);
-      }
-      setError(msg);
+      setError(err?.message || "Invalid verification code.");
       setPin(["", "", "", "", "", ""]);
-      const firstInput = document.getElementById("pin-0");
-      if (firstInput) (firstInput as HTMLInputElement).focus();
+      document.getElementById("pin-0")?.focus();
       setIsLoading(false);
     }
   };
@@ -182,7 +159,6 @@ const VerifyEmailbd: React.FC = () => {
     await sendOTP(email);
   };
 
-  // Check if all pin fields are filled
   const isPinComplete = pin.every((d) => d !== "");
 
   return (
@@ -207,7 +183,7 @@ const VerifyEmailbd: React.FC = () => {
         </div>
       )}
 
-      <div className="flex gap-[5px] ml-[-150px] border-none justify-center mb-6">
+      <div className="flex gap-[5px] ml-[-150px] justify-center mb-6">
         {pin.map((digit, idx) => (
           <input
             key={idx}
@@ -246,39 +222,6 @@ const VerifyEmailbd: React.FC = () => {
           {canResend ? "Resend code" : `Resend code ${resendTimer}s`}
         </button>
       </div>
-
-      {isLoading && (
-        <div className="fixed inset-0 flex ml-[15%] mt-[30px] items-center justify-center bg-black bg-opacity-50 z-50">
-          <div className="loader"></div>
-          <style jsx global>{`
-            .loader {
-              width: 30px;
-              height: 30px;
-              position: relative;
-            }
-            .loader::after {
-              content: "";
-              position: absolute;
-              top: 0;
-              left: 0;
-              width: 70%;
-              height: 70%;
-              border: 5px solid #333333;
-              border-top-color: #4df2be;
-              border-radius: 50%;
-              animation: spin 1s linear infinite;
-            }
-            @keyframes spin {
-              0% {
-                transform: rotate(0deg);
-              }
-              100% {
-                transform: rotate(360deg);
-              }
-            }
-          `}</style>
-        </div>
-      )}
     </div>
   );
 };

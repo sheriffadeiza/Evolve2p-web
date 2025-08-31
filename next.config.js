@@ -36,7 +36,7 @@ const nextConfig = {
   experimental: {
     // This prevents Next.js from statically optimizing pages that might use browser APIs
     // like localStorage during the initial render
-    appDir: true,
+    
   },
 };
 

@@ -4,7 +4,6 @@ import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 
 const EmailForm = () => {
-  const BASE_URL = "https://evolve2p-backend.onrender.com/api/";
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [error, setError] = useState<string>("");
@@ -26,15 +25,10 @@ const EmailForm = () => {
         body: JSON.stringify({ email }),
       });
 
-      if (!response.ok) {
-        throw new Error("Failed to send code");
-      }
-
       const sendMail = await response.json();
 
-      if (sendMail.error) {
-        alert(sendMail?.message);
-        return;
+      if (!response.ok || sendMail.error) {
+        throw new Error(sendMail?.message || "Failed to send code");
       }
 
       alert(sendMail?.message);
@@ -85,8 +79,10 @@ const EmailForm = () => {
         return;
       }
 
+      // ✅ Always save the entered email to localStorage
       localStorage.setItem("UserReg", JSON.stringify({ email }));
 
+      // ✅ Then send OTP
       await sendOTP(email);
     } catch (error) {
       console.log(error);

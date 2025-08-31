@@ -3,15 +3,12 @@
 import React from 'react';
 import Image from 'next/image';
 import image from '../../../public/Assets/Evolve2p_goback/Content.png';
-import { useSignup } from '@/context/SignupContext';
 import { useRouter } from 'next/navigation';
 
 const Confirmnav = () => {
-  const { setCurrentStep } = useSignup();
   const router = useRouter();
 
   const handleGoBack = () => {
-    setCurrentStep('secpin');
     router.push('/Signups/Secpin');
   };
 

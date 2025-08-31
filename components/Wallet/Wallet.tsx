@@ -226,7 +226,7 @@ const Wallet: React.FC<QRCodeBoxProps> = ({ value }) => {
             <div className="flex items-center space-x-[10px] ml-[40%]    ">
               <div
                 className="flex w-[122px] h-[40px]  items-center bg-[#2D2D2D] relative text-[#4DF2BE] space-x-[5px] ml-[5px] mt-4 rounded-full"
-                style={{ padding: "10px 16px" }}
+                style={{ padding: "5px 10px" }}
               >
                 <Image src={Send} alt="send" className="ml-[10px]" />
                 <p className="   rounded-full font-[700] text-[14px] pl-[10px] ">
@@ -432,7 +432,7 @@ const Wallet: React.FC<QRCodeBoxProps> = ({ value }) => {
 
               <div
                 className="flex w-[130px] h-[40px] bor items-center bg-[#2D2D2D] text-[#4DF2BE] space-x-[10px] relative  mt-4 rounded-full"
-                style={{ padding: "10px 16px" }}
+                style={{ padding: "5px 10px" }}
               >
                 <Image src={Rarrowd} alt="Rd" className="ml-[15px]" />
                 <p className="    rounded-full font-[700] text-[14px] pl-[10px]">
@@ -511,15 +511,13 @@ const Wallet: React.FC<QRCodeBoxProps> = ({ value }) => {
                 </div>
               )}
 
-              <div
+               <div
                 className="flex w-[122px] h-[40px]  items-center bg-[#2D2D2D] text-[#4DF2BE] space-x-[10px] mt-4 rounded-full"
-                style={{ padding: "10px 16px" }}
-                onClick={() => {
-                  router.push("/swap");
-                }}
+                style={{ padding: "5px 10px" }}
+                onClick={() => router.push("/swap")}
               >
-                <Image src={Swap} alt="swap" className="ml-[20px]" />
-                <p className="px-4 py-1 ml-[5px]   rounded-full font-[700] text-[14px]">
+                <p className="pl-[10px]"><Image src={Swap} alt="swap"/></p>
+                <p className="px-4 py-1 ml-[10px]   rounded-full font-[700] text-[14px]">
                   Swap
                 </p>
               </div>

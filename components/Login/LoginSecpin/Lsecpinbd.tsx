@@ -11,16 +11,22 @@ const Lsecpinbd: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string>("");
   const [success, setSuccess] = useState<string>("");
+  const [userData, setUserData] = useState<any>(null);
+
   const router = useRouter();
 
-  const userData = localStorage.getItem("UserData")
-    ? JSON.parse(localStorage.getItem("UserData") as string)
-    : null;
-
+  // ✅ Safely load from localStorage only on client
   useEffect(() => {
-    if (!userData) {
-      setError("Please login first");
-      setTimeout(() => router.push("/Logins/login"), 1500);
+    try {
+      const stored = localStorage.getItem("UserData");
+      if (stored) {
+        setUserData(JSON.parse(stored));
+      } else {
+        setError("Please login first");
+        setTimeout(() => router.push("/Logins/login"), 1500);
+      }
+    } catch {
+      setError("Failed to read user data");
     }
   }, [router]);
 
@@ -73,7 +79,7 @@ const Lsecpinbd: React.FC = () => {
       const data = await response.json();
 
       if (!data?.success) {
-        setError(data?.message);
+        setError(data?.message || "Invalid PIN");
         setPin(["", "", "", ""]);
         return;
       }
@@ -97,17 +103,16 @@ const Lsecpinbd: React.FC = () => {
         Enter security PIN
       </h2>
       <p className="text-[16px] font-[400] mt-[-10px] mb-6 text-[#8F8F8F]">
-        Your PIN helps you log in faster and approve transactions <br />{" "}
-        securely.
+        Your PIN helps you log in faster and approve transactions <br /> securely.
       </p>
 
-      {error && typeof error === "string" && (
+      {error && (
         <div className="p-4 mb-4 text-[#F5918A] bg-[#332222] rounded w-[90%] border border-[#553333]">
           <p className="text-sm mt-1">{error}</p>
         </div>
       )}
 
-      {success && typeof success === "string" && (
+      {success && (
         <div className="p-3 mb-4 text-[#4DF2BE] bg-[#223322] rounded w-[90%]">
           <p>{success}</p>
         </div>
