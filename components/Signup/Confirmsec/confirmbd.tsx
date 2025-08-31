@@ -101,15 +101,15 @@ const Confirmbd: React.FC = () => {
     <div className="text-white ml-[100px] mt-[30px]">
       {/* Success Modal */}
       {showSuccess && (
-        <div className="fixed inset-0 bg-[#333333] bg-opacity-70 flex items-center justify-center z-50">
-          <div className="bg-black text-white w-[250px] p-6 rounded-[10px] text-center shadow-lg">
+        <div className="fixed inset-0 bg-[#3e3e3e] ml-[25%] h- bg-opacity-70 flex items-center justify-center z-50">
+          <div className=" text-white w-[450px] h-[250px] p-6 rounded-[10px] text-center  z-[100]">
             <h3 className="text-[#4DF2BE] text-[18px] font-bold mb-2">
               Success!
             </h3>
-            <p className="mb-4 text-[#FCFCFC]">PIN confirmed successfully</p>
+            <p className="mt-[50px] text-[#FCFCFC]">PIN confirmed successfully</p>
             <button
               onClick={handleContinue}
-              className="bg-[#1ECB84] hover:bg-[#19b97a] transition-colors duration-200 text-black font-semibold py-2 px-4 rounded w-full"
+              className="bg-[#4DF2BE] border-none w-[250px] h-[30px]  text-[16px]  mt-[30px] transition-colors duration-200 text-black font-semibold py-2 px-4 rounded-full"
             >
               Continue to KYC
             </button>
@@ -146,7 +146,7 @@ const Confirmbd: React.FC = () => {
 
       {pin.join("").length === 4 && (
         <button
-          className="w-[300px] h-[48px] mt-[30px] bg-[#4DF2BE] text-[#0F1012] rounded-[100px] font-[700] disabled:opacity-50"
+          className="w-[300px] h-[48px] mt-[30px] ml-[50px] text-[16px] border-none bg-[#4DF2BE] text-[#0F1012] rounded-[100px] font-[700] disabled:opacity-50"
           onClick={handleSubmit}
           disabled={isLoading}
         >

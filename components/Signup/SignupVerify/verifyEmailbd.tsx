@@ -202,7 +202,7 @@ const VerifyEmailbd: React.FC = () => {
 
       {isPinComplete && (
         <button
-          className="w-[300px] h-[48px] mt-[10px] bg-[#4DF2BE] text-[#0F1012] rounded-[100px] font-[700] disabled:opacity-50"
+          className="w-[300px] h-[48px] mt-[10px] ml-[55px] bg-[#4DF2BE] border-none text-[#0F1012] rounded-[100px] font-[700] disabled:opacity-50"
           onClick={() => verifyCode(pin.join(""))}
           disabled={isLoading}
         >

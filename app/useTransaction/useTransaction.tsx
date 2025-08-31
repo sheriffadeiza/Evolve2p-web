@@ -9,62 +9,61 @@ export const useTransaction = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const storedUserData = localStorage.getItem("UserData");
-    const token = localStorage.getItem("accessToken");
+  const storedUserData = localStorage.getItem("UserData");
 
-    if (!storedUserData || !token) {
-      console.error("UserData or accessToken missing in localStorage");
-      setLoading(false);
-      return;
-    }
+  if (!storedUserData) {
+    console.error("UserData missing in localStorage");
+    setLoading(false);
+    return;
+  }
 
-    let email = "";
+  let token = "";
+  try {
+    const parsedUser = JSON.parse(storedUserData);
+    token = parsedUser?.accessToken || "";
+  } catch (err) {
+    console.error("Failed to parse UserData:", err);
+  }
+
+  if (!token) {
+    console.error("No token found in UserData");
+    setLoading(false);
+    return;
+  }
+
+  async function fetchTransactions() {
     try {
-      const parsedUser = JSON.parse(storedUserData);
-      email = parsedUser?.email;
-    } catch (err) {
-      console.error("Failed to parse UserData:", err);
-    }
-
-    if (!email) {
-      console.error("Email not found in UserData");
-      setLoading(false);
-      return;
-    }
-
-    async function fetchTransactions() {
-      try {
-        const res = await fetch(
-          "https://evolve2p-backend.onrender.com/api/get-user",
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              "Authorization": `Bearer ${token}`, // ✅ send token for auth
-            },
-            body: JSON.stringify({ email }), // ✅ backend needs email
-          }
-        );
-
-        if (!res.ok) {
-          throw new Error(`API error: ${res.status}`);
+      const res = await fetch(
+        "https://evolve2p-backend.onrender.com/api/get-user",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`, // ✅ only token
+          },
         }
+      );
 
-        const data = await res.json();
-        console.log("✅ User fetched:", data);
-
-        const userTransactions = data.transactions || [];
-        setTransactions(userTransactions);
-        setFilteredTransactions(userTransactions);
-      } catch (err) {
-        console.error("Failed to fetch transactions:", err);
-      } finally {
-        setLoading(false);
+      if (!res.ok) {
+        throw new Error(`API error: ${res.status}`);
       }
-    }
 
-    fetchTransactions();
-  }, []);
+      const data = await res.json();
+      console.log("✅ User fetched:", data);
+
+      const userTransactions = data.transactions || [];
+      setTransactions(userTransactions);
+      setFilteredTransactions(userTransactions);
+    } catch (err) {
+      console.error("Failed to fetch transactions:", err);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  fetchTransactions();
+}, []);
+
 
   // 🔍 Search filtering
   useEffect(() => {

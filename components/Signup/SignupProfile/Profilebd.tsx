@@ -215,17 +215,17 @@ const Profilebd = () => {
     <div className="flex flex-col px-8 py-16 ml-[100px] gap-2 w-full max-w-[400px] text-white">
       {/* Success Modal */}
       {showSuccessModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50">
-          <div className="bg-[#222222] h-[30vh] p-6 rounded-[10px] w-[300px] text-center">
+        <div className="fixed inset-0 bg-black bg-opacity-70 ml-[30%]  flex items-center justify-center z-50">
+          <div className="bg-[#222222] h-[40vh] p-6 rounded-[10px] w-[500px] text-center">
             <h3 className="text-[#4DF2BE] text-[18px] font-bold mb-2">
               Success!
             </h3>
-            <p className="text-[#FCFCFC]">
+            <p className="text-[#FCFCFC] mt-[50px]">
               Registration completed successfully
             </p>
             <button
               onClick={handleContinueToSecurityPin}
-              className="w-[250px] mt-[40px] border-none bg-[#4DF2BE] text-[#000] py-2 rounded-[100px] font-bold hover:bg-[#3dd9ab] transition"
+              className="w-[250px] h-[50px] mt-[50px] border-none bg-[#4DF2BE] text-[#000] py-2 rounded-[100px] font-bold hover:bg-[#3dd9ab] transition"
             >
               Continue to Security Pin
             </button>

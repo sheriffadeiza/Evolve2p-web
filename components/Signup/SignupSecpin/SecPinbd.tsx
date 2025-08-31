@@ -62,7 +62,7 @@ const SecPinbd: React.FC = () => {
 
       {pin.join("").length === 4 && (
         <button
-          className="w-[300px] h-[48px] mt-[30px] bg-[#4DF2BE] text-[#0F1012] rounded-[100px] font-[700] disabled:opacity-50"
+          className="w-[300px] h-[48px] ml-[55px] border-none mt-[30px] bg-[#4DF2BE] text-[16px] text-[#0F1012] rounded-[100px] font-[700] disabled:opacity-50"
           onClick={handleSubmit}
           disabled={isLoading}
         >
