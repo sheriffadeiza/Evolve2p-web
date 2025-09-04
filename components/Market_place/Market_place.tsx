@@ -21,6 +21,7 @@ import BTC from "../../public/Assets/Evolve2p_BTC/Bitcoin (BTC).svg";
 import ETH from "../../public/Assets/Evolve2p_ETH/Ethereum (ETH).svg";
 import USDT from "../../public/Assets/Evolve2p_USDT/Tether (USDT).svg";
 import USDC from "../../public/Assets/Evolve2p_USDC/USD Coin (USDC).svg";
+import Times from "../../public/Assets/Evolve2p_times/Icon container.png";
 import Footer from "../../components/Footer/Footer";
 
 const Market_place: React.FC = () => {
@@ -34,10 +35,30 @@ const Market_place: React.FC = () => {
   const [isPaymentOpen, setIsPaymentOpen] = useState(false);
   const [selectedMethod, setSelectedMethod] =
     useState<string>("Payment Method");
+  const [selected2Method, setSelected2Method] =
+    useState<string>("Payment Method");
+  const [isFunnelOpen, setIsFunnelOpen] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState("Bank Transfer");
+  const [payment2Method, setPayment2Method] = useState("Bank Transfer");
+  const [isPayment2Open, setIsPayment2Open] = useState(false);
+  const [isCurrencyOpen, setIsCurrencyOpen] = useState(false);
+  const [currency, setCurrency] = useState("USD");
+  const [isRegionOpen, setIsRegionOpen] = useState(false);
+  const [region, setRegion] = useState("All Regions");
+  
+
+  const [adTypes, setAdTypes] = useState({
+    tradeableOnly: true,
+    verifiedOnly: true,
+    noVerification: false,
+  });
+  const [sortBy, setSortBy] = useState("Best Rate");
 
   const toggleMarketDropdown = () => {
     setIsMarketDropdownOpen((prev) => !prev);
   };
+
+  const toggleFunnel = () => setIsFunnelOpen((prev) => !prev);
 
   const handleReset = () => {
     setMinAmount("");
@@ -63,6 +84,50 @@ const Market_place: React.FC = () => {
     "Cryptocurrency Wallet",
     "Mobile Payment App",
   ];
+
+  const methods2 = [
+    "Bank Transfer",
+    "PayPal",
+    "Credit Card",
+    "Cryptocurrency Wallet",
+    "Mobile Payment App",
+  ];
+
+  const currencies = ["USD", "NGN", "BTC", "ETH"];
+
+  const regions = [
+    "All Regions",
+    "United States",
+    "Nigeria",
+    "Brazil",
+    "Ethiopia",
+    "Germany",
+  ];
+
+    const sortOptions = ["Best Rate", "Highest Volume", "Completion Rate", "Rating"];
+
+
+  const Toggle = ({ enabled, onToggle }: { enabled: boolean; onToggle: () => void }) => {
+    return (
+      <div
+        onClick={onToggle}
+        className={`w-[40px] h-[20px] rounded-full p-[2px] flex items-center  cursor-pointer transition-colors duration-300
+        
+          ${
+          enabled ? "bg-[#4DF2BE]" : "bg-[#8F8F8F]"
+          
+        }`
+      
+      }
+      >
+      <div
+  className={`w-[15px] h-[15px] rounded-full transition-transform duration-300
+    ${enabled ? "translate-x-[25px] bg-[#000]" : "translate-x-0 bg-[#fff]"}
+  `}
+/>
+      </div>
+    );
+  };
 
   return (
     <main className="min-h-screen bg-[#0F1012] pr-[10px] mt-[30px] pl-[30px] text-white md:p-8">
@@ -348,41 +413,332 @@ const Market_place: React.FC = () => {
               </div>
             </div>
 
-             {/* Dropdown Menu */}
-      {isPaymentOpen && (
-        <div className="absolute left-[950px]  top-[195px] w-[228px] h-[216px] bg-[#222222] rounded-[12px] shadow-lg p-[8px] z-50"
-        style={{border: "1px solid #2D2D2D"}}
-        >
-          {methods.map((method, index) => (
-            <p
-              key={index}
-              className="text-[#FFFFFF] text-[16px] font-[500] py-2 cursor-pointer hover:text-emerald-400"
-              onClick={() => {
-                setSelectedMethod(method);
-                setIsPaymentOpen(false);
-              }}
-            >
-              {method}
-            </p>
-          ))}
-        </div>
-      )}
+            {/* Dropdown Menu */}
+            {isPaymentOpen && (
+              <div
+                className="absolute left-[950px]  top-[195px] w-[228px] h-[216px] bg-[#222222] rounded-[12px] shadow-lg p-[8px] z-50"
+                style={{ border: "1px solid #2D2D2D" }}
+              >
+                {methods.map((method, index) => (
+                  <p
+                    key={index}
+                    className="text-[#FFFFFF] text-[16px] font-[500] py-2 cursor-pointer hover:text-emerald-400"
+                    onClick={() => {
+                      setSelectedMethod(method);
+                      setIsPaymentOpen(false);
+                    }}
+                  >
+                    {method}
+                  </p>
+                ))}
+              </div>
+            )}
 
+            {/* Funnel button */}
             <div
-              className=" w-[28px] h-[28px] mt-[5px]  flex items-center  bg-[#2D2D2D] space-x-[15px] rounded-full p-[8px] realtive"
+              onClick={() => setIsFunnelOpen(true)}
+              className="w-[28px] h-[28px] mt-[5px] flex items-center bg-[#2D2D2D] space-x-[15px] rounded-full p-[8px] relative cursor-pointer"
               style={{ border: "1px solid #2D2D2D" }}
             >
               <Image
                 src={Funnel}
                 alt="funnel"
-                className="w-[ 22.75px] h-[ 22.75px] text-[#8F8F8F] ml-[2px] "
+                className="w-[22.75px] h-[22.75px] text-[#8F8F8F] ml-[2px]"
               />
               <Image
                 src={Vector}
                 alt="vector"
-                className="w-[12px] h-[12px]  ml-[18px] mt-[-23px] absolute"
+                className="w-[12px] h-[12px] ml-[18px] mt-[-23px] absolute"
               />
             </div>
+
+            {/* Modal (always mounted; animated open/close) */}
+            <div
+              className={`
+    fixed inset-0 z-50 top-[200px]  left-[850px] flex justify-end
+    transition-opacity  duration-300
+    ${
+      isFunnelOpen
+        ? "opacity-100 pointer-events-auto  bg-black/70"
+        : "opacity-0 pointer-events-none bg-black/0"
+    }
+  `}
+              onClick={toggleFunnel} /* click backdrop to close */
+              aria-hidden={!isFunnelOpen}
+            >
+              <div
+                className={`
+      bg-[#0F1012] w-[400px] max-h-[65vh] ] pl-[25px] overflow-y-auto scrollbar-thin scrollbar-thumb-[#DBDBDB] scrollbar-track-[#2D2D2D]   rounded-[12px] shadow-xl
+      transform transition-transform duration-300 ease-in-out
+      ${isFunnelOpen ? "translate-x-0" : "translate-x-full"}
+    `}
+                onClick={(e) =>
+                  e.stopPropagation()
+                } /* don't close when clicking inside */
+              >
+                <p>
+                  {" "}
+                  <Image
+                    src={Times}
+                    alt={"times"}
+                    width={20}
+                    height={20}
+                    className="absolute top-[20px] w-[32px] h-[32px]  ml-[80%] cursor-pointer"
+                    onClick={toggleFunnel}
+                  />
+                </p>
+                <h2 className="text-[16px] mt-[80px] text-[#FFFFFF] font-[700] mb-6">
+                  More Filter
+                </h2>
+                {/* Payment Method */}
+                <div className="w-[370px] mt-[30px]">
+                  {/* Label */}
+                  <label className="block text-[14px] font-[500] text-[#C7C7C7] mb-2">
+                    Payment Method
+                  </label>
+
+                  {/* Selected field */}
+                  <div
+                    onClick={() => setIsPayment2Open(!isPayment2Open)}
+                    className="w-[360px] h-[43.2px] flex items-center justify-between mt-[10px] text-[#FFFFFF] p-[8px] rounded-md bg-[#2D2D2D]  cursor-pointer text-[14px] font-[500] relative"
+                    style={{ padding: "5px 5px 5px 10px" }}
+                  >
+                    {selected2Method}
+
+                    {/* Custom Arrow */}
+                    <Image
+                      src={Arrow_d}
+                      alt="arrow"
+                      className={`w-[20px] h-[20px] transition-transform duration-300 ${
+                        isPayment2Open ? "rotate-180" : "rotate-0"
+                      }`}
+                    />
+                  </div>
+
+                  {/* Dropdown Menu */}
+                  {isPayment2Open && (
+                    <div className="mt-2 bg-[#2D2D2D] w-[229px] p-[8px] space-y-[10px]  shadow-lg overflow-hidden">
+                      {methods2.map((method) => (
+                        <div
+                          key={method}
+                          onClick={() => {
+                            setSelected2Method(method);
+                            setIsPayment2Open(false);
+                          }}
+                          className={`px-4 py-3 cursor-pointer text-[16px] font-[500] 
+                ${
+                  payment2Method === method
+                    ? "text-[#FFFFFF]"
+                    : "text-[#C7C7C7]"
+                }
+                hover:bg-[#3A3A3A]`}
+                        >
+                          {method}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {/* Currency */}
+                  <label className="block text-[14px] mt-[30px] font-[500] text-[#C7C7C7] mb-2">
+                    Currency
+                  </label>
+                  <div
+                    onClick={() => setIsCurrencyOpen(!isCurrencyOpen)}
+                    className="w-[360px] h-[43.2px] flex items-center  justify-between mt-[10px] rounded-md bg-[#2D2D2D] text-[#FFFFFf] cursor-pointer text-[14px] font-[500]"
+                    style={{ padding: "5px 5px 5px 10px" }}
+                  >
+                    {currency}
+                    <Image
+                      src={Arrow_d}
+                      alt="arrow"
+                      className={`w-[20px] h-[20px] transition-transform duration-300 ${
+                        isCurrencyOpen ? "rotate-180" : "rotate-0"
+                      }`}
+                    />
+                  </div>
+
+                  {/* Dropdown menu */}
+                  {isCurrencyOpen && (
+                    <div className="mt-2 bg-[#2D2D2D] p-[8px] w-[229px] space-y-[10px] shadow-lg overflow-hidden ">
+                      {currencies.map((cur) => (
+                        <div
+                          key={cur}
+                          onClick={() => {
+                            setCurrency(cur);
+                            setIsCurrencyOpen(false);
+                          }}
+                          className={`flex items-center justify-between px-4 py-3 cursor-pointer text-[16px] font-[500]
+          ${currency === cur ? "text-[#FFFFFF]" : "text-[#C7C7C7]"}
+          hover:bg-[#3A3A3A]`}
+                        >
+                          <span>{cur}</span>
+
+                          {/* Indicator */}
+                          <span
+                            className={`relative inline-flex items-center justify-center rounded-full
+            ${
+              currency === cur
+                ? "w-[20px] h-[20px] bg-[#4DF2BE]"
+                : "w-[20px] h-[20px] border-2 border-[#8F8F8F] bg-transparent"
+            }`}
+                          >
+                            {currency === cur && (
+                              <span className="block w-[10px] h-[10px] rounded-full bg-[#0F1012]" />
+                            )}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                .{/* Country/Region */}
+                <div className="w-[370px] mt-[30px]">
+                  {/* Label */}
+                  <label className="block text-[14px] font-[500] text-[#C7C7C7] mb-2">
+                    Country/Region
+                  </label>
+
+                  {/* Selected button */}
+                  <div
+                    onClick={() => setIsRegionOpen(!isRegionOpen)}
+                    className="w-[360px] h-[43.2px] mt-[10px] p-[8px] text-[#FFFFFF] flex items-center justify-between px-3 rounded-md bg-[#2D2D2D] text-white cursor-pointer text-[14px] font-[500]"
+                  >
+                    <span className="flex items-center  text-[#FCFCFC] text-[14px] font-[500]">
+                  <Image
+                    src={Globe}
+                    alt="bitcoin"
+                    className="w-[19.998px] h-[20px]  "
+                  />
+                  <p className="ml-[5px]"> {region} </p>
+                </span>
+                    
+                    <Image
+                      src={Arrow_d}
+                      alt="arrow"
+                      className={`w-[20px] h-[20px] transition-transform duration-300 ${
+                        isCurrencyOpen ? "rotate-180" : "rotate-0"
+                      }`}
+                    />{" "}
+                  </div>
+
+                  {/* Dropdown menu */}
+                  {isRegionOpen && (
+                    <div className="mt-2 bg-[#2D2D2D] p-[8px] w-[229px] space-y-[15px] shadow-lg overflow-hidden ">
+                      {regions.map((reg) => (
+                        <div
+                          key={reg}
+                          onClick={() => {
+                            setRegion(reg);
+                            setIsRegionOpen(false);
+                          }}
+                          className={`flex items-center justify-between px-4 py-3 cursor-pointer text-[16px] font-[500]
+                ${region === reg ? "text-[#FFFFFF]" : "text-[#C7C7C7]"}
+                hover:bg-[#3A3A3A]`}
+                        >
+                          <span>{reg}</span>
+
+                          {/* Radio-like indicator */}
+                          <span
+                            className={`relative inline-flex items-center justify-center rounded-full
+                  ${
+                    region === reg
+                      ? "w-[24px] h-[24px] bg-[#4DF2BE]"
+                      : "w-[24px] h-[24px] border-2 border-[#8F8F8F] bg-transparent"
+                  }`}
+                          >
+                            {region === reg && (
+                              <span className="block w-[10px] h-[10px] rounded-full bg-[#1E1E1E]" />
+                            )}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                {/* Ad Types */}
+                 <div className="w-[370px] mt-[30px] text-white">
+      {/* Ad Types */}
+      <label className="block text-[14px] font-[500] text-[#C7C7C7] mb-2">
+        Ad Types
+      </label>
+      <div className="space-y-[10px] mb-6">
+        {/* Tradeable Ads only */}
+        <div className="flex items-center w-[360px] text-[#FFFFFF] p-[12px]  h-[44px] mt-[10px] justify-between bg-[#2D2D2D] px-4 py-3 rounded-[8px]">
+          <span className="text-[14px] font-[500]">Tradeable Ads only</span>
+           <Toggle
+            enabled={adTypes.tradeableOnly}
+            onToggle={() =>
+              setAdTypes({ ...adTypes, tradeableOnly: !adTypes.tradeableOnly })
+            }
+          />
+        </div>
+
+       {/* Verified Traders Ads Only */}
+        <div className="flex items-center w-[360px] text-[#FFFFFF] p-[12px] h-[44px] mt-[10px]  justify-between bg-[#2D2D2D] px-4 py-3 rounded-[8px]">
+          <span className="text-[14px] font-[500]">Verified Traders Ads Only</span>
+          <Toggle
+            enabled={adTypes.verifiedOnly}
+            onToggle={() =>
+              setAdTypes({ ...adTypes, verifiedOnly: !adTypes.verifiedOnly })
+            }
+          />
+        </div>
+
+        {/* Ads with no verification required */}
+        <div className="flex items-center w-[360px] text-[#FFFFFF] p-[12px] h-[44px] mt-[10px] justify-between bg-[#2D2D2D] px-4 py-3 rounded-[8px]">
+          <span className="text-[14px] font-[500]">Ads with no verification required</span>
+          <Toggle
+            enabled={adTypes.noVerification}
+            onToggle={() =>
+              setAdTypes({ ...adTypes, noVerification: !adTypes.noVerification })
+            }
+          />
+        </div>
+      </div>
+
+                </div>
+                  <label className="block text-[14px] mt-[15px] font-[500] text-[#C7C7C7] mb-2">Sort by</label>
+      <div className="space-y-[10px]">
+        {sortOptions.map((option) => (
+          <div
+            key={option}
+            onClick={() => setSortBy(option)}
+            className={`flex items-center w-[360px] h-[44px] justify-between mt-[10px] p-[12px] px-4 py-3 cursor-pointer rounded-[8px] bg-[#2D2D2D]
+              ${sortBy === option ? "text-[#FFFFFF]" : "text-[#C7C7C7]"}`}
+          >
+            <span className="text-[14px] font-[500]">{option}</span>
+
+            {/* Custom Radio */}
+            <span
+              className={`w-[20px] h-[20px] flex items-center justify-center rounded-full border 
+                ${sortBy === option ? "border-[#4DF2BE] bg-[#4DF2BE]" : "border-[#8F8F8F]"}`}
+            >
+              {sortBy === option && (
+                <span className="w-[10px] h-[10px] bg-[#0F1012] rounded-full"></span>
+              )}
+            </span>
+          </div>
+        ))}
+      </div>
+      {/* Action Buttons */}
+    <div className="flex ml-[40%] space-x-[10px] text-[14px] font-[700] mt-[20px] mb-[20px]">
+      <button onClick={toggleFunnel} className=" w-[87px] h-[48px] border-none py-2 rounded-full bg-[#2D2D2D] text-[#FFFFFF] font-semibold">
+        Cancel
+      </button>
+      <button
+        onClick={() => {
+          console.log({ paymentMethod, currency, region, adTypes, sortBy });
+          toggleFunnel();
+        }}
+        className="w-[118px] h-[48px] py-2 rounded-full bg-[#2D2D2D] border-none  text-[#4DF2BE] font-semibold"
+      >
+        Apply Filter
+      </button>
+    </div>
+      </div>
+      
+            </div>
+
             <div
               className=" w-[28px] h-[28px] mt-[5px]  flex items-center  bg-[#2D2D2D] space-x-[15px] rounded-full p-[8px] "
               style={{ border: "1px solid #2D2D2D" }}
