@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import Nav from "../../components/NAV/Nav";
+import { useRouter } from "next/navigation";
 import Image from "next/image";
 import Arrow_d from "../../public/Assets/Evolve2p_arrowd/arrow-down-01.png";
 import Globe from "../../public/Assets/Evolve2p_globe/Makretplace/elements.svg";
@@ -46,7 +47,7 @@ const Market_place: React.FC = () => {
   const [isRegionOpen, setIsRegionOpen] = useState(false);
   const [region, setRegion] = useState("All Regions");
   
-
+  const router = useRouter();
   const [adTypes, setAdTypes] = useState({
     tradeableOnly: true,
     verifiedOnly: true,
@@ -865,6 +866,7 @@ const Market_place: React.FC = () => {
               </div>
               <div className="w-[78px] h-[28px] whitespace-nowrap mt-[60px] ml-[55px]">
                 <button
+                 onClick={() => router.push("/buy_btc")}
                   className=" bg-[#4DF2BE] text-[14px] text-[#0F1012] font-[700] rounded-full"
                   style={{ border: "1px solid #4DF2BE", padding: "8px 10px" }}
                 >
@@ -983,6 +985,7 @@ const Market_place: React.FC = () => {
               </div>
               <div className="w-[78px] h-[28px] whitespace-nowrap mt-[60px] ml-[55px]">
                 <button
+                 onClick={() => router.push("/buy_btc")}
                   className=" bg-[#4DF2BE] text-[14px] text-[#0F1012] font-[700] rounded-full"
                   style={{ border: "1px solid #4DF2BE", padding: "8px 10px" }}
                 >
@@ -1101,6 +1104,8 @@ const Market_place: React.FC = () => {
               </div>
               <div className="w-[78px] h-[28px] whitespace-nowrap mt-[60px] ml-[55px]">
                 <button
+                      onClick={() => router.push("/buy_btc")}
+
                   className=" bg-[#4DF2BE] text-[14px] text-[#0F1012] font-[700] rounded-full"
                   style={{ border: "1px solid #4DF2BE", padding: "8px 10px" }}
                 >
@@ -1219,6 +1224,7 @@ const Market_place: React.FC = () => {
               </div>
               <div className="w-[78px] h-[28px] whitespace-nowrap mt-[60px] ml-[55px]">
                 <button
+                 onClick={() => router.push("/buy_btc")}
                   className=" bg-[#4DF2BE] text-[14px] text-[#0F1012] font-[700] rounded-full"
                   style={{ border: "1px solid #4DF2BE", padding: "8px 10px" }}
                 >
@@ -1337,6 +1343,7 @@ const Market_place: React.FC = () => {
               </div>
               <div className="w-[78px] h-[28px] whitespace-nowrap mt-[60px] ml-[55px]">
                 <button
+                 onClick={() => router.push("/buy_btc")}
                   className=" bg-[#4DF2BE] text-[14px] text-[#0F1012] font-[700] rounded-full"
                   style={{ border: "1px solid #4DF2BE", padding: "8px 10px" }}
                 >
@@ -1455,6 +1462,7 @@ const Market_place: React.FC = () => {
               </div>
               <div className="w-[78px] h-[28px] whitespace-nowrap mt-[60px] ml-[55px]">
                 <button
+                 onClick={() => router.push("/buy_btc")}
                   className=" bg-[#4DF2BE] text-[14px] text-[#0F1012] font-[700] rounded-full"
                   style={{ border: "1px solid #4DF2BE", padding: "8px 10px" }}
                 >
@@ -1573,6 +1581,7 @@ const Market_place: React.FC = () => {
               </div>
               <div className="w-[78px] h-[28px] whitespace-nowrap mt-[60px] ml-[55px]">
                 <button
+                 onClick={() => router.push("/buy_btc")}
                   className=" bg-[#4DF2BE] text-[14px] text-[#0F1012] font-[700] rounded-full"
                   style={{ border: "1px solid #4DF2BE", padding: "8px 10px" }}
                 >
@@ -1692,6 +1701,7 @@ const Market_place: React.FC = () => {
               </div>
               <div className="w-[78px] h-[28px] whitespace-nowrap mt-[60px] ml-[55px]">
                 <button
+                 onClick={() => router.push("/buy_btc")}
                   className=" bg-[#4DF2BE] text-[14px] text-[#0F1012] font-[700] rounded-full"
                   style={{ border: "1px solid #4DF2BE", padding: "8px 10px" }}
                 >
@@ -1810,6 +1820,7 @@ const Market_place: React.FC = () => {
               </div>
               <div className="w-[78px] h-[28px] whitespace-nowrap mt-[60px] ml-[55px]">
                 <button
+                 onClick={() => router.push("/buy_btc")}
                   className=" bg-[#4DF2BE] text-[14px] text-[#0F1012] font-[700] rounded-full"
                   style={{ border: "1px solid #4DF2BE", padding: "8px 10px" }}
                 >
