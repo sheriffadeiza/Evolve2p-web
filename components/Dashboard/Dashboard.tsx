@@ -730,7 +730,9 @@ const Dashboard: React.FC<QRCodeBoxProps> = ({ value }) => {
                 style={{ padding: "5px 10px" }}
                 onClick={() => router.push("/swap")}
               >
-                <p className="pl-[10px]"><Image src={Swap} alt="swap"/></p>
+                <p className="pl-[10px]">
+                  <Image src={Swap} alt="swap" />
+                </p>
                 <p className="px-4 py-1 ml-[10px]   rounded-full font-[700] text-[14px]">
                   Swap
                 </p>

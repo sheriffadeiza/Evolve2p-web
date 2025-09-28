@@ -1,7 +1,7 @@
-'use client';
-import React, { useState } from 'react';
+"use client";
+import React, { useState } from "react";
 import Image from "next/image";
-import { usePathname, useRouter } from 'next/navigation';
+import { usePathname, useRouter } from "next/navigation";
 import Bell from "../../public/Assets/Evolve2p_bell/elements.svg";
 import Profile from "../../public/Assets/Evolve2p_profile/Dashboard/elements.svg";
 import Logo from "../../public/Assets/Evolve2p_logods/Dashboard/Logo.svg";
@@ -48,20 +48,24 @@ const Nav: React.FC = () => {
         <Image src={Logo} alt="logo" />
       </div>
       <ul className="flex items-center space-x-[40px] text-[#FFFFFF] list-none mb-[25px]">
-        {navLinks.map(link => {
+        {navLinks.map((link) => {
           const isActive = pathname === link.path;
           return (
             <li
               key={link.name}
               onClick={() => router.push(link.path)}
               className={`cursor-pointer transition rounded-[40px] 
-                ${isActive ? "bg-[#2D2D2D] text-[#4DF2BE] w-[115px] h-[42px] flex items-center justify-center" : ""}
+                ${
+                  isActive
+                    ? "bg-[#2D2D2D] text-[#4DF2BE] w-[115px] h-[42px] flex items-center justify-center"
+                    : ""
+                }
               `}
               style={{
                 minWidth: isActive ? "115px" : "unset",
                 minHeight: isActive ? "42px" : "unset",
                 width: isActive ? "115px" : "fit-content",
-                height: isActive ? "42px" : "fit-content"
+                height: isActive ? "42px" : "fit-content",
               }}
             >
               {link.name}
@@ -81,16 +85,21 @@ const Nav: React.FC = () => {
         </div>
 
         <div
-          className="flex w-[40px] h-[25px] items-center bg-transparent mt-[10px] pr-[5px] space-x-[15px] mr-[20px] mb-[15px] border rounded-full"
+          className="flex w-[40px] h-[25px] items-center bg-transparent mt-[10px] pr-[5px] space-x-[15px] mr-[20px] mb-[15px] border-2 cursor-pointer rounded-full"
           style={{ borderColor: "#2D2D2D", borderWidth: "1px" }}
         >
           <Image src={Profile} alt="itsprofile" />
-          <Image src={Parrow} alt="dropdown arrow" onClick={toggleProfiledown} />
+          <Image
+            src={Parrow}
+            alt="dropdown arrow"
+            onClick={toggleProfiledown}
+          />
         </div>
 
         {isProfileOpen && (
-          <div className="absolute top-[100px] left-[80%] w-[234px] h-[337px] bg-[#222222] space-y-[20px]  rounded-[12px] shadow-lg p-[8px] z-50 text-white space-y-4"
-          style={{border: '1px solid #2D2D2D'}}
+          <div
+            className="absolute top-[100px] left-[80%] w-[234px] h-[337px] bg-[#222222] space-y-[20px]  rounded-[12px] shadow-lg p-[8px] z-50 text-white space-y-4"
+            style={{ border: "1px solid #2D2D2D" }}
           >
             {profileOptions.map((item, index) => (
               <div
@@ -99,20 +108,38 @@ const Nav: React.FC = () => {
                 className="flex justify-between items-center cursor-pointer hover:text-[#4DF2BE] text-[16px] font-medium"
               >
                 <span className="flex  items-center space-x-2">
-                  <Image src={item.icon} alt={item.name} width={20} height={20} />
-                  <span  className={`ml-[10px] text-[16px] font-[500] ${ item.name === "Verify me" ? "text-[#FE857D]"  : "text-[#FCFCFC]"}`}>{item.name}</span>
+                  <Image
+                    src={item.icon}
+                    alt={item.name}
+                    width={20}
+                    height={20}
+                  />
+                  <span
+                    className={`ml-[10px] text-[16px] font-[500] ${
+                      item.name === "Verify me"
+                        ? "text-[#FE857D]"
+                        : "text-[#FCFCFC]"
+                    }`}
+                  >
+                    {item.name}
+                  </span>
                 </span>
                 {item.tier && (
-                  <span className="bg-[#3A3A3A]  flex items-center w-[43px] h-[22px] text-[12px] font-[500] text-[#DBDBDB]  rounded-[16px]"
-                  style={{padding: '2px 8px'}}
-                  >{item.tier}</span>
+                  <span
+                    className="bg-[#3A3A3A]  flex items-center w-[55px] text-center justify-center h-[22px] text-[12px] font-[500] text-[#DBDBDB]  rounded-[16px]"
+                    style={{ padding: "2px 8px" }}
+                  >
+                    {item.tier}
+                  </span>
                 )}
               </div>
             ))}
             <hr className="border-[#333]" />
             <div className="flex items-center space-x-2 text-[#FE857D] cursor-pointer hover:underline">
               <Image src={Logout} alt="logout" width={20} height={20} />
-              <span className='ml-[10px] text-[16px] font-[500] text-[#FE857D]'>Logout</span>
+              <span className="ml-[10px] text-[16px] font-[500] text-[#FE857D]">
+                Logout
+              </span>
             </div>
           </div>
         )}

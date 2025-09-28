@@ -46,7 +46,7 @@ const Market_place: React.FC = () => {
   const [currency, setCurrency] = useState("USD");
   const [isRegionOpen, setIsRegionOpen] = useState(false);
   const [region, setRegion] = useState("All Regions");
-  
+
   const router = useRouter();
   const [adTypes, setAdTypes] = useState({
     tradeableOnly: true,
@@ -105,27 +105,32 @@ const Market_place: React.FC = () => {
     "Germany",
   ];
 
-    const sortOptions = ["Best Rate", "Highest Volume", "Completion Rate", "Rating"];
+  const sortOptions = [
+    "Best Rate",
+    "Highest Volume",
+    "Completion Rate",
+    "Rating",
+  ];
 
-
-  const Toggle = ({ enabled, onToggle }: { enabled: boolean; onToggle: () => void }) => {
+  const Toggle = ({
+    enabled,
+    onToggle,
+  }: {
+    enabled: boolean;
+    onToggle: () => void;
+  }) => {
     return (
       <div
         onClick={onToggle}
         className={`w-[40px] h-[20px] rounded-full p-[2px] flex items-center  cursor-pointer transition-colors duration-300
         
-          ${
-          enabled ? "bg-[#4DF2BE]" : "bg-[#8F8F8F]"
-          
-        }`
-      
-      }
+          ${enabled ? "bg-[#4DF2BE]" : "bg-[#8F8F8F]"}`}
       >
-      <div
-  className={`w-[15px] h-[15px] rounded-full transition-transform duration-300
+        <div
+          className={`w-[15px] h-[15px] rounded-full transition-transform duration-300
     ${enabled ? "translate-x-[25px] bg-[#000]" : "translate-x-0 bg-[#fff]"}
   `}
-/>
+        />
       </div>
     );
   };
@@ -135,7 +140,7 @@ const Market_place: React.FC = () => {
       <div className="max-w-7xl mx-auto">
         <Nav />
 
-        <div className="flex  space-x-[10px] mt-[35px]">
+        <div className="flex  space-x-[10px] mt-[35px] ">
           {/*left_div  */}
           <div className="bg-[#222222]  pl-[30px] pt-[20px] w-[395px] h-[498.79999]">
             <h2 className="text-[24px] text-[#FCFCFC] font-[700]">
@@ -605,14 +610,13 @@ const Market_place: React.FC = () => {
                     className="w-[360px] h-[43.2px] mt-[10px] p-[8px] text-[#FFFFFF] flex items-center justify-between px-3 rounded-md bg-[#2D2D2D] text-white cursor-pointer text-[14px] font-[500]"
                   >
                     <span className="flex items-center  text-[#FCFCFC] text-[14px] font-[500]">
-                  <Image
-                    src={Globe}
-                    alt="bitcoin"
-                    className="w-[19.998px] h-[20px]  "
-                  />
-                  <p className="ml-[5px]"> {region} </p>
-                </span>
-                    
+                      <Image
+                        src={Globe}
+                        alt="bitcoin"
+                        className="w-[19.998px] h-[20px]  "
+                      />
+                      <p className="ml-[5px]"> {region} </p>
+                    </span>
                     <Image
                       src={Arrow_d}
                       alt="arrow"
@@ -657,87 +661,115 @@ const Market_place: React.FC = () => {
                   )}
                 </div>
                 {/* Ad Types */}
-                 <div className="w-[370px] mt-[30px] text-white">
-      {/* Ad Types */}
-      <label className="block text-[14px] font-[500] text-[#C7C7C7] mb-2">
-        Ad Types
-      </label>
-      <div className="space-y-[10px] mb-6">
-        {/* Tradeable Ads only */}
-        <div className="flex items-center w-[360px] text-[#FFFFFF] p-[12px]  h-[44px] mt-[10px] justify-between bg-[#2D2D2D] px-4 py-3 rounded-[8px]">
-          <span className="text-[14px] font-[500]">Tradeable Ads only</span>
-           <Toggle
-            enabled={adTypes.tradeableOnly}
-            onToggle={() =>
-              setAdTypes({ ...adTypes, tradeableOnly: !adTypes.tradeableOnly })
-            }
-          />
-        </div>
+                <div className="w-[370px] mt-[30px] text-white">
+                  {/* Ad Types */}
+                  <label className="block text-[14px] font-[500] text-[#C7C7C7] mb-2">
+                    Ad Types
+                  </label>
+                  <div className="space-y-[10px] mb-6">
+                    {/* Tradeable Ads only */}
+                    <div className="flex items-center w-[360px] text-[#FFFFFF] p-[12px]  h-[44px] mt-[10px] justify-between bg-[#2D2D2D] px-4 py-3 rounded-[8px]">
+                      <span className="text-[14px] font-[500]">
+                        Tradeable Ads only
+                      </span>
+                      <Toggle
+                        enabled={adTypes.tradeableOnly}
+                        onToggle={() =>
+                          setAdTypes({
+                            ...adTypes,
+                            tradeableOnly: !adTypes.tradeableOnly,
+                          })
+                        }
+                      />
+                    </div>
 
-       {/* Verified Traders Ads Only */}
-        <div className="flex items-center w-[360px] text-[#FFFFFF] p-[12px] h-[44px] mt-[10px]  justify-between bg-[#2D2D2D] px-4 py-3 rounded-[8px]">
-          <span className="text-[14px] font-[500]">Verified Traders Ads Only</span>
-          <Toggle
-            enabled={adTypes.verifiedOnly}
-            onToggle={() =>
-              setAdTypes({ ...adTypes, verifiedOnly: !adTypes.verifiedOnly })
-            }
-          />
-        </div>
+                    {/* Verified Traders Ads Only */}
+                    <div className="flex items-center w-[360px] text-[#FFFFFF] p-[12px] h-[44px] mt-[10px]  justify-between bg-[#2D2D2D] px-4 py-3 rounded-[8px]">
+                      <span className="text-[14px] font-[500]">
+                        Verified Traders Ads Only
+                      </span>
+                      <Toggle
+                        enabled={adTypes.verifiedOnly}
+                        onToggle={() =>
+                          setAdTypes({
+                            ...adTypes,
+                            verifiedOnly: !adTypes.verifiedOnly,
+                          })
+                        }
+                      />
+                    </div>
 
-        {/* Ads with no verification required */}
-        <div className="flex items-center w-[360px] text-[#FFFFFF] p-[12px] h-[44px] mt-[10px] justify-between bg-[#2D2D2D] px-4 py-3 rounded-[8px]">
-          <span className="text-[14px] font-[500]">Ads with no verification required</span>
-          <Toggle
-            enabled={adTypes.noVerification}
-            onToggle={() =>
-              setAdTypes({ ...adTypes, noVerification: !adTypes.noVerification })
-            }
-          />
-        </div>
-      </div>
-
+                    {/* Ads with no verification required */}
+                    <div className="flex items-center w-[360px] text-[#FFFFFF] p-[12px] h-[44px] mt-[10px] justify-between bg-[#2D2D2D] px-4 py-3 rounded-[8px]">
+                      <span className="text-[14px] font-[500]">
+                        Ads with no verification required
+                      </span>
+                      <Toggle
+                        enabled={adTypes.noVerification}
+                        onToggle={() =>
+                          setAdTypes({
+                            ...adTypes,
+                            noVerification: !adTypes.noVerification,
+                          })
+                        }
+                      />
+                    </div>
+                  </div>
                 </div>
-                  <label className="block text-[14px] mt-[15px] font-[500] text-[#C7C7C7] mb-2">Sort by</label>
-      <div className="space-y-[10px]">
-        {sortOptions.map((option) => (
-          <div
-            key={option}
-            onClick={() => setSortBy(option)}
-            className={`flex items-center w-[360px] h-[44px] justify-between mt-[10px] p-[12px] px-4 py-3 cursor-pointer rounded-[8px] bg-[#2D2D2D]
+                <label className="block text-[14px] mt-[15px] font-[500] text-[#C7C7C7] mb-2">
+                  Sort by
+                </label>
+                <div className="space-y-[10px]">
+                  {sortOptions.map((option) => (
+                    <div
+                      key={option}
+                      onClick={() => setSortBy(option)}
+                      className={`flex items-center w-[360px] h-[44px] justify-between mt-[10px] p-[12px] px-4 py-3 cursor-pointer rounded-[8px] bg-[#2D2D2D]
               ${sortBy === option ? "text-[#FFFFFF]" : "text-[#C7C7C7]"}`}
-          >
-            <span className="text-[14px] font-[500]">{option}</span>
+                    >
+                      <span className="text-[14px] font-[500]">{option}</span>
 
-            {/* Custom Radio */}
-            <span
-              className={`w-[20px] h-[20px] flex items-center justify-center rounded-full border 
-                ${sortBy === option ? "border-[#4DF2BE] bg-[#4DF2BE]" : "border-[#8F8F8F]"}`}
-            >
-              {sortBy === option && (
-                <span className="w-[10px] h-[10px] bg-[#0F1012] rounded-full"></span>
-              )}
-            </span>
-          </div>
-        ))}
-      </div>
-      {/* Action Buttons */}
-    <div className="flex ml-[40%] space-x-[10px] text-[14px] font-[700] mt-[20px] mb-[20px]">
-      <button onClick={toggleFunnel} className=" w-[87px] h-[48px] border-none py-2 rounded-full bg-[#2D2D2D] text-[#FFFFFF] font-semibold">
-        Cancel
-      </button>
-      <button
-        onClick={() => {
-          console.log({ paymentMethod, currency, region, adTypes, sortBy });
-          toggleFunnel();
-        }}
-        className="w-[118px] h-[48px] py-2 rounded-full bg-[#2D2D2D] border-none  text-[#4DF2BE] font-semibold"
-      >
-        Apply Filter
-      </button>
-    </div>
-      </div>
-      
+                      {/* Custom Radio */}
+                      <span
+                        className={`w-[20px] h-[20px] flex items-center justify-center rounded-full border 
+                ${
+                  sortBy === option
+                    ? "border-[#4DF2BE] bg-[#4DF2BE]"
+                    : "border-[#8F8F8F]"
+                }`}
+                      >
+                        {sortBy === option && (
+                          <span className="w-[10px] h-[10px] bg-[#0F1012] rounded-full"></span>
+                        )}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+                {/* Action Buttons */}
+                <div className="flex ml-[40%] space-x-[10px] text-[14px] font-[700] mt-[20px] mb-[20px]">
+                  <button
+                    onClick={toggleFunnel}
+                    className=" w-[87px] h-[48px] border-none py-2 rounded-full bg-[#2D2D2D] text-[#FFFFFF] font-semibold"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={() => {
+                      console.log({
+                        paymentMethod,
+                        currency,
+                        region,
+                        adTypes,
+                        sortBy,
+                      });
+                      toggleFunnel();
+                    }}
+                    className="w-[118px] h-[48px] py-2 rounded-full bg-[#2D2D2D] border-none  text-[#4DF2BE] font-semibold"
+                  >
+                    Apply Filter
+                  </button>
+                </div>
+              </div>
             </div>
 
             <div
@@ -866,7 +898,7 @@ const Market_place: React.FC = () => {
               </div>
               <div className="w-[78px] h-[28px] whitespace-nowrap mt-[60px] ml-[55px]">
                 <button
-                 onClick={() => router.push("/buy_btc")}
+                  onClick={() => router.push("/buy_btc")}
                   className=" bg-[#4DF2BE] text-[14px] text-[#0F1012] font-[700] rounded-full"
                   style={{ border: "1px solid #4DF2BE", padding: "8px 10px" }}
                 >
@@ -985,7 +1017,7 @@ const Market_place: React.FC = () => {
               </div>
               <div className="w-[78px] h-[28px] whitespace-nowrap mt-[60px] ml-[55px]">
                 <button
-                 onClick={() => router.push("/buy_btc")}
+                  onClick={() => router.push("/buy_btc")}
                   className=" bg-[#4DF2BE] text-[14px] text-[#0F1012] font-[700] rounded-full"
                   style={{ border: "1px solid #4DF2BE", padding: "8px 10px" }}
                 >
@@ -1104,8 +1136,7 @@ const Market_place: React.FC = () => {
               </div>
               <div className="w-[78px] h-[28px] whitespace-nowrap mt-[60px] ml-[55px]">
                 <button
-                      onClick={() => router.push("/buy_btc")}
-
+                  onClick={() => router.push("/buy_btc")}
                   className=" bg-[#4DF2BE] text-[14px] text-[#0F1012] font-[700] rounded-full"
                   style={{ border: "1px solid #4DF2BE", padding: "8px 10px" }}
                 >
@@ -1224,7 +1255,7 @@ const Market_place: React.FC = () => {
               </div>
               <div className="w-[78px] h-[28px] whitespace-nowrap mt-[60px] ml-[55px]">
                 <button
-                 onClick={() => router.push("/buy_btc")}
+                  onClick={() => router.push("/buy_btc")}
                   className=" bg-[#4DF2BE] text-[14px] text-[#0F1012] font-[700] rounded-full"
                   style={{ border: "1px solid #4DF2BE", padding: "8px 10px" }}
                 >
@@ -1343,7 +1374,7 @@ const Market_place: React.FC = () => {
               </div>
               <div className="w-[78px] h-[28px] whitespace-nowrap mt-[60px] ml-[55px]">
                 <button
-                 onClick={() => router.push("/buy_btc")}
+                  onClick={() => router.push("/buy_btc")}
                   className=" bg-[#4DF2BE] text-[14px] text-[#0F1012] font-[700] rounded-full"
                   style={{ border: "1px solid #4DF2BE", padding: "8px 10px" }}
                 >
@@ -1462,7 +1493,7 @@ const Market_place: React.FC = () => {
               </div>
               <div className="w-[78px] h-[28px] whitespace-nowrap mt-[60px] ml-[55px]">
                 <button
-                 onClick={() => router.push("/buy_btc")}
+                  onClick={() => router.push("/buy_btc")}
                   className=" bg-[#4DF2BE] text-[14px] text-[#0F1012] font-[700] rounded-full"
                   style={{ border: "1px solid #4DF2BE", padding: "8px 10px" }}
                 >
@@ -1581,7 +1612,7 @@ const Market_place: React.FC = () => {
               </div>
               <div className="w-[78px] h-[28px] whitespace-nowrap mt-[60px] ml-[55px]">
                 <button
-                 onClick={() => router.push("/buy_btc")}
+                  onClick={() => router.push("/buy_btc")}
                   className=" bg-[#4DF2BE] text-[14px] text-[#0F1012] font-[700] rounded-full"
                   style={{ border: "1px solid #4DF2BE", padding: "8px 10px" }}
                 >
@@ -1701,7 +1732,7 @@ const Market_place: React.FC = () => {
               </div>
               <div className="w-[78px] h-[28px] whitespace-nowrap mt-[60px] ml-[55px]">
                 <button
-                 onClick={() => router.push("/buy_btc")}
+                  onClick={() => router.push("/buy_btc")}
                   className=" bg-[#4DF2BE] text-[14px] text-[#0F1012] font-[700] rounded-full"
                   style={{ border: "1px solid #4DF2BE", padding: "8px 10px" }}
                 >
@@ -1820,7 +1851,7 @@ const Market_place: React.FC = () => {
               </div>
               <div className="w-[78px] h-[28px] whitespace-nowrap mt-[60px] ml-[55px]">
                 <button
-                 onClick={() => router.push("/buy_btc")}
+                  onClick={() => router.push("/buy_btc")}
                   className=" bg-[#4DF2BE] text-[14px] text-[#0F1012] font-[700] rounded-full"
                   style={{ border: "1px solid #4DF2BE", padding: "8px 10px" }}
                 >
