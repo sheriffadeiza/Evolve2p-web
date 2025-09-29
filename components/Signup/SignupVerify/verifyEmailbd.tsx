@@ -163,7 +163,7 @@ const VerifyEmailbd: React.FC = () => {
 
   return (
     <div className="w-full lg:mx-0  flex justify-center">
-      <div className="lg:max-w-md max-w-sm  p-4 mx-auto lg:ml-[120px] mt-10 lg:px-4 text-white">
+      <div className="lg:max-w-lg max-w-sm  p-4 mx-auto lg:ml-[120px] mt-10 lg:px-4 text-white ">
         <h1 className="text-[24px] text-[#FCFCFC] font-[700] mb-2">
           Verify Email
         </h1>
@@ -184,7 +184,7 @@ const VerifyEmailbd: React.FC = () => {
           </div>
         )}
 
-        <div className="flex gap-[5px] lg:ml-[-150px] justify-center mb-6">
+        <div className="flex gap-[5px]  justify-center mb-6   lg:w-full">
           {pin.map((digit, idx) => (
             <input
               key={idx}
@@ -192,7 +192,7 @@ const VerifyEmailbd: React.FC = () => {
               maxLength={1}
               value={pin[idx]}
               onChange={(e) => handleChange(e.target.value, idx)}
-              className=" w-full lg:w-[55px] h-[56px] rounded-[10px] border-none bg-[#222222] text-center text-[14px] font-[500] text-[#FCFCFC] focus:outline-none focus:ring-1 focus:ring-[#4DF2BE] "
+              className=" w-full lg:w-[55px] h-[56px] rounded-[10px] border-none bg-[#222222] text-center text-[14px] font-[500] text-[#FCFCFC] focus:outline-none focus:ring-1 focus:ring-[#4DF2BE"
               type="password"
               inputMode="numeric"
               pattern="[0-9]*"
@@ -203,7 +203,7 @@ const VerifyEmailbd: React.FC = () => {
 
         {isPinComplete && (
           <button
-            className=" w-full lg:w-[300px] h-[48px] mt-[10px] lg:ml-[-10px] bg-[#4DF2BE] border-none text-[#0F1012] rounded-[100px] font-[700] disabled:opacity-50 "
+            className=" w-full lg:w-[100%] h-[48px] mt-[10px] lg:ml-[-10px] bg-[#4DF2BE] border-none text-[#0F1012] rounded-[100px] font-[700] disabled:opacity-50 "
             onClick={() => verifyCode(pin.join(""))}
             disabled={isLoading}
           >
