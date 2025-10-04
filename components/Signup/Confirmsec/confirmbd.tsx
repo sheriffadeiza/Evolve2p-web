@@ -99,7 +99,7 @@ const Confirmbd: React.FC = () => {
 
   return (
     <div className="w-full lg:mx-auto">
-      <div className="text-white border-0 border-red-500 mt-[30px]  lg:max-w-md mx-auto p-8 max-w-sm">
+      <div className="text-whitemt-[30px]  lg:max-w-md mx-auto p-8 max-w-sm">
         {/* Success Modal */}
         {showSuccess && (
           <div className="fixed inset-0 bg-[#3e3e3e] ml-[25%] h- bg-opacity-70 flex items-center justify-center z-50">

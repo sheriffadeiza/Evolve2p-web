@@ -92,8 +92,8 @@ const EmailForm = () => {
   };
 
   return (
-    <div className=" lg:pt-[30px] w-full lg:mx-0">
-      <div className="flex flex-col gap-2 lg:max-w-md mx-auto p-8 max-w-sm">
+    <div className=" lg:pt-[30px] w-full lg:mx-0 border-2 border-red-500">
+      <div className="flex flex-col gap-2 lg:max-w-md mx-auto p-8 max-w-sm border-2 border-green-500">
         <h1 className="text-[24px] font-[700] text-[#FCFCFC]">
           Create account
         </h1>
@@ -118,7 +118,7 @@ const EmailForm = () => {
         )}
 
         <button
-          className={`p-3 w-full lg:w-[420px] h-[56px] mt-[8%] bg-[#4DF2BE] text-[#0F1012] rounded-[100px] border border-brand-green ${
+          className={`p-3 w-full lg:w-[100%] h-[56px] mt-[8%] bg-[#4DF2BE] text-[#0F1012] rounded-[100px] border border-brand-green ${
             isLoading
               ? "opacity-50 cursor-not-allowed"
               : "cursor-pointer hover:bg-[#3dd9ab]"
