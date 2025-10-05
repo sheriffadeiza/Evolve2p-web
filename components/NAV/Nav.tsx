@@ -15,6 +15,17 @@ import LimitIcon from "../../public/Assets/Evolve2p_limicon/elements.svg";
 import HistoryIcon from "../../public/Assets/Evolve2p_trahisicon/elements.svg";
 import Logout from "../../public/Assets/Evolve2p_logouticon/elements.svg";
 
+
+
+const Nav: React.FC = () => {
+  const pathname = usePathname();
+  const router = useRouter();
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
+
+  const toggleProfiledown = () => {
+    setIsProfileOpen((prev) => !prev);
+  };
+
 const navLinks = [
   { name: "Dashboard", path: "/dashboard" },
   { name: "Wallet", path: "/wallet" },
@@ -25,22 +36,13 @@ const navLinks = [
 
 const profileOptions = [
   { name: "Verify me", icon: VerifyIcon, action: () => {} },
-  { name: "My Profile", icon: ProfileIcon, action: () => {} },
+  { name: "My Profile", icon: ProfileIcon, action: () => router.push("/profile") },
   { name: "Account Level", icon: LevelIcon, tier: "Tier 1", action: () => {} },
   { name: "Settings", icon: SettingsIcon, action: () => {} },
   { name: "My Transactions", icon: TransactionsIcon, action: () => {} },
   { name: "Transaction Limit", icon: LimitIcon, action: () => {} },
   { name: "Trade History", icon: HistoryIcon, action: () => {} },
 ];
-
-const Nav: React.FC = () => {
-  const pathname = usePathname();
-  const router = useRouter();
-  const [isProfileOpen, setIsProfileOpen] = useState(false);
-
-  const toggleProfiledown = () => {
-    setIsProfileOpen((prev) => !prev);
-  };
 
   return (
     <nav className="flex items-center">

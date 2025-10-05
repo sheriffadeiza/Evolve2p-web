@@ -31,7 +31,7 @@ import Yellow_i from "../../public/Assets/Evolve2p_yellowi/elements.svg";
 import Copy from "../../public/Assets/Evolve2p_code/elements.svg";
 import Share from "../../public/Assets/Evolve2p_share/elements.svg";
 import DashboardTransactions from "@/app/dashboardTransaction/dashboardTrans";
-import Footer from "../Footer/Footer";
+import Footer from "../../components/Footer/Footer";
 
 interface QRCodeBoxProps {
   value?: string;

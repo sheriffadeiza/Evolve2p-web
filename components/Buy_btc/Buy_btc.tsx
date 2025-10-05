@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Nav from "../../components/NAV/Nav";
+import { useRouter } from "next/navigation";
 import Image from "next/image";
 import Vector from "../../public/Assets/Evolve2p_vector/vector.svg";
 import Mark_green from "../../public/Assets/Evolve2p_mark/elements.svg";
@@ -20,8 +21,11 @@ import USDT from "../../public/Assets/Evolve2p_USDT/Tether (USDT).svg";
 import USDC from "../../public/Assets/Evolve2p_USDC/USD Coin (USDC).svg";
 import Arrow_great from "../../public/Assets/Evolve2p_Larrow/arrow-right-01.svg";
 import Times from "../../public/Assets/Evolve2p_times/Icon container.png";
+import Footer from "../../components/Footer/Footer";
 
 const BuyBTC = () => {
+
+   const router = useRouter();
   const [isTermsOpen, setIsTermsOpen] = useState(false);
   const [isSellerOpen, setIsSellerOpen] = useState(false);
 
@@ -683,12 +687,19 @@ const BuyBTC = () => {
               </div>
             </div>
             <div className=" items-center justfy-center mt-[20px] ml-[40px]">
-              <button className=" flex items-center justify-center w-[458px] h-[48px]  border-2 border-[#4DF2BE] rounded-full bg-[#4DF2BE]">
+              <button className=" flex items-center justify-center w-[458px] h-[48px]  border-2 border-[#4DF2BE] cursor-pointer rounded-full bg-[#4DF2BE]"
+               onClick={() => router.push("/prc_buy")}
+              >
                 Buy BTC
               </button>
             </div>
           </div>
         </div>
+         <div className="w-[106%] ml-[-5%] h-[1px] bg-[#fff] mt-[10%] opacity-20 my-8"></div>
+        
+                <div className=" mb-[80px] mt-[30%] ">
+                  <Footer />
+                </div>
       </div>
     </main>
   );
