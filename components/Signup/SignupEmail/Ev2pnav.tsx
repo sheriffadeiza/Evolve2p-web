@@ -30,7 +30,7 @@ const Ev2pnav = () => {
   }, []);
 
   return (
-    <div className="flex mt-[80px] gap-[26%] md:gap-[20%] items-center justify-center lg:ml-[40px] p-[12px_20px] lg:flex lg:justify-between border-2 border-red-500 ">
+    <div className="flex mt-[80px] gap-[26%] md:gap-[20%] items-center justify-center lg:ml-[40px] p-[12px_20px] lg:flex lg:justify-between">
       <Image src={evolve_logo} alt="Evolve2p Logo" width={120} height={40} />
 
       <button className=" md:py-4 w-[100px] md:w-[84px]l h-[24px] flex items-center justify-center border-0 transition-colors rounded-full text-[14px] font-[500] bg-[#3A3A3A] text-[#DBDBDB]">

@@ -1,14 +1,14 @@
-'use client';
+"use client";
 
-import React from 'react'
-import Head from '../../../components/Signup/SignupEmail/Header'
+import React from "react";
+import Head from "../../../components/Signup/SignupEmail/Header";
 
 const Header = () => {
   return (
     <div>
-      <Head/>
+      <Head />
     </div>
-  )
-}
+  );
+};
 
-export default Header
+export default Header;

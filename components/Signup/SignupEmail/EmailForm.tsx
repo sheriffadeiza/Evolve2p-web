@@ -92,8 +92,8 @@ const EmailForm = () => {
   };
 
   return (
-    <div className=" lg:pt-[30px] w-full lg:mx-0 border-2 border-red-500">
-      <div className="flex flex-col gap-2 lg:max-w-md mx-auto p-8 max-w-sm border-2 border-green-500">
+    <div className=" lg:pt-[30px] w-full lg:mx-0 ">
+      <div className="flex flex-col gap-2 lg:max-w-md mx-auto p-8 max-w-sm">
         <h1 className="text-[24px] font-[700] text-[#FCFCFC]">
           Create account
         </h1>
