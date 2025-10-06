@@ -131,22 +131,22 @@ const Lpassbd = () => {
   };
 
   return (
-    <div className="flex flex-col text-center items-center justify-center max-w-md ml-[80px] mx-auto mt-10 px-4 text-white">
+    <div className="flex flex-col text-center items-center justify-center max-w-md  mx-auto my-6 px-4 text-white  lg:max-w-lg ">
       {/* Success Modal */}
       {showSuccessModal && (
-        <div className="fixed inset-0 flex items-center justify-center z-50">
-          <div className="bg-[#0F1012] p-8 rounded-[10px] w-[375px] h-[300px] flex flex-col items-center justify-center">
+        <div className="fixed inset-0 flex items-center justify-center z-50 ">
+          <div className="bg-[#0F1012] p-8 rounded-[10px] w-[375px] h-[300px] flex flex-col items-center justify-center border-2 border-gray-400">
             <Image src={ModalC} alt="Success Icon" width={58.001} height={58} />
             <h2 className="text-[20px] text-[#FCFCFC] font-[700] mb-2">
               Password Changed
             </h2>
-            <p className="text-[16px] font-[400] text-[#8F8F8F] mb-6 text-center">
+            <p className="text-[16px] font-[400] text-[#8F8F8F]  mb-6 text-center w-full">
               Your password has been successfully updated. You can now log in
               with your new password.
             </p>
             <button
               onClick={handleGoToLogin}
-              className="w-[356px] h-[48px] bg-[#4DF2BE] mt-[30px] text-[14px] text-[#0F1012] border-none font-[700] py-3 rounded-[100px] hover:bg-[#3dd9ab] transition"
+              className=" w-[356px] h-[48px] bg-[#4DF2BE] mt-[30px] text-[14px] text-[#0F1012] border-none font-[700] py-3 rounded-[100px] hover:bg-[#3dd9ab] transition"
             >
               Go to log in
             </button>
@@ -154,10 +154,10 @@ const Lpassbd = () => {
         </div>
       )}
 
-      <h1 className="text-[24px] ml-[-16%] text-[#FCFCFC] font-[700]">
+      <h1 className="text-[24px] text-[#FCFCFC] font-[700] sm:ml-[-40%] ml-[-28%]  ">
         Create new password
       </h1>
-      <p className="text-[16px] font-[400] mt-[-10px] ml-[-48px] text-[#8F8F8F] whitespace-nowrap">
+      <p className="text-[16px] font-[400] mt-[6px]  text-[#8F8F8F]  sm:ml-[-2%]  whitespace-wrap">
         Create a strong password to protect your trades and funds.
       </p>
 
@@ -167,15 +167,15 @@ const Lpassbd = () => {
         </div>
       )}
 
-      <label className="block text-[14px] ml-[-29%] mt-[30px] font-[500] text-[#8F8F8F] mb-[10px]">
+      <label className="block text-[14px] ml-[-82%] mt-[30px] font-[500] text-[#8F8F8F] mb-[10px]">
         Password
       </label>
-      <div className="relative">
+      <div className="relative w-full">
         <input
           type={showPassword ? "text" : "password"}
           value={password}
           onChange={handlePasswordChange}
-          className={`w-[380px] h-[56px] bg-[#222222] ml-[-25px] text-[#DBDBDB] text-[14px] font-[500] border mb-4 pl-[15px] pr-10 rounded-[10px] ${
+          className={`w-[100%] h-[56px] bg-[#222222]  text-[#DBDBDB] text-[14px] font-[500] border mb-4 pl-[15px] pr-10 rounded-[10px] ${
             error &&
             (!isMinLength || !hasNumber || !hasSpecialChar || !hasUpperLower)
               ? "border-[#F5918A]"
@@ -187,7 +187,7 @@ const Lpassbd = () => {
         <button
           type="button"
           onClick={() => setShowPassword(!showPassword)}
-          className="absolute border-0 right-2 ml-[-40px] top-[55%] bg-[#222222] -translate-y-1/2 text-[#DBDBDB]"
+          className="absolute border-0 right-2 ml-[-40px] top-[45%] bg-[#222222] -translate-y-1/2 text-[#DBDBDB]"
           disabled={isLoading}
         >
           <Image
@@ -199,7 +199,7 @@ const Lpassbd = () => {
         </button>
       </div>
 
-      <ul className="text-[14px] font-[400] font-satoshi ml-[-20%] text-[#8F8F8F] mb-6 space-y-[10px]">
+      <ul className="text-[14px] font-[400] font-satoshi  text-[#8F8F8F] mb-6 space-y-[10px]  w-full">
         <li className="flex items-center gap-[5px]">
           <Image
             src={isMinLength ? schecklistActive : schecklistInactive}
@@ -256,15 +256,15 @@ const Lpassbd = () => {
         </li>
       </ul>
 
-      <label className="block text-[14px] mt-[10px] font-[500] ml-[-26%] text-[#8F8F8F] mb-[10px]">
+      <label className="block text-[14px] mt-[10px] font-[500] ml-[-66%] text-[#8F8F8F] mb-[10px]">
         Confirm password
       </label>
-      <div className="relative inline-block">
+      <div className="relative w-full inline-block ">
         <input
           type={showConfirm ? "text" : "password"}
           value={confirmPassword}
           onChange={handleConfirmPasswordChange}
-          className={`w-[380px] h-[56px] bg-[#222222] text-[#DBDBDB] ml-[-30px] text-[14px] font-[500] border text-white mb-4 pl-[15px] pr-10 rounded-[10px] ${
+          className={`w-[100%] h-[56px] bg-[#222222] text-[#DBDBDB]  text-[14px] font-[500] border  mb-4 pl-[15px] pr-10 rounded-[10px] ${
             error && !passwordsMatch ? "border-[#F5918A]" : "border-[#2E2E2E]"
           }`}
           placeholder="Re-enter your password"
@@ -273,7 +273,7 @@ const Lpassbd = () => {
         <button
           type="button"
           onClick={() => setShowConfirm(!showConfirm)}
-          className="absolute top-[55%] border-0 right-2 ml-[-40px] bg-[#222222] -translate-y-1/2 text-[#DBDBDB]"
+          className="absolute top-[45%] border-0 right-2 ml-[-40px] bg-[#222222] -translate-y-1/2 text-[#DBDBDB]"
           disabled={isLoading}
         >
           <Image
@@ -286,7 +286,7 @@ const Lpassbd = () => {
       </div>
 
       <button
-        className={`w-[400px] h-[56px] ml-[-30px] border-none mt-[40px] bg-[#4DF2BE] text-[#0F1012] py-3 rounded-[100px] hover:bg-[#1a5d50] transition ${
+        className={`w-[100%] h-[56px]  border-none mt-[40px] bg-[#4DF2BE] text-[#0F1012] py-3 rounded-[100px] hover:bg-[#1a5d50] transition ${
           !allFieldsValid() || isLoading ? "opacity-50 cursor-not-allowed" : ""
         }`}
         onClick={handleSubmit}
