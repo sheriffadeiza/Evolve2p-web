@@ -100,7 +100,7 @@ const Lverifybd: React.FC = () => {
   const allFilled = pin.every((digit) => digit.length === 1);
 
   return (
-    <div className="max-w-md mx-auto ml-[-100px] text-center mt-10 px-4 text-white">
+    <div className="max-w-md mx-auto  text-center mt-4 px-4 text-white  mb-6">
       <h1 className="text-[24px] ml-[-15%] text-[#FCFCFC] font-[700] mb-2">
         Verify Email
       </h1>
@@ -110,7 +110,7 @@ const Lverifybd: React.FC = () => {
       </p>
 
       <form onSubmit={handleVerify}>
-        <div className="flex gap-[10px] ml-[100px] border-none justify-center mb-6">
+        <div className="flex gap-[10px]   justify-center mb-6 ">
           {pin.map((digit, idx) => (
             <input
               key={idx}
@@ -118,7 +118,7 @@ const Lverifybd: React.FC = () => {
               maxLength={1}
               value={digit}
               onChange={(e) => handleChange(e.target.value, idx)}
-              className="w-[62px] h-[56px] rounded-[10px] border-none bg-[#222222] text-center text-xl text-[#FCFCFC] focus:outline-none focus:ring-1 focus:ring-[#1ECB84]"
+              className="w-[100%] h-[56px] rounded-[10px] border-none bg-[#222222] text-center text-xl text-[#FCFCFC] focus:outline-none focus:ring-1 focus:ring-[#1ECB84]"
               type="password"
               disabled={isLoading}
               autoComplete="one-time-code"
@@ -156,8 +156,8 @@ const Lverifybd: React.FC = () => {
       </div>
 
       {showModal && (
-        <div className="fixed inset-0 flex ml-[20%] w-[80%] mt-[-20%] items-center justify-center bg-black bg-opacity-60 z-50">
-          <div className="bg-[#1F1F1F] rounded-lg p-8 shadow-lg text-center flex flex-col items-center justify-center">
+        <div className="fixed inset-0 flex ml-[14%] md:mt-[-8%] w-[70%] mt-[14%] items-center justify-center  bg-opacity-60 z-50 xl:mt-[40%%]">
+          <div className="bg-[#1F1F1F] rounded-lg p-8 shadow-lg text-center flex flex-col items-center justify-center border-2">
             <h2 className="text-[#1ECB84] text-[20px] font-[700] mb-2">
               Email Verified!
             </h2>

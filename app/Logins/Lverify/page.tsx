@@ -10,7 +10,7 @@ const page = () => {
       <Header />
 
       {/* Main Content */}
-      <div className="border-2 border-red-500">
+      <div className="h-dvh">
         <Lverifynav />
         <Lverifybd />
       </div>
