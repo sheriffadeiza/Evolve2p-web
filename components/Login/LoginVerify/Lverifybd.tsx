@@ -136,7 +136,7 @@ const Lverifybd: React.FC = () => {
           <button
             type="submit"
             disabled={isLoading}
-            className="w-[380px] h-[56px] py-2 mt-[20px] ml-[10%] border-none justify-center rounded-[100px] text-[14px] font-[700] bg-[#4DF2BE] text-[#0F1012] hover:opacity-90"
+            className="w-[100%] h-[56px] py-2 mt-[20px]  border-none justify-center rounded-[100px] text-[14px] font-[700] bg-[#4DF2BE] text-[#0F1012] hover:opacity-90"
           >
             {isLoading ? "Verifying email..." : "Verify Email"}
           </button>
