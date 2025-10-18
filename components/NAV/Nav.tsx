@@ -43,7 +43,7 @@ const Nav: React.FC = () => {
   };
 
   return (
-    <nav className="flex items-center">
+    <nav className="flex items-center border-2 border-yellow-500">
       <div className="mr-[40px]">
         <Image src={Logo} alt="logo" />
       </div>

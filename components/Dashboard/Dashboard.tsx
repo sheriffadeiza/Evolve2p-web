@@ -198,12 +198,12 @@ const Dashboard: React.FC<QRCodeBoxProps> = ({ value }) => {
   }
 
   return (
-    <main className="min-h-screen bg-[#0F1012] pr-[10px] mt-[30px] pl-[30px] text-white md:p-8 relative">
-      <div className="max-w-7xl mx-auto">
+    <main className="min-h-screen bg-[#0F1012] pr-[10px] mt-[30px] pl-[30px] text-white md:p-8 relative border-2 border-green-500">
+      <div className="max-w-7xl mx-auto  border-2 border-red-500">
         <Nav />
         {/* Main Content */}
         {/* Header */}
-        <div className="flex space-x-[5px]  text-[24px] font-[500] items-center mb-6">
+        <div className="flex space-x-[5px]  text-[24px] font-[500] items-center mb-6 border-2 border-white">
           <p className="text-[#8F8F8F]">Hello,</p>
           <p className="text-[#FCFCFC]">
             {clientUser?.username
@@ -226,13 +226,12 @@ const Dashboard: React.FC<QRCodeBoxProps> = ({ value }) => {
             Complete KYC and enjoy access to all features available on the app.
           </p>
           <button
-            className="text-[14px] w-[127px] h-[33px]  text-center ml-[25px] text-[#4DF2BE] font-[700] bg-[#2D2D2D] border border-[#222] rounded-full"
+            className="text-[14px] w-[127px] h-[33px]  text-center ml-[25px] text-[#4DF2BE] font-[700] bg-[#2D2D2D] border border-[#222] rounded-full cursor-pointer"
             onClick={toggleVerifyModal}
           >
             Complete KYC
           </button>
         </div>
-        cl
         {/* Verification Modal */}
         {showVerifyModal && (
           <div
