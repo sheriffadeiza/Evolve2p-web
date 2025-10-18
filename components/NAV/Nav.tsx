@@ -30,18 +30,18 @@ const navLinks = [
   { name: "Dashboard", path: "/dashboard" },
   { name: "Wallet", path: "/wallet" },
   { name: "Marketplace", path: "/market_place" },
-  { name: "Trade history", path: "/trade-history" },
+  { name: "Trade history", path: "/tradehistory" },
   { name: "Support", path: "/support" },
 ];
 
 const profileOptions = [
   { name: "Verify me", icon: VerifyIcon, action: () => {} },
   { name: "My Profile", icon: ProfileIcon, action: () => router.push("/profile") },
-  { name: "Account Level", icon: LevelIcon, tier: "Tier 1", action: () => {} },
-  { name: "Settings", icon: SettingsIcon, action: () => {} },
+  { name: "Account Level", icon: LevelIcon, tier: "Tier 1", action: () => router.push("/accountL") },
+  { name: "Notifications", icon: SettingsIcon, action: () => router.push("/notifications") },
   { name: "My Transactions", icon: TransactionsIcon, action: () => {} },
-  { name: "Transaction Limit", icon: LimitIcon, action: () => {} },
-  { name: "Trade History", icon: HistoryIcon, action: () => {} },
+  { name: "Transaction Limit", icon: LimitIcon, action: () => router.push("/translim") },
+  { name: "Trade History", icon: HistoryIcon, action: () => router.push("/tradehistory") },
 ];
 
   return (

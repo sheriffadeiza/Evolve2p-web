@@ -12,6 +12,8 @@ import Barrow from "../../public/Assets/Evolve2p_Barrow/arrow-down-01.svg";
 import Mode from "../../public/Assets/Evolve2p_mode/Profile/elements.svg";
 import Lang from "../../public/Assets/Evolve2p_Lang/Profile/globe.svg";
 import Delete from "../../public/Assets/Evolve2p_Delete/Profile/elements.svg";
+import Footer from "../../components/Footer/Footer";
+
 
 
 
@@ -172,17 +174,17 @@ const [openLang, setOpenLang] = useState(false);
     c.name.toLowerCase().includes(currencySearch.toLowerCase())
   );
   return (
-    <main className="min-h-screen bg-[#0F1012] pr-[10px] mt-[30px] pl-[30px] text-white md:p-8">
+    <main className="min-h-screen  bg-[#0F1012] pr-[10px] mt-[30px] pl-[30px] text-white md:p-8">
       <div className="max-w-7xl mx-auto">
         <Nav />
-               <div className="flex items-center mt-[-100px] mr-[40px] ">
-                 
+               <div className="flex  items-center mt-[-100px] mr-[40px]">
+                  
                  <Settings />
                  
                 
         
           {/* Right side */}
-          <div className="w-[809px]  mt-[108px] bg-[#1A1A1A] gap-[20px] p-[24px_64px]">
+          <div className="w-[809px]  mt-[108px] bg-[#1A1A1A]   gap-[20px] p-[24px_64px]">
             <div className="flex w-[681px] items-center justify-between ">
               <p className="text-[24px] font-[700] text-[#FFFFFF]">Profile</p>
 
@@ -560,6 +562,11 @@ const [openLang, setOpenLang] = useState(false);
 
           </div>
         </div>
+         <div className="w-[106%] ml-[-5%] h-[1px] bg-[#fff] mt-[10%] opacity-20 my-8"></div>
+        
+                <div className=" mb-[80px] mt-[30%] ">
+                  <Footer />
+                </div>
       </div>
     </main>
   );
