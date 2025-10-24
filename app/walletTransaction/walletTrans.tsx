@@ -7,9 +7,9 @@ import { useTransaction } from "@/app/useTransaction/useTransaction";
 // icons
 import BuyIcon from "../../public/Assets/Evolve2p_BuyT/arrow-down-right-01.svg";
 import SwapIcon from "../../public/Assets/Evolve2p_SwapT/elements.svg";
-import EscrowIcon from "../../public/Assets/Evolve2p_EscrowedT/elements.svg";
 import SellIcon from "../../public/Assets/Evolve2p_SellT/arrow-up-right-01.svg";
 import SendIcon from "../../public/Assets/Evolve2p_SellT/arrow-up-right-01.svg";
+import EscrowIcon from "../../public/Assets/Evolve2p_EscrowedT/elements.svg";
 import processingIcon from "../../public/Assets/Evolve2p_ProcT/elements.svg";
 import completedIcon from "../../public/Assets/Evolve2p_CompT/elements.svg";
 import failedIcon from "../../public/Assets/Evolve2p_FailedT/elements.svg";
