@@ -18,6 +18,7 @@ import Nav from "../NAV/Nav";
 import { useTransaction } from "@/app/useTransaction/useTransaction";
 import TabsNav from "../TabsNav/TabsNav";
 import Footer from "../Footer/Footer";
+import { formatHashOrAddress } from "@/utils";
 
 const Transaction = () => {
   const {
@@ -25,9 +26,10 @@ const Transaction = () => {
     searchTerm,
     setSearchTerm,
     loading,
+    transactions,
   } = useTransaction();
 
-  if (loading) return <p className="text-[#ffffff] p-10">Loading transactions...</p>;
+  console.log(transactions);
 
   // ✅ Map transaction types to icons
   const typeIcons: Record<string, any> = {
@@ -63,6 +65,9 @@ const Transaction = () => {
     Cancelled: cancelledIcon,
     Expired: expiredIcon,
   };
+
+  if (loading)
+    return <p className="text-[#ffffff] p-10">Loading transactions...</p>;
 
   return (
     <main className="min-h-screen bg-[#0F1012] pr-[10px] mt-[30px] pl-[30px] text-white md:p-8">
@@ -109,8 +114,9 @@ const Transaction = () => {
               <tr className="text-[#C7C7C7] text-[14px] font-[500]">
                 <th className="text-left py-2 pl-4">Type</th>
                 <th className="text-left py-2 pl-4">Amount</th>
-                <th className="text-left py-2 pl-4">Asset</th>
-                <th className="text-left py-2 pl-4">Counterparty</th>
+                <th className="text-left py-2 pl-4">To Address</th>
+                <th className="text-left py-2 pl-4">From Address</th>
+                <th className="text-left py-2 pl-4">txHash</th>
                 <th className="text-left py-2 pl-4">Status</th>
                 <th className="text-left py-2 pl-4">Date</th>
               </tr>
@@ -134,11 +140,18 @@ const Transaction = () => {
                       {t.type}
                     </td>
                     <td className="py-3 pl-4">{t.amount}</td>
-                    <td className="py-3 pl-4">{t.asset}</td>
-                    <td className="py-3 pl-4">{t.counterparty || "-"}</td>
+                    <td className="py-3 pl-4">
+                      {formatHashOrAddress(t?.toAddress)}
+                    </td>
+                    <td className="py-3 pl-4">
+                      {formatHashOrAddress(t?.fromAddress) || "-"}
+                    </td>
+                    <td className="py-3 pl-4">
+                      {formatHashOrAddress(t?.txHash) || "-"}
+                    </td>
                     <td className="py-3 pl-4">
                       <span
-                        className={`flex items-center px-3 py-1 rounded-full text-xs font-medium ${
+                        className={`flex items-center gap-5 px-3 py-1 rounded-full text-xs font-medium ${
                           statusColors[t.status] ||
                           "bg-gray-800 text-gray-400 px-2"
                         }`}
@@ -150,17 +163,20 @@ const Transaction = () => {
                           height={14}
                           className="mr-1"
                         />
-                        {t.status}
+                        {" " + " " + t.status}
                       </span>
                     </td>
                     <td className="py-3 pl-4">
-                      {new Date(t.date).toDateString()}
+                      {new Date(t?.createdAt).toDateString()}
                     </td>
                   </tr>
                 ))
               ) : (
                 <tr>
-                  <td colSpan={6} className="text-center pt-[20px] py-6 text-[#ffffff]">
+                  <td
+                    colSpan={6}
+                    className="text-center pt-[20px] py-6 text-[#ffffff]"
+                  >
                     No transactions found
                   </td>
                 </tr>

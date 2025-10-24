@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import Nav from "../../components/NAV/Nav";
 import TabsNav from "../TabsNav/TabsNav";
 import Image from "next/image";
@@ -14,6 +14,120 @@ import Times from "../../public/Assets/Evolve2p_times/Icon container.png";
 import USDC from "../../public/Assets/Evolve2p_USDC/USD Coin (USDC).svg";
 import USDT from "../../public/Assets/Evolve2p_USDT/Tether (USDT).svg";
 import Footer from "../../components/Footer/Footer";
+import { useRouter } from "next/navigation";
+
+type CoinSymbol = "BTC" | "ETH" | "USDT" | "USDC";
+
+interface CoinInfo {
+  usd: number;
+  btc: number;
+  eth: number;
+}
+
+interface CoinDataMap {
+  [key: string]: CoinInfo;
+}
+
+/**
+ * Fetches latest coin prices from CoinPaprika and returns a CoinDataMap.
+ */
+export async function fetchCoinData(): Promise<CoinDataMap | null> {
+  const symbolToId: Record<string, string> = {
+    bitcoin: "btc-bitcoin",
+    ethereum: "eth-ethereum",
+    tether: "usdt-tether",
+    "usd-coin": "usdc-usd-coin",
+  };
+
+  try {
+    // Fetch USD prices for all supported coins
+    const entries = await Promise.all(
+      Object.entries(symbolToId).map(async ([key, id]) => {
+        const res = await fetch(`https://api.coinpaprika.com/v1/tickers/${id}`);
+        const data = await res.json();
+        return [key, parseFloat(data.quotes.USD.price)];
+      })
+    );
+
+    const usdPrices = Object.fromEntries(entries);
+    const btcPrice = usdPrices.bitcoin;
+    const ethPrice = usdPrices.ethereum;
+
+    const formattedPrices: CoinDataMap = {};
+
+    for (const key in usdPrices) {
+      const usd = usdPrices[key];
+      formattedPrices[key] = {
+        usd,
+        btc: parseFloat((usd / btcPrice).toFixed(8)),
+        eth: parseFloat((usd / ethPrice).toFixed(8)),
+      };
+    }
+
+    // Set 1 for base units
+    formattedPrices.bitcoin.btc = 1;
+    formattedPrices.ethereum.eth = 1;
+
+    return formattedPrices;
+  } catch (error) {
+    console.error("❌ Failed to fetch coin prices:", error);
+    return null;
+  }
+}
+
+/**
+ * Get coin data safely using a switch-case symbol mapper.
+ */
+export function getCoinData(
+  symbol: string,
+  coinData?: CoinDataMap
+): CoinInfo | { error: true; message: string } {
+  if (!symbol) return { error: true, message: "Symbol is required" };
+  if (!coinData) return { error: true, message: "Coin data is undefined" };
+
+  let key: string;
+
+  switch (symbol.toUpperCase()) {
+    case "BTC":
+      key = "bitcoin";
+      break;
+    case "ETH":
+      key = "ethereum";
+      break;
+    case "USDT":
+      key = "tether";
+      break;
+    case "USDC":
+      key = "usd-coin";
+      break;
+    default:
+      key = symbol.toLowerCase();
+  }
+
+  const data = coinData[key];
+  return (
+    data || { error: true, message: `No data found for symbol "${symbol}"` }
+  );
+}
+
+export function convertCoinValue(
+  fromSymbol: string,
+  toSymbol: string,
+  amount: number,
+  coinData?: CoinDataMap
+): number | { error: true; message: string } {
+  const fromData = getCoinData(fromSymbol, coinData);
+  const toData = getCoinData(toSymbol, coinData);
+
+  if ("error" in fromData) return fromData;
+  if ("error" in toData) return toData;
+
+  // Convert through USD as a base reference
+  const usdValue = amount * fromData.usd;
+  const converted = usdValue / toData.usd;
+
+  return parseFloat(converted.toFixed(8));
+}
 
 const Swap: React.FC = () => {
   const [isSwapModal, setIsSwapModal] = useState(false);
@@ -21,17 +135,14 @@ const Swap: React.FC = () => {
   const [IsSecpinModal, setIsSecpinModal] = useState(false);
   const [SecDropdownOpen, setSecDropdownOpen] = useState(false);
   const [SecDropdownOpenTwo, setSecDropdownOpenTwo] = useState(false);
+  const [clientUser, setClientUser] = useState<any>(null);
+  const [coinPrices, setCoinPrices] = useState<any>(null);
+  const [fromCoinValue, setFromCoinValue] = useState("");
+  const [toCoinValue, setToCoinValue] = useState("0");
+  const [convertedValue, setConvertedValue] = useState<number>(0);
+  const [isSwapping, setIsSwapping] = useState(false);
 
-  const [selectedCoin, setSelectedCoin] = useState({
-    name: "BTC",
-    icon: BTC,
-  });
-
-  const [selectedCoinTwo, setSelectedCoinTwo] = useState({
-    name: "ETH",
-    icon: ETH,
-  });
- 
+  const router = useRouter();
 
   const closeSwapModal = () => setIsSwapModal(false);
   const closeSecpinModal = () => setIsSecpinModal(false);
@@ -51,11 +162,30 @@ const Swap: React.FC = () => {
     setPin(newPin);
   };
 
+  useEffect(() => {
+    (async () => {
+      const res = await fetchCoinData();
+      setCoinPrices(res);
+    })();
+  }, []);
+
   const coins = [
-    { name: "BTC", icon: BTC },
-    { name: "ETH", icon: ETH },
-    { name: "USDT", icon: USDT },
-    { name: "USDC", icon: USDC },
+    {
+      name: "BTC",
+      icon: BTC,
+    },
+    {
+      name: "ETH",
+      icon: ETH,
+    },
+    {
+      name: "USDT",
+      icon: USDT,
+    },
+    {
+      name: "USDC",
+      icon: USDC,
+    },
   ];
 
   const coins2 = [
@@ -64,6 +194,77 @@ const Swap: React.FC = () => {
     { name: "USDT", icon: USDT },
     { name: "USDC", icon: USDC },
   ];
+
+  const [selectedCoin, setSelectedCoin] = useState(coins[0]);
+
+  const [selectedCoinTwo, setSelectedCoinTwo] = useState(coins2[1]);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const stored = localStorage.getItem("UserData");
+      if (!stored) {
+        router.push("/Logins/login");
+        return;
+      }
+      if (stored) {
+        console.log(JSON.parse(stored));
+        setClientUser(JSON.parse(stored)?.userData);
+      }
+    }
+  }, []);
+
+  useEffect(() => {
+    const value = convertCoinValue(
+      selectedCoin?.name,
+      selectedCoinTwo?.name,
+      Number(fromCoinValue),
+      coinPrices
+    );
+
+    if (typeof value === "number") {
+      setConvertedValue(value);
+    }
+  }, [fromCoinValue, selectedCoin, selectedCoinTwo]);
+
+  const handleSwap = async () => {
+    if (!fromCoinValue) return;
+    setIsSwapping(true);
+    if (typeof window !== "undefined") {
+      const stored = localStorage.getItem("UserData");
+      const accessToken = JSON.parse(stored || "")?.accessToken;
+
+      const res = await fetch(
+        "https://evolve2p-backend.onrender.com/api/swap",
+        {
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: "Bearer " + accessToken,
+          },
+          body: JSON.stringify({
+            fromCoin: selectedCoin?.name,
+            toCoin: selectedCoinTwo?.name,
+            fromAmount: fromCoinValue,
+          }),
+          method: "POST",
+        }
+      );
+
+      const data = await res?.json();
+
+      if (data?.error) {
+        setIsSwapping(false);
+        alert(data?.message);
+        return;
+      }
+
+      if (data?.success) {
+        setIsSwapping(false);
+        setFromCoinValue("");
+        setConvertedValue(0);
+        alert(data?.message);
+      }
+    }
+  };
 
   return (
     <main className="min-h-screen bg-[#0F1012] pr-[10px] mt-[30px] pl-[30px] text-white md:p-8">
@@ -124,7 +325,7 @@ const Swap: React.FC = () => {
               } z-[1000]`}
             >
               <div className="bg-[#1A1A1A]  rounded-[12px] w-[560px] max-h-[85vh] p-[24px] overflow-y-auto scrollbar-thin scrollbar-thumb-[#DBDBDB] scrollbar-track-[#2D2D2D]">
-                <div className="flex  items-center justify-between">
+                <button className="flex  items-center justify-between">
                   <p className="text-[16px] font-[700] text-[#FFFFFF]">
                     Confirm Swap
                   </p>
@@ -136,7 +337,7 @@ const Swap: React.FC = () => {
                     className="absolute top-[20px] w-[32px] h-[32px] mt-[15px]  ml-[85%] cursor-pointer"
                     onClick={closeSwapModal}
                   />
-                </div>
+                </button>
 
                 <p className="text-center text-[#8F8F8F] text-[16px] font-[500] mt-[30px]">
                   Review the above before confirming <br /> Once made, your
@@ -189,11 +390,12 @@ const Swap: React.FC = () => {
                     Cancel
                   </button>
                   <button
+                    disabled={isSwapping}
+                    onClick={handleSwap}
                     className="w-[242px] h-[48px] bg-[#4DF2BE] rounded-full text-[14px] text-[#0F1012] font-[700]"
                     style={{ border: "1px solid #4DF2BE" }}
-                    onClick={() => setIsSecpinModal(true)}
                   >
-                    Confirm Swap
+                    {isSwapping ? "swapping..." : "Confirm Swap"}
                   </button>
                 </div>
               </div>
@@ -217,12 +419,14 @@ const Swap: React.FC = () => {
 
               <div className="flex items-center justify-between ">
                 <div className=" flex text-[28px]  ">
-                  <p className="text-[#FCFCFC] ">
-                    0{" "}
-                    <span className="text-[#8F8F8F] font-[400] w-[9px] h-[38px]">
-                      |
-                    </span>{" "}
-                  </p>
+                  <div className="text-[#FCFCFC] ">
+                    <input
+                      defaultValue={fromCoinValue}
+                      onChange={(e) => setFromCoinValue(e.target.value)}
+                      placeholder="0"
+                      className="bg-transparent border-none outline-none text-[30px] w-auto min-w-0 text-[#FCFCFC]"
+                    />
+                  </div>
                 </div>
                 {/*where dropdown one */}
                 <div className="w-[96px] h-[32px] flex items-center space-x-[10px]  justify-center bg-[#2D2D2D] rounded-full ">
@@ -290,9 +494,15 @@ const Swap: React.FC = () => {
                 <div className="flex items-center">
                   <p className="text-[14px] font-[400] text-[#8F8F8F]">
                     Balance:{" "}
-                  </p>{" "}
+                  </p>
                   <span className="text-[14px] font-[500] text-[#FCFCFC]">
-                    0.90 BTC
+                    {" "}
+                    {
+                      clientUser?.wallets?.find(
+                        (w: any) => w?.currency == selectedCoin?.name
+                      )?.balance
+                    }{" "}
+                    {selectedCoin?.name}
                   </span>
                 </div>
               </div>
@@ -325,17 +535,18 @@ const Swap: React.FC = () => {
 
               <div className="flex items-center justify-between ">
                 <div className=" flex text-[28px]  ">
-                  <p className="text-[#FCFCFC] ">
-                    0{" "}
-                    <span className="text-[#8F8F8F] font-[400] w-[9px] h-[38px]">
-                      |
-                    </span>{" "}
-                  </p>
+                  <div className="text-[#FCFCFC] ">
+                    <input
+                      disabled
+                      placeholder={String(convertedValue)}
+                      className="bg-transparent border-none outline-none text-[30px] w-auto min-w-0 text-white"
+                    />
+                  </div>
                 </div>
 
                 {/*where dropdown two */}
 
-              <div className="w-[96px] h-[32px] flex items-center space-x-[10px]  justify-center bg-[#2D2D2D] rounded-full ">
+                <div className="w-[96px] h-[32px] flex items-center space-x-[10px]  justify-center bg-[#2D2D2D] rounded-full ">
                   <Image
                     src={selectedCoinTwo.icon}
                     alt={selectedCoinTwo.name}
@@ -404,7 +615,12 @@ const Swap: React.FC = () => {
                     Balance:{" "}
                   </p>{" "}
                   <span className="text-[14px] font-[500] text-[#FCFCFC]">
-                    0.00 ETH
+                    {
+                      clientUser?.wallets?.find(
+                        (w: any) => w?.currency == selectedCoinTwo?.name
+                      )?.balance
+                    }{" "}
+                    {selectedCoinTwo?.name}
                   </span>
                 </div>
               </div>
@@ -442,17 +658,13 @@ const Swap: React.FC = () => {
               </div>
             </div>
 
-            <div
-              className="w-[105px] h-[44px] flex  items-center justify-center rounded-full bg-[#4DF2BE] ml-auto"
+            <button
+              onClick={() => setIsSwapModal(true)}
+              className="w-[105px] cursor-pointer h-[44px] flex  items-center justify-center rounded-full bg-[#4DF2BE] ml-auto"
               style={{ border: "1px solid  #4DF2BE" }}
             >
-              <p
-                className="text-[14px] font-[700] text-[#0F1012]"
-                onClick={() => setIsSwapModal(true)}
-              >
-                Swap now
-              </p>
-            </div>
+              <p className="text-[14px] font-[700] text-[#0F1012]">Swap now</p>
+            </button>
           </div>
         </div>
 

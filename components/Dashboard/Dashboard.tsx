@@ -213,26 +213,30 @@ const Dashboard: React.FC<QRCodeBoxProps> = ({ value }) => {
               : "User"}
           </p>
         </div>
-        <div
-          className="flex pl-[15px] bg-[#342827] h-[68px] w-[1224px]  items-center gap-2 mb-6 "
-          style={{
-            borderLeft: "2px solid #FE857D",
-            borderRadius: "0px 12px 12px 0px",
-            padding: "16px 32px 16px 8px",
-          }}
-        >
-          <Image src={icon_i} alt="i" sizes="24px" />
-          <p className="text-[14px] ml-[20px] font-[500px] text-[#FCFCFC]">
-            Complete KYC and enjoy access to all features available on the app.
-          </p>
-          <button
-            className="text-[14px] w-[127px] h-[33px]  text-center ml-[25px] text-[#4DF2BE] font-[700] bg-[#2D2D2D] border border-[#222] rounded-full"
-            onClick={toggleVerifyModal}
+
+        {!clientUser?.kycVerified && (
+          <div
+            className="flex pl-[15px] bg-[#342827] h-[68px] w-[1224px]  items-center gap-2 mb-6 "
+            style={{
+              borderLeft: "2px solid #FE857D",
+              borderRadius: "0px 12px 12px 0px",
+              padding: "16px 32px 16px 8px",
+            }}
           >
-            Complete KYC
-          </button>
-        </div>
-        cl
+            <Image src={icon_i} alt="i" sizes="24px" />
+            <p className="text-[14px] ml-[20px] font-[500px] text-[#FCFCFC]">
+              Complete KYC and enjoy access to all features available on the
+              app.
+            </p>
+            <button
+              className="text-[14px] w-[127px] h-[33px]  text-center ml-[25px] text-[#4DF2BE] font-[700] bg-[#2D2D2D] border border-[#222] rounded-full"
+              onClick={toggleVerifyModal}
+            >
+              Complete KYC
+            </button>
+          </div>
+        )}
+
         {/* Verification Modal */}
         {showVerifyModal && (
           <div
@@ -309,6 +313,7 @@ const Dashboard: React.FC<QRCodeBoxProps> = ({ value }) => {
           </div>
         )}
         {/* How It Works Modal */}
+
         {showHowModal && (
           <div
             className="fixed inset-0 bg-black bg-opacity-50 mt-[22%] ml-[10%] flex items-center justify-center z-[1000]"
@@ -364,6 +369,7 @@ const Dashboard: React.FC<QRCodeBoxProps> = ({ value }) => {
           </div>
         )}
         {/* Balance Cards */}
+
         <div className="flex md:flex-row justify-between pr-[30px] mt-[5px]">
           {/*left_side */}
           <div
@@ -730,7 +736,9 @@ const Dashboard: React.FC<QRCodeBoxProps> = ({ value }) => {
                 style={{ padding: "5px 10px" }}
                 onClick={() => router.push("/swap")}
               >
-                <p className="pl-[10px]"><Image src={Swap} alt="swap"/></p>
+                <p className="pl-[10px]">
+                  <Image src={Swap} alt="swap" />
+                </p>
                 <p className="px-4 py-1 ml-[10px]   rounded-full font-[700] text-[14px]">
                   Swap
                 </p>
