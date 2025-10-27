@@ -5,7 +5,7 @@ import Image from "next/image";
 import Arrow from "../../../public/Assets/Icons/arrow.svg";
 import { useRouter } from "next/navigation";
 
-const UPDATE_PHONE_URL = "https://evolve2p-backend.onrender.com/api/auth/update-phone"; 
+const UPDATE_PHONE_URL = "https://evolve2p-backend.onrender.com/api/update-user"; 
 // ✅ Change ONLY if backend says different
 
 const UpdatePhone = () => {
