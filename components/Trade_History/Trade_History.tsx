@@ -274,7 +274,7 @@ const Trade_History: React.FC = () => {
                         <td className="py-[12px] text-[#4DF2BE]">{trade.counterpart}</td>
                         <td className="py-[12px] text-[#C7C7C7]">{trade.date}</td>
                         <td>
-                          <span className="px-3 py-[2px_8px] bg-[#4DF2BE33] text-[#4DF2BE] rounded-full text-[12px]">
+                          <span className="px-3 p-[2px_8px] bg-[#4DF2BE33] text-[#4DF2BE] rounded-full text-[12px]">
                             {trade.status}
                           </span>
                         </td>
