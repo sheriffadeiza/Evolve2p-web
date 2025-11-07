@@ -59,9 +59,9 @@ const DashboardTransactions = () => {
   const recentTransactions = filteredTransactions.slice(0, 10);
 
   return (
-    <div className="w-[913px] h-[722px]">
+    <div className="w-full lg:w-[913px] h-[722px]  sm:mt-[4%] mt-[34%]  md:mt-[0px]">
       {/* Header */}
-      <div className="flex items-center justify-between w-[900px] h-[24px] rounded-[12px]">
+      <div className="flex items-center justify-between w-full lg:w-[900px] h-[24px] rounded-[12px] mb-[20px] ">
         <p className="text-[16px] font-[500] text-[#8F8F8F]">Transactions</p>
         <div className="flex items-center space-x-[10px]">
           <Link href="/transactions" className="flex items-center">
@@ -139,7 +139,7 @@ const DashboardTransactions = () => {
         </table>
       ) : (
         // 👇 placeholder if no transactions
-        <div className="flex-1 flex flex-col items-center mt-[15%] justify-center">
+        <div className=" flex flex-col items-center lg:mt-[15%] justify-center border-0 border-red-500">
           <Image src={G19} alt="group19" />
           <p className="text-[14px] font-[400] text-[#8F8F8F]">
             Your 10 most recent transactions will appear here
@@ -148,7 +148,7 @@ const DashboardTransactions = () => {
       )}
 
       {/* Divider */}
-      <div className="w-[153.8%] ml-[-10%] h-[1px] bg-[#fff] mt-[40%] opacity-20 my-8"></div>
+      <div className="w-[108%] sm:w-[104.6%] h-[1px]  ml-[-12px] bg-[#fff] mt-[364%] opacity-20 my-8 sm:mt-[172%]  md:mt-[138%] md:h-[1px] md:w-[110%] md:ml-[-36px]  lg:w-[153.8%] xl:w-[152%] xl:mt-[60%] xl:ml-[-68px] "></div>
     </div>
   );
 };
