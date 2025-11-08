@@ -511,12 +511,14 @@ const Wallet: React.FC<QRCodeBoxProps> = ({ value }) => {
                 </div>
               )}
 
-               <div
+              <div
                 className="flex w-[122px] h-[40px]  items-center bg-[#2D2D2D] text-[#4DF2BE] space-x-[10px] mt-4 rounded-full"
                 style={{ padding: "5px 10px" }}
                 onClick={() => router.push("/swap")}
               >
-                <p className="pl-[10px]"><Image src={Swap} alt="swap"/></p>
+                <p className="pl-[10px]">
+                  <Image src={Swap} alt="swap" />
+                </p>
                 <p className="px-4 py-1 ml-[10px]   rounded-full font-[700] text-[14px]">
                   Swap
                 </p>
@@ -570,12 +572,10 @@ const Wallet: React.FC<QRCodeBoxProps> = ({ value }) => {
             </div>
 
             <div>
-             
               <p className="ml-[120%]">Balance</p>
             </div>
 
             <div>
-             
               <p className="ml-[520%] whitespace-nowrap">In USD</p>
             </div>
           </div>
