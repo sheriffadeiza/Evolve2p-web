@@ -11,11 +11,14 @@ const Lsecpinbd: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string>("");
   const [success, setSuccess] = useState<string>("");
-  const [userData, setUserData] = useState<any>(null);
+  const [userData, setUserData] = useState<{
+    accessToken: string;
+    userData: any;
+  } | null>(null);
 
   const router = useRouter();
 
-  // ✅ Safely load from localStorage only on client
+  // ✅ Load UserData from localStorage on client-side
   useEffect(() => {
     try {
       const stored = localStorage.getItem("UserData");
@@ -36,6 +39,8 @@ const Lsecpinbd: React.FC = () => {
     newPin[idx] = val;
     setPin(newPin);
     setError("");
+
+    // Focus next input
     if (val && idx < 3) {
       document.getElementById(`pin-${idx + 1}`)?.focus();
     }
@@ -68,10 +73,10 @@ const Lsecpinbd: React.FC = () => {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${userData?.accessToken}`,
+          Authorization: `Bearer ${userData.accessToken}`,
         },
         body: JSON.stringify({
-          email: userData?.userData?.email,
+          email: userData.userData?.email,
           pin: tempPin,
         }),
       });
@@ -85,10 +90,8 @@ const Lsecpinbd: React.FC = () => {
       }
 
       setSuccess("PIN verified!");
-      setTimeout(() => {
-        router.push("/Loader");
-      }, 1000);
-    } catch (err: any) {
+      setTimeout(() => router.push("/Loader"), 1000);
+    } catch (err) {
       setError("Network error. Please try again.");
     } finally {
       setLoading(false);
@@ -137,7 +140,7 @@ const Lsecpinbd: React.FC = () => {
 
       {isPinComplete && (
         <button
-          className="w-[300px] h-[48px] mt-[30px] bg-[#4DF2BE] text-[#0F1012] rounded-[100px] font-[700] disabled:opacity-50"
+          className="w-[300px] h-[48px] ml-[12%] mt-[30px] border-none bg-[#4DF2BE] text-[#0F1012] rounded-[100px] font-[700] disabled:opacity-50"
           onClick={handleSubmit}
           disabled={loading}
         >
@@ -146,7 +149,7 @@ const Lsecpinbd: React.FC = () => {
       )}
 
       <div
-        className="text-[14px] mt-[70px] ml-[-20%] font-[700] text-center text-[#FCFCFC] hover:underline cursor-pointer"
+        className="text-[14px] mt-[70px] ml-[-23%] font-[700] text-center text-[#FCFCFC] hover:underline cursor-pointer"
         onClick={() => alert("Forgot PIN functionality coming soon")}
       >
         Forgot PIN

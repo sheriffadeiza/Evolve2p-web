@@ -69,7 +69,7 @@ const Wallet: React.FC<QRCodeBoxProps> = ({ value }) => {
 
   const [isTransOpen, setIsTransOpen] = useState(false);
 
-  const balance = 1000; // 🔁 This is the static amount in USD
+  const balance = 0; // 🔁 This is the static amount in USD
 
   const handleSelect = (currency: Currency) => {
     setSelectedCurrency(currency);

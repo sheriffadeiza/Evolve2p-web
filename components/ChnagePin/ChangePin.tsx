@@ -26,13 +26,48 @@ const UpdatePin: React.FC = () => {
     }
   };
 
-  const handleContinue = () => {
+  const handleContinue = async () => {
+    const pin = inputRefs.current.map((input) => input.value).join("");
+    if (pin.length !== 4) {
+      alert("Please enter your full 4-digit PIN");
+      return;
+    }
+
+    const email = localStorage.getItem("userEmail"); // stored earlier in signup/login
+    if (!email) {
+      alert("Email not found. Please log in again.");
+      return;
+    }
+
     setIsLoading(true);
-    // Simulate an async action before routing
-    setTimeout(() => {
-      router.push("/change-pin/newpin");
+
+    try {
+      const res = await fetch("https://evolve2p-backend.onrender.com/api/check-pin", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ pin, email }),
+      });
+
+      if (!res.ok) {
+        throw new Error("Server error");
+      }
+
+      const data = await res.json();
+
+      if (data.success || data.message === "PIN verified successfully") {
+        alert("✅ PIN verified successfully!");
+        router.push("/change-pin/newpin");
+      } else {
+        alert(data.message || "❌ Invalid PIN. Please try again.");
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Unexpected server response. Please try again later.");
+    } finally {
       setIsLoading(false);
-    }, 1500);
+    }
   };
 
   return (

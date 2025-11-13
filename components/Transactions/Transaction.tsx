@@ -67,7 +67,7 @@ const Transaction = () => {
   };
 
   if (loading)
-    return <p className="text-[#ffffff] p-10">Loading transactions...</p>;
+    return <p className="text-[#ffffff]  p-10">Loading transactions...</p>;
 
   return (
     <main className="min-h-screen bg-[#0F1012] pr-[10px] mt-[30px] pl-[30px] text-white md:p-8">
@@ -175,7 +175,7 @@ const Transaction = () => {
                 <tr>
                   <td
                     colSpan={6}
-                    className="text-center pt-[20px] py-6 text-[#ffffff]"
+                    className="text-center mt-[50%] pt-[50px] py-6 text-[#ffffff]"
                   >
                     No transactions found
                   </td>

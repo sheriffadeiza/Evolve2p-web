@@ -23,27 +23,30 @@ const Loginbd: React.FC = () => {
       setError("You must provide an email and a password");
       return;
     }
-   
+
     setLoading(true);
 
     try {
-      const LogiResponse = await fetch(BASE_URL + "auth/login", {
+      const loginResponse = await fetch(BASE_URL + "auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password }),
       });
 
-      const data = await LogiResponse.json();
+      const data = await loginResponse.json();
 
       if (data?.error) {
         alert(data?.message);
         return;
       }
 
-      // Always use accessToken for consistency
-      let token = data?.accessToken;
+      const token = data?.accessToken;
 
-      const CheckTokenResponse = await fetch(BASE_URL + "check-token", {
+      // Immediately save fresh token
+      localStorage.setItem("accessToken", token);
+
+      // Verify token validity
+      const checkTokenResponse = await fetch(BASE_URL + "check-token", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -51,7 +54,7 @@ const Loginbd: React.FC = () => {
         },
       });
 
-      const checkTokenData = await CheckTokenResponse.json();
+      const checkTokenData = await checkTokenResponse.json();
 
       if (checkTokenData?.success) {
         const userResponse = await fetch(BASE_URL + "get-user", {
@@ -65,14 +68,22 @@ const Loginbd: React.FC = () => {
         const userData = await userResponse.json();
 
         if (userData?.success) {
+          // Save combined token and user info
           localStorage.setItem(
             "UserData",
-            JSON.stringify({ accessToken: token, userData: userData?.user })
+            JSON.stringify({
+              accessToken: token,
+              userData: userData?.user,
+            })
           );
           router.push("/Logins/Lsecpin");
+        } else {
+          setError("Unable to fetch user data. Please try again.");
         }
+      } else {
+        setError("Token validation failed. Please try logging in again.");
       }
-    } catch (err: any) {
+    } catch (err) {
       setError("Network error. Please try again.");
     } finally {
       setLoading(false);

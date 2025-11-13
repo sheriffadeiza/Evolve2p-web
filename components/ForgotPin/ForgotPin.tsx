@@ -1,4 +1,4 @@
-'use client';
+"use client";
 
 import React, { useState } from "react";
 import Image from "next/image";
@@ -11,82 +11,34 @@ import Lessthan from "../../public/Assets/Evolve2p_lessthan/Makretplace/arrow-le
 
 const ForgotPin: React.FC = () => {
   const router = useRouter();
-  const [email, setEmail] = useState("");
-  const [error, setError] = useState("");
   const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
-  const handleContinue = async () => {
-    if (!password) return;
-    setIsLoading(true);
-    setTimeout(() => {
-      setIsLoading(false);
-      router.push("/change-pin/fnewpin"); // proceed to the "Enter new pin" page
-    }, 1000);
+  const handleForgotPassword = () => {
+    router.push("/reset-password");
   };
 
-  const handleForgotPassword = () => {
-    // If user explicitly typed an email in state (not present in UI currently), prefer it
-    let emailToUse = email?.trim();
+  const handleContinue = async () => {
+    if (!password) return alert("Please enter your password before continuing.");
 
-    // If no email typed, try several places in localStorage
-    if (!emailToUse && typeof window !== "undefined") {
-      // 1) reset_email (maybe previously stored)
-      const resetEmail = localStorage.getItem("reset_email");
-      if (resetEmail) emailToUse = resetEmail;
-
-      // 2) UserData (could be { userData: { email, ... } } or { email })
-      if (!emailToUse) {
-        const stored = localStorage.getItem("UserData");
-        if (stored) {
-          try {
-            const parsed = JSON.parse(stored);
-            // check several possible shapes
-            emailToUse =
-              emailToUse ||
-              parsed?.userData?.email ||
-              parsed?.email ||
-              parsed?.user?.email ||
-              parsed?.userData?.user?.email;
-          } catch {
-            // ignore parse error
-          }
-        }
-      }
-
-      // 3) userProfile
-      if (!emailToUse) {
-        const userProfile = localStorage.getItem("userProfile");
-        if (userProfile) {
-          try {
-            const parsed = JSON.parse(userProfile);
-            emailToUse = emailToUse || parsed?.email || parsed?.user?.email;
-          } catch {
-            // ignore
-          }
-        }
-      }
-    }
-
-    if (!emailToUse) {
-      // no email anywhere — inform the user and redirect to login
-      setError("No email found. Please log in.");
-      setTimeout(() => {
-        router.push("/Logins/login");
-      }, 1500);
+    try {
+      // ✅ Save password in localStorage
+      localStorage.setItem("reset_password", password);
+    } catch (error) {
+      console.error("Error saving password:", error);
+      alert("Unable to save password. Please try again.");
       return;
     }
 
-    // store the email to reset_email so Resetp page can use it
-    try {
-      localStorage.setItem("reset_email", emailToUse);
-    } catch {
-      // ignore localStorage write errors
-    }
+    setIsLoading(true);
 
-    // navigate to the reset page
-    router.push("/Logins/Resetp");
+    // Delay for smoother UX and ensure localStorage saves before routing
+    setTimeout(() => {
+      setIsLoading(false);
+      router.push("/change-pin/fnewpin"); // proceed to the next page
+    }, 800);
   };
 
   return (
@@ -143,7 +95,7 @@ const ForgotPin: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute top-[58%] border-0 right-2 ml-[90%] bg-[#222222] -translate-y-1/2 text-[#DBDBDB]"
+                    className="absolute top-[45%] border-0 right-2 ml-[90%] bg-[#222222] -translate-y-1/2 text-[#DBDBDB]"
                     disabled={isLoading}
                   >
                     <Image
@@ -153,23 +105,20 @@ const ForgotPin: React.FC = () => {
                       height={20}
                     />
                   </button>
+
+                  <div
+                    onClick={handleForgotPassword}
+                    className="ml-[70%] mt-[10px] text-[14px] font-[700] text-[#FCFCFC] hover:underline cursor-pointer"
+                  >
+                    Forgot password
+                  </div>
+
+                  {/* show error message (if any) */}
+                  {error && (
+                    <div className="text-[#FE857D] mt-3 font-[600]">{error}</div>
+                  )}
                 </div>
               </div>
-
-              {/* Forgot Password */}
-              <div
-                onClick={handleForgotPassword}
-                className="ml-[45%] mt-[10px] text-[14px] font-[700] text-[#FCFCFC] hover:underline cursor-pointer"
-              >
-                Forgot password
-              </div>
-
-              {/* show error message (if any) */}
-              {error && (
-                <div className="text-[#FE857D] mt-3 font-[600]">
-                  {error}
-                </div>
-              )}
 
               {/* Continue Button */}
               <button

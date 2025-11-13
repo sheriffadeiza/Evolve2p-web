@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 
 import E2p_logo from "../../public/Assets/Evolve2p_E2p/Profile/Logo.svg";
 import Mark_green from "../../public/Assets/Evolve2p_mark/elements.svg";
@@ -23,6 +23,7 @@ const Settings = () => {
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [clientUser, setClientUser] = useState<{ username?: string } | null>(null);
   const pathname = usePathname();
+  const router = useRouter();
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -41,6 +42,20 @@ const Settings = () => {
         ? clientUser.username
         : `@${clientUser.username}`
       : "@User";
+
+  // ✅ Logout handler
+  const handleLogout = () => {
+    try {
+      localStorage.removeItem("UserData");
+      localStorage.removeItem("accessToken");
+      localStorage.removeItem("userEmail");
+      localStorage.removeItem("userPassword");
+      setShowLogoutModal(false);
+      router.push("/login"); // redirect to login
+    } catch (err) {
+      console.error("Logout failed:", err);
+    }
+  };
 
   return (
     <div>
@@ -99,7 +114,9 @@ const Settings = () => {
               <Link href="/accountL" className="no-underline">
                 <div
                   className={`h-[45px] border-b-[1px] border-b-[#3A3A3A] rounded-t-[8px] p-[8px_12px] cursor-pointer ${
-                    pathname.startsWith("/accountL") ? "bg-[#20342E]" : "bg-[#2D2D2D]"
+                    pathname.startsWith("/accountL")
+                      ? "bg-[#20342E]"
+                      : "bg-[#2D2D2D]"
                   }`}
                 >
                   <div className="flex items-center justify-between">
@@ -304,9 +321,9 @@ const Settings = () => {
         </div>
       </div>
 
-      {/* Logout Modal */}
+      {/* ✅ Logout Modal */}
       {showLogoutModal && (
-        <div className="fixed inset-0 top-[150px] ml-[40%] flex items-center justify-center bg-black bg-opacity-50 z-50">
+        <div className="fixed inset-0 top-[80px] ml-[40%] flex items-center justify-center bg-black bg-opacity-50 z-50">
           <div className="bg-[#0F1012] rounded-[16px] w-[420px] h-[485px] text-center text-white shadow-lg">
             <div className="flex items-center h-[108px] justify-center p-[36px_126px_16px_126px]">
               <Image
@@ -328,7 +345,7 @@ const Settings = () => {
 
             <div className="h-[148px] space-y-[10px] p-[8px_0_32px_0]">
               <button
-                onClick={() => setShowLogoutModal(false)}
+                onClick={handleLogout} // ✅ logs out and redirects
                 className="w-[380px] h-[48px] bg-[#FE857D] text-[14px] border-[1px] border-[#FE857D] rounded-full text-[#0F1012] font-[700] mb-3"
               >
                 Log out

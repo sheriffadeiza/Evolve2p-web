@@ -12,6 +12,7 @@ import Currency from "../../public/Assets/Evolve2p_Currency/Profile/money-04.svg
 import Barrow from "../../public/Assets/Evolve2p_Barrow/arrow-down-01.svg";
 import Mode from "../../public/Assets/Evolve2p_mode/Profile/elements.svg";
 import Lang from "../../public/Assets/Evolve2p_Lang/Profile/globe.svg";
+import Times from "../../public/Assets/Evolve2p_times/Icon container.png";
 import Delete from "../../public/Assets/Evolve2p_Delete/Profile/elements.svg";
 import Footer from "../../components/Footer/Footer";
 
@@ -40,19 +41,26 @@ const Profile = () => {
   const [selectedCountry, setSelectedCountry] = useState<Country | null>(null);
   const [openCountry, setOpenCountry] = useState(false);
   const [loadingCountries, setLoadingCountries] = useState(false);
-   const router = useRouter();
+
+  const router = useRouter();
 
   // Preferred currency states
   const [currencyList, setCurrencyList] = useState<CurrencyItem[]>([]);
-  const [selectedCurrency, setSelectedCurrency] = useState<CurrencyItem | null>(null);
+  const [selectedCurrency, setSelectedCurrency] = useState<CurrencyItem | null>(
+    null
+  );
   const [openCurrency, setOpenCurrency] = useState(false);
   const [currencySearch, setCurrencySearch] = useState("");
+    const toggleFunnel = () => setOpenCurrency((prev) => !prev);
+
 
   // phone state
   const [phone, setPhone] = useState<string>("8100000000");
 
   const days = Array.from({ length: 31 }, (_, i) => i + 1);
-  const months = Array.from({ length: 12 }, (_, i) => (i + 1).toString().padStart(2, "0"));
+  const months = Array.from({ length: 12 }, (_, i) =>
+    (i + 1).toString().padStart(2, "0")
+  );
   const currentYear = new Date().getFullYear();
   const years = Array.from({ length: 100 }, (_, i) => currentYear - i);
 
@@ -78,13 +86,83 @@ const Profile = () => {
   const [openLang, setOpenLang] = useState(false);
   const [selectedLang, setSelectedLang] = useState("English");
 
-  const Toggle = ({ enabled, onToggle }: { enabled: boolean; onToggle: () => void }) => {
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  // --------------------------
+  // 🧩 DELETE ACCOUNT FUNCTION
+  // --------------------------
+ const handleDeleteAccount = async () => {
+  const accessToken = localStorage.getItem("accessToken");
+
+  if (!accessToken) {
+    alert("No access token found. Please log in again.");
+    return;
+  }
+
+  // 🟡 Step 1: Confirm user action
+  const confirmDelete = window.confirm(
+    "Are you sure you want to delete your account? This action cannot be undone."
+  );
+  if (!confirmDelete) return;
+
+  try {
+    setIsDeleting(true);
+
+    // 🟡 Step 2: Make DELETE request
+    const res = await fetch(
+      "https://evolve2p-backend.onrender.com/api/delete-account",
+      {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+      }
+    );
+
+    // 🟡 Step 3: Handle possible non-JSON response
+    const text = await res.text();
+    let data;
+    try {
+      data = JSON.parse(text);
+    } catch {
+      console.error("⚠️ Non-JSON server response:", text);
+      alert("Unexpected server response. Please try again later.");
+      return;
+    }
+
+    // 🟡 Step 4: Check if successful
+    if (!res.ok) {
+      console.error("❌ Backend error:", data);
+      alert(data.message || "Failed to delete account. Please try again.");
+      return;
+    }
+
+    // 🟢 Step 5: Success
+    alert("✅ Your account has been deleted successfully.");
+    localStorage.clear();
+    window.location.href = "/signup";
+  } catch (error: any) {
+    console.error("❌ Error deleting account:", error);
+    alert(error.message || "Failed to delete account. Please try again.");
+  } finally {
+    setIsDeleting(false);
+  }
+};
+
+
+
+  const Toggle = ({
+    enabled,
+    onToggle,
+  }: {
+    enabled: boolean;
+    onToggle: () => void;
+  }) => {
     return (
       <div
         onClick={onToggle}
         className={`w-[40px] h-[20px] rounded-full p-[2px] flex items-center  cursor-pointer transition-colors duration-300
-          ${enabled ? "bg-[#4DF2BE]" : "bg-[#8F8F8F]"}`
-        }
+          ${enabled ? "bg-[#4DF2BE]" : "bg-[#8F8F8F]"}`}
       >
         <div
           className={`w-[15px] h-[15px] rounded-full transition-transform duration-300
@@ -124,7 +202,10 @@ const Profile = () => {
               dial = prefixOverrides[code];
             } else if (c.idd && c.idd.root) {
               // some countries have suffixes array, take first if present
-              const suffix = Array.isArray(c.idd.suffixes) && c.idd.suffixes.length > 0 ? c.idd.suffixes[0] : "";
+              const suffix =
+                Array.isArray(c.idd.suffixes) && c.idd.suffixes.length > 0
+                  ? c.idd.suffixes[0]
+                  : "";
               dial = `${c.idd.root}${suffix}`;
             }
             return {
@@ -157,7 +238,9 @@ const Profile = () => {
               }
             }
           });
-          const arr = Object.values(currencyMap).sort((a, b) => a.name.localeCompare(b.name));
+          const arr = Object.values(currencyMap).sort((a, b) =>
+            a.name.localeCompare(b.name)
+          );
           setCurrencyList(arr);
 
           // Default currency: from Nigeria if available
@@ -192,11 +275,15 @@ const Profile = () => {
     <main className="min-h-screen  bg-[#0F1012] pr-[10px] mt-[30px] pl-[30px] text-white md:p-8">
       <div className="max-w-7xl mx-auto">
         <Nav />
-        <div className="flex  items-center mt-[-100px] mr-[40px]">
+        <div className="flex  items-center mt-[-80px] mr-[40px]">
+
+          <div className="mt-[30px]">
           <Settings />
 
+          </div>
+
           {/* Right side */}
-          <div className="w-[809px]  mt-[108px] bg-[#1A1A1A]   gap-[20px] p-[24px_64px]">
+          <div className="w-[809px]  mt-[100px] bg-[#1A1A1A]   gap-[20px] p-[24px_64px]">
             <div className="flex w-[681px] items-center justify-between ">
               <p className="text-[24px] font-[700] text-[#FFFFFF]">Profile</p>
 
@@ -213,7 +300,9 @@ const Profile = () => {
 
             <form className="space-y-4 w-[681px] mt-[15px]">
               <div className="flex flex-col">
-                <label className="text-[14px] font-[500] text-[#C7C7C7]">Email</label>
+                <label className="text-[14px] font-[500] text-[#C7C7C7]">
+                  Email
+                </label>
                 <input
                   type="email"
                   className="h-[56px] bg-[#222222]  mt-1 p-[8px_8px_8px_16px] rounded-[8px] text-[14px] font-[400] border-none text-[#C7C7C7]"
@@ -222,7 +311,9 @@ const Profile = () => {
               </div>
 
               <div className="flex flex-col  mt-[20px]">
-                <label className="text-[14px] font-[500] text-[#C7C7C7]">Username</label>
+                <label className="text-[14px] font-[500] text-[#C7C7C7]">
+                  Username
+                </label>
                 <div className="relative  ">
                   <span className="absolute  left-4 top-1/2 -translate-y-1/2 pl-[15px] text-[#C7C7C7]  text-[16px]">
                     @
@@ -244,9 +335,16 @@ const Profile = () => {
                 {/* phone number */}
                 <div className="flex flex-col w-[330.5] ">
                   <div className="flex items-center    justify-between">
-                    <p className="text-[14px] font-[500] text-[#C7C7C7]">Phone number</p>
+                    <p className="text-[14px] font-[500] text-[#C7C7C7]">
+                      Phone number
+                    </p>
 
-                    <p className="text-[14px] font-[700] text-[#4DF2BE] cursor-pointer" onClick={() => router.push("/profile/updatephone")}>Verify</p>
+                    <p
+                      className="text-[14px] font-[700] text-[#4DF2BE] cursor-pointer"
+                      onClick={() => router.push("/profile/updatephone")}
+                    >
+                      Verify
+                    </p>
                   </div>
 
                   <div className="flex items-center mt-2">
@@ -266,7 +364,12 @@ const Profile = () => {
                         placeholder="Phone number"
                       />
                       <span className="flex items-center absolute right-[20px] top-1/2 -translate-y-1/2 ">
-                        <Image src={Yellow_i} alt="yellowi" width={24} height={24} />
+                        <Image
+                          src={Yellow_i}
+                          alt="yellowi"
+                          width={24}
+                          height={24}
+                        />
                       </span>
                     </div>
                   </div>
@@ -274,7 +377,9 @@ const Profile = () => {
 
                 {/* country */}
                 <div className="flex flex-col ml-[20px] w-[330.5px]">
-                  <p className="text-[14px] font-[500] text-[#C7C7C7]">Country</p>
+                  <p className="text-[14px] font-[500] text-[#C7C7C7]">
+                    Country
+                  </p>
                   <div className="flex items-center mt-2">
                     <div className="flex items-center relative w-[330px]">
                       {selectedCountry && (
@@ -287,7 +392,7 @@ const Profile = () => {
                             alt={selectedCountry.name}
                             width={24}
                             height={16}
-                            className="rounded-sm mr-2"
+                            className="rounded-sm ml-[50px]"
                           />
                         </div>
                       )}
@@ -302,7 +407,9 @@ const Profile = () => {
                       {openCountry && (
                         <div className="absolute top-[60px] left-0 bg-[#222222] rounded-[8px] shadow-lg max-h-[200px] overflow-y-auto z-50">
                           {loadingCountries && (
-                            <div className="p-3 text-[#C7C7C7] text-[14px]">Loading...</div>
+                            <div className="p-3 text-[#C7C7C7] text-[14px]">
+                              Loading...
+                            </div>
                           )}
                           {!loadingCountries &&
                             countries.map((ct) => (
@@ -315,11 +422,13 @@ const Profile = () => {
                                   const codes = Object.keys(ct.currencies);
                                   if (codes.length > 0) {
                                     const c0 = codes[0];
-                                    const found = currencyList.find((ci) => ci.code === c0);
+                                    const found = currencyList.find(
+                                      (ci) => ci.code === c0
+                                    );
                                     if (found) setSelectedCurrency(found);
                                   }
                                 }}
-                                className="flex items-center px-3 py-2 hover:bg-[#333333] cursor-pointer"
+                                className="flex items-center ml-[20px] gap-[20px] mb-[20px] px-3 py-2 hover:bg-[#333333] cursor-pointer"
                               >
                                 <img
                                   src={ct.flag}
@@ -359,7 +468,9 @@ const Profile = () => {
                   </div>
 
                   <span className="ml-[40px] text-[#C7C7C7] text-[14px] font-[400]">
-                    {day && month && year ? `${day}/${month}/${year}` : "DD/MM/YYYY"}
+                    {day && month && year
+                      ? `${day}/${month}/${year}`
+                      : "DD/MM/YYYY"}
                   </span>
 
                   {/* single arrow at the far right */}
@@ -436,18 +547,39 @@ const Profile = () => {
                         <p className="text-[12px] font-[500] text-[#DBDBDB]">
                           {selectedCurrency?.code}
                         </p>
-                        <Image src={Barrow} alt="arrow-down" className="ml-[25px] w-[15px]" />
+                        <Image
+                          src={Barrow}
+                          alt="arrow-down"
+                          className="ml-[25px] w-[15px]"
+                        />
                       </div>
                     </div>
                     {openCurrency && (
-                      <div className="absolute top-[50px] right-0 bg-[#222222] rounded-[8px] shadow-lg w-[300px] max-h-[300px] overflow-y-auto z-50">
-                        <div className="p-3 border-b border-[#333333]">
+                      <div className="absolute top-[50px] p-[0_32px] w-[560px] h-[798px] right-[10px] bg-[#1A1A1A] rounded-[8px] shadow-lg w-[300px] max-h-[300px] overflow-y-auto z-50">
+                        <div className="">
+                         
+                         <div className="mt-[30px]">
+                          <p className="text-[16px] font-[700] text-[#FFFFFF]">Selected prefered currency</p>
+
+                            {" "}
+                            <p>
+                                            <Image
+                                              src={Times}
+                                              alt={"times"}
+                                              width={20}
+                                              height={20}
+                                              className="absolute top-[20px] w-[32px] h-[32px]  ml-[80%] cursor-pointer"
+                                              onClick={toggleFunnel}
+                                            />
+                                          </p>
+                         </div>
+
                           <input
                             type="text"
                             placeholder="Search currency..."
                             value={currencySearch}
                             onChange={(e) => setCurrencySearch(e.target.value)}
-                            className="w-full h-[36px] px-3 bg-[#2D2D2D] text-white rounded-[8px] outline-none"
+                            className="w-[520px]  h-[56px] mt-[50px] pl-[30px] bg-[#2D2D2D] border-none  text-white rounded-[8px] outline-none"
                           />
                         </div>
                         {filteredCurrencies.map((ci) => (
@@ -457,19 +589,21 @@ const Profile = () => {
                               setSelectedCurrency(ci);
                               setOpenCurrency(false);
                             }}
-                            className="flex items-center justify-between px-4 py-3 hover:bg-[#333333] cursor-pointer"
+                            className="flex items-center  justify-between  hover:bg-[#333333] cursor-pointer"
                           >
-                            <div className="flex items-center gap-3">
+                            <div className="flex border-none  items-center mt-[20px]  ml-[20px] gap-[10px]">
                               <img
                                 src={ci.flag}
                                 alt={ci.name}
-                                width={24}
-                                height={16}
-                                className="rounded-sm"
+                                width={28}
+                                height={28}
+                                className="rounded-full"
                               />
-                              <span className="text-[#DBDBDB] text-[14px]">{ci.name}</span>
+                              <span className="text-[#DBDBDB] text-[14px]">
+                                {ci.name}
+                              </span>
                             </div>
-                            <span className="text-[#B5B5B5] text-[14px] font-[500]">
+                            <span className="text-[#4DF2BE] text-[14px] font-[500]">
                               {ci.code}
                             </span>
                           </div>
@@ -481,7 +615,9 @@ const Profile = () => {
                   <div className="flex items-center justify-between h-[44px] p-[8px_12px] bg-[#2D2D2D] rounded-[8px]">
                     <div className="flex items-center gap-[10px] ">
                       <Image src={Mode} alt="mode" />
-                      <p className="text-[14px] font-[500] text-[#DBDBDB]">Dark mode</p>
+                      <p className="text-[14px] font-[500] text-[#DBDBDB]">
+                        Dark mode
+                      </p>
                     </div>
 
                     <div className="space-y-[10px] mb-6">
@@ -497,14 +633,18 @@ const Profile = () => {
                   <div className="flex items-center justify-between h-[44px] p-[8px_15px] bg-[#2D2D2D] rounded-[8px]">
                     <div className="flex items-center gap-[10px] ">
                       <Image src={Lang} alt="lang" />
-                      <p className="text-[14px] font-[500] text-[#DBDBDB]">App Language</p>
+                      <p className="text-[14px] font-[500] text-[#DBDBDB]">
+                        App Language
+                      </p>
                     </div>
 
                     <div
                       onClick={() => setOpenLang(!openLang)}
                       className="flex items-center w-[64px] h-[22px] bg-[#3A3A3A] p-[2px_8px] rounded-[16px] cursor-pointer"
                     >
-                      <p className="text-[12px] font-[500] text-[#DBDBDB] truncate">{selectedLang}</p>
+                      <p className="text-[12px] font-[500] text-[#DBDBDB] truncate">
+                        {selectedLang}
+                      </p>
                       <Image
                         src={Barrow}
                         alt="arrow"
@@ -526,7 +666,9 @@ const Profile = () => {
                                 setOpenLang(false);
                               }}
                               className={`px-4 py-2 flex items-center justify-between cursor-pointer hover:bg-[#2D2D2D] text-[14px] font-[500] ${
-                                selectedLang === lang ? "text-[#4DF2BE]" : "text-[#DBDBDB]"
+                                selectedLang === lang
+                                  ? "text-[#4DF2BE]"
+                                  : "text-[#DBDBDB]"
                               }`}
                             >
                               {lang}
@@ -549,18 +691,29 @@ const Profile = () => {
               </div>
             </form>
 
-            <div className="w-[681px] h-[1px] bg-[#3A3A3A] mt-[20px]" />
-
             <div className="w-[681px] ">
               <p className="text-[14px] font-[500] text-[#DBDBDB]">
-                Deleting your account is permanent and cannot be undone. All your data, including transaction
-                history and saved preferences, will be erased. You will no longer have access to your account.
+                {" "}
+                Deleting your account is permanent and cannot be undone. All
+                your data, including transaction history and saved preferences,
+                will be erased. You will no longer have access to your account.{" "}
               </p>
 
-              <div className="flex items-center justify-center gap-[10px] w-[154px] h-[36px] bg-[#222222] p-[8px_14px] rounded-full mt-4">
+              <button
+                onClick={handleDeleteAccount}
+                disabled={isDeleting}
+                className={`flex items-center justify-center gap-[10px] w-[160px] border-none h-[36px] p-[8px_14px] rounded-full mt-4 transition
+    ${
+      isDeleting
+        ? "opacity-50 cursor-not-allowed bg-[#2D2D2D]"
+        : "bg-[#222222] hover:bg-[#2D2D2D]"
+    }`}
+              >
                 <Image src={Delete} alt="delete" />
-                <p className="text-[14px] font-[700] text-[#FE857D]">Delete account</p>
-              </div>
+                <p className="text-[14px] font-[700] text-[#FE857D]">
+                  {isDeleting ? "Deleting..." : "Delete account"}
+                </p>
+              </button>
             </div>
           </div>
         </div>

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useRef, useState } from "react";
+import React, { useRef, useState, useEffect } from "react";
 import Nav from "../../components/NAV/Nav";
 import Settings from "../../components/Settings/Settings";
 import Lessthan from "../../public/Assets/Evolve2p_lessthan/Makretplace/arrow-left-01.svg";
@@ -9,12 +9,32 @@ import Footer from "../../components/Footer/Footer";
 import { useRouter } from "next/navigation";
 import Modalc from "../../public/Assets/Evolve2p_modalC/elements.png";
 
+const CHECK_PIN_ENDPOINT =
+  "https://evolve2p-backend.onrender.com/api/check-pin"; // ✅ make sure this is the correct endpoint
+
 const ConfirmPin: React.FC = () => {
   const router = useRouter();
   const [pin, setPin] = useState<string[]>(["", "", "", ""]);
   const inputsRef = useRef<Array<HTMLInputElement | null>>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [showModal, setShowModal] = useState(false); // 🟢 new modal state
+  const [showModal, setShowModal] = useState(false);
+  const [userEmail, setUserEmail] = useState<string>("");
+
+  // ✅ Load user email from localStorage
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem("UserData");
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        setUserEmail(parsed?.userData?.email || "");
+      } else {
+        alert("Session expired. Please log in again.");
+        router.push("/login");
+      }
+    } catch (err) {
+      console.error("Failed to load user email:", err);
+    }
+  }, [router]);
 
   const handleChange =
     (index: number) => (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -27,7 +47,6 @@ const ConfirmPin: React.FC = () => {
       }
 
       updatePinAt(index, lastChar);
-
       const next = inputsRef.current[index + 1];
       if (next) next.focus();
     };
@@ -65,14 +84,39 @@ const ConfirmPin: React.FC = () => {
   const allFilled = pin.every((digit) => digit !== "");
 
   const handleContinue = async () => {
-    if (!allFilled || isLoading) return;
+    if (!allFilled || isLoading || !userEmail) return;
 
+    const enteredPin = pin.join("");
     setIsLoading(true);
 
-    setTimeout(() => {
+    try {
+      const res = await fetch(CHECK_PIN_ENDPOINT, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: userEmail, pin: enteredPin }),
+      });
+
+      const data = await res.json();
+      console.log("Check-pin response:", data);
+
+      if (!res.ok || !data?.success) {
+        const message =
+          typeof data?.message === "string"
+            ? data.message
+            : data?.message
+            ? JSON.stringify(data.message)
+            : "PIN verification failed. Try again.";
+        alert(message);
+        setPin(["", "", "", ""]);
+      } else {
+        setShowModal(true);
+      }
+    } catch (err) {
+      console.error("Error checking PIN:", err);
+      alert("An unexpected error occurred. Please try again later.");
+    } finally {
       setIsLoading(false);
-      setShowModal(true); // 🟢 show success modal after loading
-    }, 900);
+    }
   };
 
   return (
@@ -168,7 +212,6 @@ const ConfirmPin: React.FC = () => {
 
         {/* Divider */}
         <div className="w-[106%] ml-[-5%] h-[1px] bg-[#fff] mt-[10%] opacity-20 my-8"></div>
-
         <div className="mb-[80px] mt-[30%]">
           <Footer />
         </div>
