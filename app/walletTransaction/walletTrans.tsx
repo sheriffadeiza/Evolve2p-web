@@ -20,10 +20,12 @@ import expiredIcon from "../../public/Assets/Evolve2p_ExpT/elements.svg";
 // placeholder images
 import G19 from "../../public/Assets/Evolve2p_group19/Group 19.svg";
 import R_arrow from "../../public/Assets/Evolve2p_R/arrow-right-02.svg";
-
+import { formatHashOrAddress } from "@/utils";
 
 const WalletTransactions = () => {
   const { filteredTransactions, loading } = useTransaction();
+
+  console.log(filteredTransactions);
 
   const statusColors: Record<string, string> = {
     Processing: "bg-[#23303C] text-[#66B9FF]",
@@ -60,7 +62,7 @@ const WalletTransactions = () => {
   const recentTransactions = filteredTransactions.slice(0, 10);
 
   return (
-     <div className="w-[913px] h-[722px]">
+    <div className="w-[100%] h-[722px]">
       {/* Header */}
       <div className="flex items-center justify-between w-[1224px] h-[338px] rounded-[12px]">
         <p className="text-[16px] font-[500] text-[#8F8F8F]">Transactions</p>
@@ -79,8 +81,8 @@ const WalletTransactions = () => {
             <tr className="text-[#C7C7C7] text-[14px] font-[500]">
               <th className="text-left py-2 pl-4">Type</th>
               <th className="text-left py-2 pl-4">Amount</th>
-              <th className="text-left py-2 pl-4">Asset</th>
-              <th className="text-left py-2 pl-4">Counterparty</th>
+              <th className="text-left py-2 pl-4">fromAddress</th>
+              <th className="text-left py-2 pl-4">toAddress</th>
               <th className="text-left py-2 pl-4">Status</th>
               <th className="text-left py-2 pl-4">Date</th>
             </tr>
@@ -108,10 +110,14 @@ const WalletTransactions = () => {
                 <td className="py-3 pl-4">{t.amount}</td>
 
                 {/* Asset */}
-                <td className="py-3 pl-4">{t.asset}</td>
+                <td className="py-3 pl-4">
+                  {formatHashOrAddress(t.fromAddress)}
+                </td>
 
                 {/* Counterparty */}
-                <td className="py-3 pl-4">{t.counterparty || "-"}</td>
+                <td className="py-3 pl-4">
+                  {formatHashOrAddress(t.toAddress) || "-"}
+                </td>
 
                 {/* Status */}
                 <td className="py-3 pl-4">
@@ -132,7 +138,7 @@ const WalletTransactions = () => {
 
                 {/* Date */}
                 <td className="py-3 pl-4">
-                  {t.date ? new Date(t.date).toDateString() : "-"}
+                  {t.createdAt ? new Date(t.createdAt).toDateString() : "-"}
                 </td>
               </tr>
             ))}

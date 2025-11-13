@@ -25,6 +25,7 @@ import Footer from "../Footer/Footer";
 import TabsNav from "../TabsNav/TabsNav";
 import { useRouter } from "next/navigation";
 import WalletTransactions from "@/app/walletTransaction/walletTrans";
+import { fetchCoinData, getCoinData } from "@/utils";
 
 interface QRCodeBoxProps {
   value?: string;
@@ -65,11 +66,19 @@ const Wallet: React.FC<QRCodeBoxProps> = ({ value }) => {
   const [currentCoin, setCurrentCoin] = useState("");
   const [showBalance, setShowBalance] = useState(true);
   const [error, setError] = useState("");
+  const [coinData, setCoinData] = useState<any>(null);
   const router = useRouter();
 
   const [isTransOpen, setIsTransOpen] = useState(false);
 
   const balance = 1000; // 🔁 This is the static amount in USD
+
+  useEffect(() => {
+    (async () => {
+      const res = await fetchCoinData();
+      setCoinData(res);
+    })();
+  }, []);
 
   const handleSelect = (currency: Currency) => {
     setSelectedCurrency(currency);
@@ -511,12 +520,14 @@ const Wallet: React.FC<QRCodeBoxProps> = ({ value }) => {
                 </div>
               )}
 
-               <div
+              <div
                 className="flex w-[122px] h-[40px]  items-center bg-[#2D2D2D] text-[#4DF2BE] space-x-[10px] mt-4 rounded-full"
                 style={{ padding: "5px 10px" }}
                 onClick={() => router.push("/swap")}
               >
-                <p className="pl-[10px]"><Image src={Swap} alt="swap"/></p>
+                <p className="pl-[10px]">
+                  <Image src={Swap} alt="swap" />
+                </p>
                 <p className="px-4 py-1 ml-[10px]   rounded-full font-[700] text-[14px]">
                   Swap
                 </p>
@@ -570,12 +581,10 @@ const Wallet: React.FC<QRCodeBoxProps> = ({ value }) => {
             </div>
 
             <div>
-             
               <p className="ml-[120%]">Balance</p>
             </div>
 
             <div>
-             
               <p className="ml-[520%] whitespace-nowrap">In USD</p>
             </div>
           </div>
@@ -595,12 +604,26 @@ const Wallet: React.FC<QRCodeBoxProps> = ({ value }) => {
                 <p className="flex items-center mt-[-15px] text-[14px] font-[400] text-[#8F8F8F] whitespace-nowrap">
                   1 USD
                   <span className="ml-[2px]">=</span>
-                  <span className="ml-[2px]">0.0000098 BTC</span>
+                  <span className="ml-[2px]">
+                    {" "}
+                    {(() => {
+                      const info = getCoinData("BTC", coinData || {});
+                      return !("error" in info) && info.btc
+                        ? `${Number(info.usd).toFixed(2)} BTC`
+                        : "N/A";
+                    })()}
+                  </span>
                 </p>
               </div>
-              <div className="flex ml-[65px] mt-[15px] space-x-[270%] ">
+              <div className="flex ml-[65px] mt-[15px] space-x-[100%] ">
                 <p className="flex text-[14px] font-[500] text-[#FCFCFC]">
-                  0{" "}
+                  <span>
+                    {
+                      clientUser?.wallets?.find(
+                        (w: any) => w?.currency == "BTC"
+                      )?.balance
+                    }{" "}
+                  </span>
                   <span className="text-[12px] ml-[5px] text-[#DBDBDB] font-[500]">
                     BTC
                   </span>
@@ -676,12 +699,26 @@ const Wallet: React.FC<QRCodeBoxProps> = ({ value }) => {
                 <p className="flex items-center mt-[-15px] text-[14px] font-[400] text-[#8F8F8F] whitespace-nowrap">
                   1 USD
                   <span className="ml-[2px]">=</span>
-                  <span className="ml-[2px]">0.0000098 BTC</span>
+                  <span className="ml-[2px]">
+                    {(() => {
+                      const info = getCoinData("ETH", coinData || {});
+                      return !("error" in info) && info.eth
+                        ? `${Number(info.usd).toFixed(2)} ETH`
+                        : "N/A";
+                    })()}
+                  </span>
                 </p>{" "}
               </div>
-              <div className="flex ml-[65px] mt-[15px] space-x-[270%] ">
+              <div className="flex ml-[65px] mt-[15px] space-x-[100%] ">
                 <p className="flex text-[14px] font-[500] text-[#FCFCFC]">
-                  0{" "}
+                  <span>
+                    {" "}
+                    {
+                      clientUser?.wallets?.find(
+                        (w: any) => w?.currency == "ETH"
+                      )?.balance
+                    }
+                  </span>
                   <span className="text-[12px] ml-[5px] text-[#DBDBDB] font-[500]">
                     ETH
                   </span>
@@ -755,12 +792,25 @@ const Wallet: React.FC<QRCodeBoxProps> = ({ value }) => {
                 <p className="flex items-center mt-[-15px] text-[14px] font-[400] text-[#8F8F8F] whitespace-nowrap">
                   1 USD
                   <span className="ml-[2px]">=</span>
-                  <span className="ml-[2px]">0.0000098 BTC</span>
+                  <span className="ml-[2px]">
+                    {(() => {
+                      const info = getCoinData("USDC", coinData || {});
+                      return !("error" in info) && info.usd
+                        ? `${Number(info.usd).toFixed(2)} USDC`
+                        : "N/A";
+                    })()}
+                  </span>
                 </p>
               </div>
-              <div className="flex ml-[60px] mt-[15px] space-x-[270%] ">
-                <p className="flex text-[14px] font-[500] text-[#FCFCFC]">
-                  0{" "}
+              <div className="flex ml-[60px] mt-[15px] space-x-[100%] ">
+                <p className="flex items-center text-[14px] font-[500] text-[#FCFCFC]">
+                  <span>
+                    {
+                      clientUser?.wallets?.find(
+                        (w: any) => w?.currency == "USDC"
+                      )?.balance
+                    }
+                  </span>
                   <span className="text-[12px] ml-[5px] text-[#DBDBDB] font-[500]">
                     USDC
                   </span>
@@ -834,12 +884,25 @@ const Wallet: React.FC<QRCodeBoxProps> = ({ value }) => {
                 <p className="flex items-center mt-[-15px] text-[14px] font-[400] text-[#8F8F8F] whitespace-nowrap">
                   1 USD
                   <span className="ml-[2px]">=</span>
-                  <span className="ml-[2px]">0.0000098 BTC</span>
+                  <span className="ml-[2px]">
+                    {(() => {
+                      const info = getCoinData("USDT", coinData || {});
+                      return !("error" in info) && info.usd
+                        ? `${Number(info.usd).toFixed(2)} USDT`
+                        : "N/A";
+                    })()}
+                  </span>
                 </p>
               </div>
-              <div className="flex ml-[60px] mt-[15px] space-x-[270%] ">
-                <p className="flex text-[14px] font-[500] text-[#FCFCFC]">
-                  0{" "}
+              <div className="flex ml-[60px] mt-[15px] space-x-[100%] ">
+                <p className="flex items-center text-[14px] font-[500] text-[#FCFCFC]">
+                  <span>
+                    {
+                      clientUser?.wallets?.find(
+                        (w: any) => w?.currency == "USDT"
+                      )?.balance
+                    }{" "}
+                  </span>
                   <span className="text-[12px] ml-[5px] text-[#DBDBDB] font-[500]">
                     USDT
                   </span>
