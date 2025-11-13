@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Nav from "../../components/NAV/Nav";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
@@ -33,9 +33,10 @@ const Market_place: React.FC = () => {
   const [isAmountOpen, setIsAmountOpen] = useState(false);
   const [minAmount, setMinAmount] = useState<number | string>("");
   const [maxAmount, setMaxAmount] = useState<number | string>("");
-  const [isPaymentOpen, setIsPaymentOpen] = useState(false);
-  const [selectedMethod, setSelectedMethod] =
-    useState<string>("Payment Method");
+const [isPaymentOpen, setIsPaymentOpen] = useState(false);
+const [selectedMethod, setSelectedMethod] = useState<string>("Payment Method");
+const [loadingMethods, setLoadingMethods] = useState(false);
+const [errorMethods, setErrorMethods] = useState("");
   const [selected2Method, setSelected2Method] =
     useState<string>("Payment Method");
   const [isFunnelOpen, setIsFunnelOpen] = useState(false);
@@ -55,16 +56,16 @@ const Market_place: React.FC = () => {
   });
   const [sortBy, setSortBy] = useState("Best Rate");
 
+  // Offer creation & display
+  const [offers, setOffers] = useState<any[]>([]);
+  const [loadingOffers, setLoadingOffers] = useState(false);
+  const [errorOffers, setErrorOffers] = useState("");
+
   const toggleMarketDropdown = () => {
     setIsMarketDropdownOpen((prev) => !prev);
   };
 
   const toggleFunnel = () => setIsFunnelOpen((prev) => !prev);
-
-  const handleReset = () => {
-    setMinAmount("");
-    setMaxAmount("");
-  };
 
   const handleApply = () => {
     console.log("Min:", minAmount, "Max:", maxAmount);
@@ -78,13 +79,13 @@ const Market_place: React.FC = () => {
     { name: "USDC", icon: USDC },
   ];
 
-  const methods = [
-    "Bank Transfer",
-    "PayPal",
-    "Credit Card",
-    "Cryptocurrency Wallet",
-    "Mobile Payment App",
-  ];
+  const [methods, setMethods] = useState<string[]>([
+  "Bank Transfer",
+  "PayPal",
+  "Credit Card",
+  "Cryptocurrency Wallet",
+  "Mobile Payment App",
+]);
 
   const methods2 = [
     "Bank Transfer",
@@ -130,6 +131,100 @@ const Market_place: React.FC = () => {
     );
   };
 
+
+   
+
+  
+
+useEffect(() => {
+    const fetchPaymentMethods = async () => {
+      setLoadingMethods(true);
+      setErrorMethods("");
+
+      try {
+        const res = await fetch("https://evolve2p-backend.onrender.com/api/get-payment-methods", {
+          method: "GET",
+          headers: { "Content-Type": "application/json" },
+        });
+
+        if (!res.ok) throw new Error("Failed to load payment methods");
+        const data = await res.json();
+
+        console.log("💳 Payment Methods API Response:", data);
+
+        // Handle multiple possible formats
+        if (Array.isArray(data)) {
+          setMethods(data);
+        } else if (Array.isArray(data.methods)) {
+          setMethods(data.methods);
+        } else if (Array.isArray(data.data)) {
+          setMethods(data.data);
+        } else if (typeof data === "object" && data !== null) {
+          const values = Object.values(data).filter((v) => typeof v === "string");
+          if (values.length > 0) setMethods(values);
+          else setErrorMethods("Unexpected response format");
+        } else {
+          setErrorMethods("Unexpected response format");
+        }
+      } catch (error: any) {
+        console.error("❌ Error fetching payment methods:", error);
+        setErrorMethods(error.message || "Error fetching methods");
+      } finally {
+        setLoadingMethods(false);
+      }
+    };
+
+    fetchPaymentMethods();
+  }, []);
+
+  // 🧹 Reset all fields
+  const handleReset = () => {
+    setMinAmount("");
+    setMaxAmount("");
+    setPaymentMethod("Bank Transfer");
+    setCurrency("USD");
+    setSelectedCoin({ name: "BTC", icon: BTC });
+  };
+
+  // 🚀 Create Offer
+  const handleCreateOffer = async () => {
+    if (!minAmount || !maxAmount) {
+      setErrorOffers("Please fill in both min and max limits.");
+      return;
+    }
+
+    setLoadingOffers(true);
+    setErrorOffers("");
+
+    try {
+      const response = await fetch("https://evolve2p-backend.onrender.com/api/create-offer", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          type: activeTab.toLowerCase(),
+          crypto: selectedCoin.name,
+          currency,
+          margin: 2.5,
+          paymentMethod,
+          minLimit: Number(minAmount),
+          maxLimit: Number(maxAmount),
+          paymentTerms: "Send only from your verified bank account.",
+          paymentTime: "30 minutes",
+        }),
+      });
+
+      if (!response.ok) throw new Error("Failed to create offer");
+
+      const data = await response.json();
+      setOffers((prev) => [...prev, data.offer || data]);
+    } catch (err: any) {
+      setErrorOffers(err.message || "Error creating offer");
+    } finally {
+      setLoadingOffers(false);
+    }
+  };
+
+
   return (
     <main className="min-h-screen bg-[#0F1012] pr-[10px] mt-[30px] pl-[30px] text-white md:p-8">
       <div className="max-w-7xl mx-auto">
@@ -150,31 +245,71 @@ const Market_place: React.FC = () => {
               <label className="block text-[14px] font-[500] text-[#8F8F8F]">
                 I want to
               </label>
-              <div className="w-[355px] h-[43.2px] mt-[10px] bg-[#2D2D2D] flex items-center justify-between px-4 py-3 rounded-lg cursor-pointer">
-                <span className="text-[#FCFCFC] pl-[15px] text-[14px] font-[500]">
-                  Buy
-                </span>
-                <Image
-                  src={Arrow_d}
-                  alt="arrow"
-                  className="text-[#DBDBDB] mr-[15px]"
-                />
-              </div>
-              <div className="w-[355px] h-[43.2px] mt-[10px] bg-[#2D2D2D] flex items-center justify-between px-4 py-3 rounded-lg cursor-pointer">
-                <span className="flex items-center pl-[15px]  text-[#FCFCFC] text-[14px] font-[500]">
-                  <Image
-                    src={BTC}
-                    alt="bitcoin"
-                    className="w-[19.998px] h-[20px]  "
-                  />
-                  <p className="ml-[5px]"> BTC</p>
-                </span>
-                <Image
-                  src={Arrow_d}
-                  alt="arrow"
-                  className="text-[#DBDBDB] mr-[15px]"
-                />
-              </div>
+              <div
+  className="w-[355px] h-[43.2px] mt-[10px] bg-[#2D2D2D] flex items-center justify-between px-4 py-3 rounded-lg cursor-pointer"
+  onClick={() => setActiveTab(activeTab === "Buy" ? "Sell" : "Buy")}
+>
+  <span className="text-[#FCFCFC] pl-[15px] text-[14px] font-[500]">
+    {activeTab}
+  </span>
+  <Image
+    src={Arrow_d}
+    alt="arrow"
+    className={`text-[#DBDBDB] mr-[15px] transition-transform duration-200 ${
+      activeTab === "Sell" ? "rotate-180" : ""
+    }`}
+  />
+</div>
+            <div className="relative">
+  <div
+    className="w-[355px] h-[43.2px] mt-[10px] bg-[#2D2D2D] flex items-center justify-between px-4 py-3 rounded-lg cursor-pointer"
+    onClick={() => setIsMarketDropdownOpen(!isMarketDropdownOpen)}
+  >
+    <span className="flex items-center pl-[15px] text-[#FCFCFC] text-[14px] font-[500]">
+      <Image
+        src={selectedCoin.icon}
+        alt={selectedCoin.name}
+        className="w-[19.998px] h-[20px]"
+      />
+      <p className="ml-[5px]">{selectedCoin.name}</p>
+    </span>
+    <Image
+      src={Arrow_d}
+      alt="arrow"
+      className={`text-[#DBDBDB] mr-[15px] transition-transform duration-200 ${
+        isMarketDropdownOpen ? "rotate-180" : ""
+      }`}
+    />
+  </div>
+
+  {/* Dropdown */}
+  {isMarketDropdownOpen && (
+    <div
+      className="absolute w-[355px] bg-[#222222] rounded-[12px] mt-2 shadow-lg p-[8px] z-50"
+      style={{ border: "1px solid #2D2D2D" }}
+    >
+      {coins.map((coin, index) => (
+        <div
+          key={index}
+          className="flex items-center py-2 px-2 cursor-pointer hover:text-emerald-400"
+          onClick={() => {
+            setSelectedCoin(coin);
+            setIsMarketDropdownOpen(false);
+          }}
+        >
+          <Image
+            src={coin.icon}
+            alt={coin.name}
+            className="w-[20px] h-[20px]"
+          />
+          <p className="ml-[10px] text-[#FFFFFF] text-[14px] font-[500]">
+            {coin.name}
+          </p>
+        </div>
+      ))}
+    </div>
+  )}
+</div>
             </div>
             <div className="w-[355px] h-[1px] bg-[#8F8F8F] mt-[20px]"></div>
 
@@ -183,45 +318,105 @@ const Market_place: React.FC = () => {
                 My payment currency and method is
               </label>
 
-              <div className="w-[355px] h-[43.2px] mt-[10px] bg-[#2D2D2D] flex items-center justify-between px-4 py-3 rounded-lg cursor-pointer">
-                <span className="text-[#FCFCFC] pl-[15px] text-[14px] font-[500]">
-                  USD
-                </span>
-                <Image
-                  src={Arrow_d}
-                  alt="arrow"
-                  className="text-[#DBDBDB] mr-[15px]"
-                />
-              </div>
+             <div className="relative">
+  <div
+    className="w-[355px] h-[43.2px] mt-[10px] bg-[#2D2D2D] flex items-center justify-between px-4 py-3 rounded-lg cursor-pointer"
+    onClick={() => setIsCurrencyOpen(!isCurrencyOpen)}
+  >
+    <span className="text-[#FCFCFC] pl-[15px] text-[14px] font-[500]">
+      {currency}
+    </span>
+    <Image
+      src={Arrow_d}
+      alt="arrow"
+      className={`text-[#DBDBDB] mr-[15px] transition-transform duration-200 ${
+        isCurrencyOpen ? "rotate-180" : ""
+      }`}
+    />
+  </div>
 
-              <div className="w-[355px] h-[43.2px] mt-[10px] bg-[#2D2D2D] flex items-center justify-between px-4 py-3 rounded-lg cursor-pointer">
-                <span className="flex items-center pl-[15px]  text-[#FCFCFC] text-[14px] font-[500]">
-                  <Image
-                    src={Globe}
-                    alt="bitcoin"
-                    className="w-[19.998px] h-[20px]  "
-                  />
-                  <p className="ml-[5px]"> All Regions</p>
-                </span>
-                <Image
-                  src={Arrow_d}
-                  alt="arrow"
-                  className="text-[#DBDBDB] mr-[15px]"
-                />
-              </div>
-            </div>
+  {/* Dropdown */}
+  {isCurrencyOpen && (
+    <div
+      className="absolute w-[355px] bg-[#222222] rounded-[12px] mt-2 shadow-lg p-[8px] z-50"
+      style={{ border: "1px solid #2D2D2D" }}
+    >
+      {currencies.map((curr, index) => (
+        <p
+          key={index}
+          className="text-[#FFFFFF] text-[14px] font-[500] py-2 px-2 cursor-pointer hover:text-emerald-400"
+          onClick={() => {
+            setCurrency(curr);
+            setIsCurrencyOpen(false);
+          }}
+        >
+          {curr}
+        </p>
+      ))}
+    </div>
+  )}
+  </div>
 
-            <div className="flex w-[355px] items-center mt-[15px]  space-x-[10px] mt-4">
-              <button className="bg-[#2c2c2c] text-[#FCFCFC] text-[14px] border-none  font-[700] px-6 py-2 rounded-full w-[77px] h-[48px]">
-                Reset
-              </button>
-              <button
-                className="bg-[#4DF2BE] text-[#0F1012] text-[14px] font-[700] px-6 py-2 rounded-full w-[266px] h-[48px]"
-                style={{ border: "1px solid #4DF2BE" }}
-              >
-                Find offer
-              </button>
-            </div>
+             
+  <div
+    className="w-[355px] h-[43.2px] mt-[10px] bg-[#2D2D2D] flex items-center justify-between px-4 py-3 rounded-lg cursor-pointer"
+    onClick={() => setIsRegionOpen(!isRegionOpen)}
+  >
+    <span className="flex items-center pl-[15px] text-[#FCFCFC] text-[14px] font-[500]">
+      <Image
+        src={Globe}
+        alt="region"
+        className="w-[19.998px] h-[20px]"
+      />
+      <p className="ml-[5px]">{region}</p>
+    </span>
+    <Image
+      src={Arrow_d}
+      alt="arrow"
+      className={`text-[#DBDBDB] mr-[15px] transition-transform duration-200 ${
+        isRegionOpen ? "rotate-180" : ""
+      }`}
+    />
+  </div>
+
+  {/* Dropdown */}
+  {isRegionOpen && (
+    <div
+      className="absolute w-[355px] bg-[#222222] rounded-[12px] mt-2 shadow-lg p-[8px] z-50"
+      style={{ border: "1px solid #2D2D2D" }}
+    >
+      {regions.map((reg, index) => (
+        <p
+          key={index}
+          className="text-[#FFFFFF] text-[14px] font-[500] py-2 px-2 cursor-pointer hover:text-emerald-400"
+          onClick={() => {
+            setRegion(reg);
+            setIsRegionOpen(false);
+          }}
+        >
+          {reg}
+        </p>
+      ))}
+    </div>
+  )}
+</div>
+            
+
+             <div className="flex mt-[20px] w-[355px] items-center space-x-[10px] mt-4">
+          <button
+          className="bg-[#2D2D2D] flex items-center justify-center border-none w-[77px] h-[48px]  text-[#FFFFFF] px-[12px] py-[20px] text-[14px] rounded-full font-[700]"
+            onClick={handleReset}
+          >
+            Reset
+          </button>
+          <button
+            onClick={handleCreateOffer}
+            className="bg-[#4DF2BE] text-[#0F1012] text-[14px] font-[700] px-6 py-2 rounded-full w-[266px] h-[48px]"
+            style={{ border: "1px solid #4DF2BE" }}
+          >
+            {loadingOffers ? "Creating..." : "Find offer"}
+          </button>
+        </div>
           </div>
           {/*right_div  */}
           {/*right_div  */}
@@ -394,47 +589,56 @@ const Market_place: React.FC = () => {
               </div>
             )}
 
-            <div
-              className=" flex items-center  w-auto   h-[40px] space-x-[20px] bg-[#2D2D2D] rounded-full 
-           "
-              style={{ padding: "5px 10px" }}
-              onClick={() => setIsPaymentOpen(!isPaymentOpen)}
-            >
-              <div className="ml-[15px] flex items-center space-x-[15px]">
-                <p className="text-[14px] font-[400] text-[#FCFCFC] whitespace-nowrap ">
-                  {selectedMethod}
-                </p>
-                <Image
-                  src={Arrow_d}
-                  alt="arrow"
-                  className={`w-[20px] h-[20px] text-[#8F8F8F] transition-transform duration-200 ${
-                    isPaymentOpen ? "rotate-180" : ""
-                  }`}
-                />
-              </div>
-            </div>
+             <div
+        className="flex items-center w-auto h-[40px] space-x-[20px] bg-[#2D2D2D] rounded-full"
+        style={{ padding: "5px 10px" }}
+        onClick={() => {
+          setIsPaymentOpen(!isPaymentOpen);
+          setIsPayment2Open(false);
+        }}
+      >
+        <div className="ml-[15px] flex items-center space-x-[15px]">
+          <p className="text-[14px] font-[400] text-[#FCFCFC] whitespace-nowrap">
+            {loadingMethods ? "Loading..." : selectedMethod}
+          </p>
+          <Image
+            src={Arrow_d}
+            alt="arrow"
+            className={`w-[20px] h-[20px] text-[#8F8F8F] transition-transform duration-200 ${
+              isPaymentOpen ? "rotate-180" : ""
+            }`}
+          />
+        </div>
+      </div>
 
-            {/* Dropdown Menu */}
-            {isPaymentOpen && (
-              <div
-                className="absolute left-[950px]  top-[195px] w-[228px] h-[216px] bg-[#222222] rounded-[12px] shadow-lg p-[8px] z-50"
-                style={{ border: "1px solid #2D2D2D" }}
+      {isPaymentOpen && (
+        <div
+          className="absolute left-[950px] top-[195px] w-[228px] h-[216px] bg-[#222222] rounded-[12px] shadow-lg p-[8px] z-50"
+          style={{ border: "1px solid #2D2D2D" }}
+        >
+
+       {errorMethods ? (
+            <p className="text-red-400 text-center text-sm">{errorMethods}</p>
+          ) : methods.length > 0 ? (
+            methods.map((method, index) => (
+              <p
+                key={index}
+                className="text-[#FFFFFF] text-[16px] font-[500] py-2 cursor-pointer hover:text-emerald-400"
+                onClick={() => {
+                  setSelectedMethod(method);
+                  setPaymentMethod(method);
+                  setIsPaymentOpen(false);
+                }}
               >
-                {methods.map((method, index) => (
-                  <p
-                    key={index}
-                    className="text-[#FFFFFF] text-[16px] font-[500] py-2 cursor-pointer hover:text-emerald-400"
-                    onClick={() => {
-                      setSelectedMethod(method);
-                      setIsPaymentOpen(false);
-                    }}
-                  >
-                    {method}
-                  </p>
-                ))}
-              </div>
-            )}
-
+                {method}
+              </p>
+            ))
+          ) : (
+            <p className="text-[#aaa] text-center text-sm">No methods found</p>
+          )}
+        </div>
+      )}
+ 
             {/* Funnel button */}
             <div
               onClick={() => setIsFunnelOpen(true)}
@@ -469,7 +673,7 @@ const Market_place: React.FC = () => {
             >
               <div
                 className={`
-      bg-[#0F1012] w-[400px] max-h-[65vh] ] pl-[25px] overflow-y-auto scrollbar-thin scrollbar-thumb-[#DBDBDB] scrollbar-track-[#2D2D2D]   rounded-[12px] shadow-xl
+      bg-[#0F1012] w-[400px] max-h-[65vh]  pl-[25px] overflow-y-auto scrollbar-thin scrollbar-thumb-[#DBDBDB] scrollbar-track-[#2D2D2D]   rounded-[12px] shadow-xl
       transform transition-transform duration-300 ease-in-out
       ${isFunnelOpen ? "translate-x-0" : "translate-x-full"}
     `}
@@ -758,1076 +962,75 @@ const Market_place: React.FC = () => {
               <p className="w-[261px] h-[20px]">Limits & Payment</p>
             </div>
 
-            <div className="flex bg-[#222222]  ml-[-15px] p-[12px] w-[809px] h-[100px] rounded-[12px]">
+           {/* --- OFFERS DISPLAY --- */}
+      <div className="flex flex-col items-center mt-12 space-y-6">
+        {loadingOffers && <p className="text-[#fff]">Loading offers...</p>}
+        {errorOffers && <p className="text-[#fff]">{errorOffers}</p>}
+
+        {!loadingOffers &&
+          !errorOffers &&
+          offers.map((offer, i) => (
+            <div
+              key={i}
+              className="flex bg-[#222222] ml-[-15px] p-[12px] w-[809px] h-[100px] rounded-[12px]"
+            >
+              {/* Seller info */}
               <div className="flex mt-[-10px] flex-col">
-                <div
-                  className="flex items-center mt-[20px]  bg-[#4A4A4A] w-[24px] h-[24px]  rounded-full"
-                  style={{ padding: "3px 2px" }}
-                >
-                  <p className="text-[10px] ml-[5px]  font-[700] text-[#8F8F8F] ">
-                    JD
+                <div className="flex items-center mt-[20px] bg-[#4A4A4A] w-fit px-[8px] py-[4px] rounded-full">
+                  <p className="text-[12px] font-[700] text-[#8F8F8F]">
+                    {offer.user?.username?.[0] || "U"}
                   </p>
-                  <Image src={Vector} alt="vector" className="mt-[20px]" />
-                  <p className="text-[14px] ml-[10px] text-[#FCFCFC] font-[500] whitespace-nowrap">
-                    John Doe
+                  <p className="ml-[8px] text-[14px] text-[#FCFCFC] font-[500] whitespace-nowrap">
+                    {offer.user?.username || "Unknown User"}
                   </p>
-
-                  <Image
-                    src={Mark_green}
-                    alt="mark"
-                    className="ml-[10px] w-[12.541px] h-[12.541px]"
-                  />
+                  <Image src={Mark_green} alt="mark" className="ml-[8px] w-[12px] h-[12px]" />
                 </div>
-                <div className="flex  text-[14px] font-[400] text-[#8F8F8F]  space-x-[10px] whitespace-nowrap">
-                  <p>100 orders</p>
-                  <Image
-                    src={Divider}
-                    alt="divider"
-                    className="w-[1px] mt-[10px] h-[12px]"
-                  />
-                  <p>100.00% completion</p>
-                  <Image
-                    src={Divider}
-                    alt="divider"
-                    className="w-[1px] mt-[10px] h-[12px]"
-                  />
-                  {/*second*/}{" "}
+                <div className="flex text-[14px] font-[400] text-[#8F8F8F] space-x-[10px] mt-[5px]">
+                  <p>Type: {offer.type}</p>
+                  <Image src={Divider} alt="divider" className="w-[1px] h-[12px]" />
+                  <p>{offer.paymentTime}</p>
                 </div>
-                <div className="flex items-center text-[14px] font-[400]  text-[#8F8F8F] mt-[-20px] ml-[5px] space-x-[10px]">
-                  <Image
-                    src={Thumbs}
-                    alt="thunbs"
-                    className="w-[12px] h-[12px]"
-                  />
-                  <p>99.99</p>
-                  <Image src={Divider} alt="divider" className="mt-[-10px]" />
+                <div className="flex items-center text-[14px] font-[400] text-[#8F8F8F] mt-[5px] space-x-[10px]">
+                  <Image src={Thumbs} alt="thumbs" className="w-[12px] h-[12px]" />
+                  <p>Margin: {offer.margin}%</p>
                   <Image src={Timer} alt="timer" />
-                  <p>15 min</p>
-                  {/*3rd */}{" "}
+                  <p>{offer.paymentTime}</p>
                 </div>
-                {/*div for flex col of a container first row*/}{" "}
               </div>
-              <div className="flex mt-[-10px] flex-col ml-[30px]  ">
-                <div className="flex      mt-[50px] space-x-[10px] whitespace-nowrap">
-                  <p className="text-[12px] font-[500] text-[#FCFCFC]">
-                    USD{" "}
-                    <span className="text-[18px] font-[700] text-[#FCFCFC]">
-                      102,120.30
-                    </span>
-                  </p>
-                </div>
-                <p className="text-[14px] font-[400] mt-[-5px]    text-[#8F8F8F]  space-x-[20px]">
-                  1 USD = 0.0000098 BTC
+
+              {/* Price section */}
+              <div className="flex flex-col ml-[30px] mt-[10px]">
+                <p className="text-[12px] font-[500] text-[#FCFCFC]">
+                  {offer.currency}{" "}
+                  <span className="text-[18px] font-[700]">{offer.maxLimit}</span>
                 </p>
-                {/*div for second column flex-col*/}{" "}
+                <p className="text-[14px] font-[400] text-[#8F8F8F]">
+                  Min: {offer.minLimit} | Max: {offer.maxLimit}
+                </p>
               </div>
-              <div className="flex flex-col mt-[-10px] ml-[30px]  ">
-                <div className="flex  ml-[20px] mt-[25px] space-x-[10px] whitespace-nowrap">
-                  <p className="text-[14px] font-[400] text-[#8F8F8F]">
-                    Available:
-                  </p>
 
-                  <p className="text-[14px] font-[400] text-[#8F8F8F]">
-                    50,000{" "}
-                    <span className="text-[14px] font-[400] text-[#8F8F8F]">
-                      BTC
-                    </span>
-                  </p>
-                </div>
-
-                <div className="flex  space-x-[5px] ml-[20px] mt-[-20px] whitespace-nowrap">
-                  <p className="text-[14px] font-[400] text-[#8F8F8F]">
-                    {" "}
-                    Order limit:
-                  </p>
-
-                  <p className="text-[14px] font-[400] text-[#8F8F8F]">
-                    200.00{" "}
-                    <span className="text-[14px] font-[400] text-[#8F8F8F]">
-                      BTC
-                    </span>
-                  </p>
-                  <Image src={Dminus} alt="minus" className="mt-[20px]" />
-                  <p className="text-[14px] font-[400] text-[#8F8F8F]">
-                    200.00{" "}
-                    <span className="text-[14px] font-[400] text-[#8F8F8F]">
-                      BTC
-                    </span>
-                  </p>
-                </div>
-                <div className="flex ml-[20px] mt-[-5px]">
-                  <Image src={Dyellow} alt="dyellow" className="w-[2px]" />
-                  <p className="text-[12px] font-[500] ml-[5px] mt-[3px] text-[#DBDBDB]">
-                    Bank Transfers
-                  </p>
-                </div>
-
-                {/*div for flex col in third column */}
+              {/* Payment Info */}
+              <div className="flex flex-col ml-[30px] mt-[10px]">
+                <p className="text-[14px] text-[#8F8F8F]">
+                  Payment: {offer.paymentMethod}
+                </p>
+                <p className="text-[12px] font-[500] text-[#DBDBDB]">
+                  {offer.paymentTerms}
+                </p>
               </div>
-              <div className="w-[78px] h-[28px] whitespace-nowrap mt-[60px] ml-[55px]">
+
+              {/* Action button */}
+              <div className="w-[78px] h-[28px] mt-[60px] ml-[55px] whitespace-nowrap">
                 <button
-                 onClick={() => router.push("/buy_btc")}
-                  className=" bg-[#4DF2BE] text-[14px] text-[#0F1012] font-[700] rounded-full"
+                  className="bg-[#4DF2BE] text-[14px] text-[#0F1012] font-[700] rounded-full"
                   style={{ border: "1px solid #4DF2BE", padding: "8px 10px" }}
                 >
-                  Buy BTC
+                  {offer.type === "buy" ? "Buy" : "Sell"} {offer.crypto}
                 </button>
               </div>
+            </div>
+          ))}
               {/*div for flex in first container*/}{" "}
-            </div>
-
-            {/* second container */}
-            <div className="flex bg-[#222222]  ml-[-15px] p-[12px] w-[809px] h-[100px] rounded-[12px]">
-              <div className="flex mt-[-10px] flex-col">
-                <div
-                  className="flex items-center mt-[20px]  bg-[#4A4A4A] w-[24px] h-[24px]  rounded-full"
-                  style={{ padding: "3px 2px" }}
-                >
-                  <p className="text-[10px] ml-[5px]  font-[700] text-[#8F8F8F] ">
-                    JS
-                  </p>
-                  <Image src={Vector} alt="vector" className="mt-[20px]" />
-                  <p className="text-[14px] ml-[10px] text-[#FCFCFC] font-[500] whitespace-nowrap">
-                    Jane Smith
-                  </p>
-
-                  <Image
-                    src={Mark_green}
-                    alt="mark"
-                    className="ml-[10px] w-[12.541px] h-[12.541px]"
-                  />
-                </div>
-                <div className="flex  text-[14px] font-[400] text-[#8F8F8F]  space-x-[10px] whitespace-nowrap">
-                  <p>150 orders</p>
-                  <Image
-                    src={Divider}
-                    alt="divider"
-                    className="w-[1px] mt-[10px] h-[12px]"
-                  />
-                  <p>98.75% completion</p>
-                  <Image
-                    src={Divider}
-                    alt="divider"
-                    className="w-[1px] mt-[10px] h-[12px]"
-                  />
-                  {/*second*/}{" "}
-                </div>
-                <div className="flex items-center text-[14px] font-[400]  text-[#8F8F8F] mt-[-20px] ml-[5px] space-x-[10px]">
-                  <Image
-                    src={Thumbs}
-                    alt="thunbs"
-                    className="w-[12px] h-[12px]"
-                  />
-                  <p>98.00</p>
-                  <Image src={Divider} alt="divider" className="mt-[-10px]" />
-                  <Image src={Timer} alt="timer" />
-                  <p>10 min</p>
-                  {/*3rd */}{" "}
-                </div>
-                {/*div for flex col of a container first row*/}{" "}
-              </div>
-              <div className="flex mt-[-10px] flex-col ml-[30px]  ">
-                <div className="flex      mt-[50px] space-x-[10px] whitespace-nowrap">
-                  <p className="text-[12px] font-[500] text-[#FCFCFC]">
-                    USD{" "}
-                    <span className="text-[18px] font-[700] text-[#FCFCFC]">
-                      125,500.00
-                    </span>
-                  </p>
-                </div>
-                <p className="text-[14px] font-[400] mt-[-5px]    text-[#8F8F8F]  space-x-[20px]">
-                  1 USD = 0.0000120 BTC
-                </p>
-                {/*div for second column flex-col*/}{" "}
-              </div>
-              <div className="flex flex-col mt-[-10px] ml-[30px]  ">
-                <div className="flex  ml-[20px] mt-[25px] space-x-[10px] whitespace-nowrap">
-                  <p className="text-[14px] font-[400] text-[#8F8F8F]">
-                    Available:
-                  </p>
-
-                  <p className="text-[14px] font-[400] text-[#8F8F8F]">
-                    30,000{" "}
-                    <span className="text-[14px] font-[400] text-[#8F8F8F]">
-                      BTC
-                    </span>
-                  </p>
-                </div>
-
-                <div className="flex  space-x-[5px] ml-[20px] mt-[-20px] whitespace-nowrap">
-                  <p className="text-[14px] font-[400] text-[#8F8F8F]">
-                    {" "}
-                    Order limit:
-                  </p>
-
-                  <p className="text-[14px] font-[400] text-[#8F8F8F]">
-                    250.00{" "}
-                    <span className="text-[14px] font-[400] text-[#8F8F8F]">
-                      BTC
-                    </span>
-                  </p>
-                  <Image src={Dminus} alt="minus" className="mt-[20px]" />
-                  <p className="text-[14px] font-[400] text-[#8F8F8F]">
-                    250.00{" "}
-                    <span className="text-[14px] font-[400] text-[#8F8F8F]">
-                      BTC
-                    </span>
-                  </p>
-                </div>
-                <div className="flex ml-[20px] mt-[-5px]">
-                  <Image src={Dpurple} alt="dpurple" className="w-[2px]" />
-                  <p className="text-[12px] font-[500] ml-[5px] mt-[3px] text-[#DBDBDB]">
-                    Credit Cards
-                  </p>
-                </div>
-
-                {/*div for flex col in third column */}
-              </div>
-              <div className="w-[78px] h-[28px] whitespace-nowrap mt-[60px] ml-[55px]">
-                <button
-                 onClick={() => router.push("/buy_btc")}
-                  className=" bg-[#4DF2BE] text-[14px] text-[#0F1012] font-[700] rounded-full"
-                  style={{ border: "1px solid #4DF2BE", padding: "8px 10px" }}
-                >
-                  Buy BTC
-                </button>
-              </div>
-              {/*div for flex in second container*/}{" "}
-            </div>
-
-            {/*third container*/}
-            <div className="flex bg-[#222222]  ml-[-15px] p-[12px] w-[809px] h-[100px] rounded-[12px]">
-              <div className="flex mt-[-10px] flex-col">
-                <div
-                  className="flex items-center mt-[20px]  bg-[#4A4A4A] w-[24px] h-[24px]  rounded-full"
-                  style={{ padding: "3px 2px" }}
-                >
-                  <p className="text-[10px] ml-[5px]  font-[700] text-[#8F8F8F] ">
-                    AJ
-                  </p>
-                  <Image src={Vector} alt="vector" className="mt-[20px]" />
-                  <p className="text-[14px] ml-[10px] text-[#FCFCFC] font-[500] whitespace-nowrap">
-                    Alice Johnson
-                  </p>
-
-                  <Image
-                    src={Mark_green}
-                    alt="mark"
-                    className="ml-[10px] w-[12.541px] h-[12.541px]"
-                  />
-                </div>
-                <div className="flex  text-[14px] font-[400] text-[#8F8F8F]  space-x-[10px] whitespace-nowrap">
-                  <p>80 orders</p>
-                  <Image
-                    src={Divider}
-                    alt="divider"
-                    className="w-[1px] mt-[10px] h-[12px]"
-                  />
-                  <p>100.00% completion</p>
-                  <Image
-                    src={Divider}
-                    alt="divider"
-                    className="w-[1px] mt-[10px] h-[12px]"
-                  />
-                  {/*second*/}{" "}
-                </div>
-                <div className="flex items-center text-[14px] font-[400]  text-[#8F8F8F] mt-[-20px] ml-[5px] space-x-[10px]">
-                  <Image
-                    src={Thumbs}
-                    alt="thunbs"
-                    className="w-[12px] h-[12px]"
-                  />
-                  <p>100.00</p>
-                  <Image src={Divider} alt="divider" className="mt-[-10px]" />
-                  <Image src={Timer} alt="timer" />
-                  <p>5 min</p>
-                  {/*3rd */}{" "}
-                </div>
-                {/*div for flex col of a container first row*/}{" "}
-              </div>
-              <div className="flex mt-[-10px] flex-col ml-[30px]  ">
-                <div className="flex      mt-[50px] space-x-[10px] whitespace-nowrap">
-                  <p className="text-[12px] font-[500] text-[#FCFCFC]">
-                    USD{" "}
-                    <span className="text-[18px] font-[700] text-[#FCFCFC]">
-                      78,000.00
-                    </span>
-                  </p>
-                </div>
-                <p className="text-[14px] font-[400] mt-[-5px]    text-[#8F8F8F]  space-x-[20px]">
-                  1 USD = 0.0000085 BTC
-                </p>
-                {/*div for second column flex-col*/}{" "}
-              </div>
-              <div className="flex flex-col mt-[-10px] ml-[30px]  ">
-                <div className="flex  ml-[20px] mt-[25px] space-x-[10px] whitespace-nowrap">
-                  <p className="text-[14px] font-[400] text-[#8F8F8F]">
-                    Available:
-                  </p>
-
-                  <p className="text-[14px] font-[400] text-[#8F8F8F]">
-                    40,000{" "}
-                    <span className="text-[14px] font-[400] text-[#8F8F8F]">
-                      BTC
-                    </span>
-                  </p>
-                </div>
-
-                <div className="flex  space-x-[5px] ml-[20px] mt-[-20px] whitespace-nowrap">
-                  <p className="text-[14px] font-[400] text-[#8F8F8F]">
-                    {" "}
-                    Order limit:
-                  </p>
-
-                  <p className="text-[14px] font-[400] text-[#8F8F8F]">
-                    180.00{" "}
-                    <span className="text-[14px] font-[400] text-[#8F8F8F]">
-                      BTC
-                    </span>
-                  </p>
-                  <Image src={Dminus} alt="minus" className="mt-[20px]" />
-                  <p className="text-[14px] font-[400] text-[#8F8F8F]">
-                    180.00{" "}
-                    <span className="text-[14px] font-[400] text-[#8F8F8F]">
-                      BTC
-                    </span>
-                  </p>
-                </div>
-                <div className="flex ml-[20px] mt-[-5px]">
-                  <Image src={Dpink} alt="dpink" className="w-[2px]" />
-                  <p className="text-[12px] font-[500] ml-[5px] mt-[3px] text-[#DBDBDB]">
-                    Wire Transfers
-                  </p>
-                </div>
-
-                {/*div for flex col in third column */}
-              </div>
-              <div className="w-[78px] h-[28px] whitespace-nowrap mt-[60px] ml-[55px]">
-                <button
-                      onClick={() => router.push("/buy_btc")}
-
-                  className=" bg-[#4DF2BE] text-[14px] text-[#0F1012] font-[700] rounded-full"
-                  style={{ border: "1px solid #4DF2BE", padding: "8px 10px" }}
-                >
-                  Buy BTC
-                </button>
-              </div>
-              {/*div for flex in third container*/}{" "}
-            </div>
-
-            {/*fourth container*/}
-            <div className="flex bg-[#222222]  ml-[-15px] p-[12px] w-[809px] h-[100px] rounded-[12px]">
-              <div className="flex mt-[-10px] flex-col">
-                <div
-                  className="flex items-center mt-[20px]  bg-[#4A4A4A] w-[24px] h-[24px]  rounded-full"
-                  style={{ padding: "3px 2px" }}
-                >
-                  <p className="text-[10px] ml-[5px]  font-[700] text-[#8F8F8F] ">
-                    BB
-                  </p>
-                  <Image src={Vector} alt="vector" className="mt-[20px]" />
-                  <p className="text-[14px] ml-[10px] text-[#FCFCFC] font-[500] whitespace-nowrap">
-                    Bob Brown
-                  </p>
-
-                  <Image
-                    src={Mark_green}
-                    alt="mark"
-                    className="ml-[10px] w-[12.541px] h-[12.541px]"
-                  />
-                </div>
-                <div className="flex  text-[14px] font-[400] text-[#8F8F8F]  space-x-[10px] whitespace-nowrap">
-                  <p>200 orders</p>
-                  <Image
-                    src={Divider}
-                    alt="divider"
-                    className="w-[1px] mt-[10px] h-[12px]"
-                  />
-                  <p>95.00% completion</p>
-                  <Image
-                    src={Divider}
-                    alt="divider"
-                    className="w-[1px] mt-[10px] h-[12px]"
-                  />
-                  {/*second*/}{" "}
-                </div>
-                <div className="flex items-center text-[14px] font-[400]  text-[#8F8F8F] mt-[-20px] ml-[5px] space-x-[10px]">
-                  <Image
-                    src={Thumbs}
-                    alt="thunbs"
-                    className="w-[12px] h-[12px]"
-                  />
-                  <p>95.50</p>
-                  <Image src={Divider} alt="divider" className="mt-[-10px]" />
-                  <Image src={Timer} alt="timer" />
-                  <p>20 min</p>
-                  {/*3rd */}{" "}
-                </div>
-                {/*div for flex col of a container first row*/}{" "}
-              </div>
-              <div className="flex mt-[-10px] flex-col ml-[30px]  ">
-                <div className="flex      mt-[50px] space-x-[10px] whitespace-nowrap">
-                  <p className="text-[12px] font-[500] text-[#FCFCFC]">
-                    USD{" "}
-                    <span className="text-[18px] font-[700] text-[#FCFCFC]">
-                      200,000.00
-                    </span>
-                  </p>
-                </div>
-                <p className="text-[14px] font-[400] mt-[-5px]    text-[#8F8F8F]  space-x-[20px]">
-                  1 USD = 0.0000145 BTC
-                </p>
-                {/*div for second column flex-col*/}{" "}
-              </div>
-              <div className="flex flex-col mt-[-10px] ml-[30px]  ">
-                <div className="flex  ml-[20px] mt-[25px] space-x-[10px] whitespace-nowrap">
-                  <p className="text-[14px] font-[400] text-[#8F8F8F]">
-                    Available:
-                  </p>
-
-                  <p className="text-[14px] font-[400] text-[#8F8F8F]">
-                    20,000{" "}
-                    <span className="text-[14px] font-[400] text-[#8F8F8F]">
-                      BTC
-                    </span>
-                  </p>
-                </div>
-
-                <div className="flex  space-x-[5px] ml-[20px] mt-[-20px] whitespace-nowrap">
-                  <p className="text-[14px] font-[400] text-[#8F8F8F]">
-                    {" "}
-                    Order limit:
-                  </p>
-
-                  <p className="text-[14px] font-[400] text-[#8F8F8F]">
-                    300.00{" "}
-                    <span className="text-[14px] font-[400] text-[#8F8F8F]">
-                      BTC
-                    </span>
-                  </p>
-                  <Image src={Dminus} alt="minus" className="mt-[20px]" />
-                  <p className="text-[14px] font-[400] text-[#8F8F8F]">
-                    300.00{" "}
-                    <span className="text-[14px] font-[400] text-[#8F8F8F]">
-                      BTC
-                    </span>
-                  </p>
-                </div>
-                <div className="flex ml-[20px] mt-[-5px]">
-                  <Image src={Dpink} alt="dpink" className="w-[2px]" />
-                  <p className="text-[12px] font-[500] ml-[5px] mt-[3px] text-[#DBDBDB]">
-                    Wire Transfers
-                  </p>
-                </div>
-
-                {/*div for flex col in third column */}
-              </div>
-              <div className="w-[78px] h-[28px] whitespace-nowrap mt-[60px] ml-[55px]">
-                <button
-                 onClick={() => router.push("/buy_btc")}
-                  className=" bg-[#4DF2BE] text-[14px] text-[#0F1012] font-[700] rounded-full"
-                  style={{ border: "1px solid #4DF2BE", padding: "8px 10px" }}
-                >
-                  Buy BTC
-                </button>
-              </div>
-              {/*div for flex in fourth container*/}{" "}
-            </div>
-
-            {/*fifth container*/}
-            <div className="flex bg-[#222222]  ml-[-15px] p-[12px] w-[809px] h-[100px] rounded-[12px]">
-              <div className="flex mt-[-10px] flex-col">
-                <div
-                  className="flex items-center mt-[20px]  bg-[#4A4A4A] w-[24px] h-[24px]  rounded-full"
-                  style={{ padding: "3px 2px" }}
-                >
-                  <p className="text-[10px] ml-[5px]  font-[700] text-[#8F8F8F] ">
-                    CG
-                  </p>
-                  <Image src={Vector} alt="vector" className="mt-[20px]" />
-                  <p className="text-[14px] ml-[10px] text-[#FCFCFC] font-[500] whitespace-nowrap">
-                    Charlie Green
-                  </p>
-
-                  <Image
-                    src={Mark_green}
-                    alt="mark"
-                    className="ml-[10px] w-[12.541px] h-[12.541px]"
-                  />
-                </div>
-                <div className="flex  text-[14px] font-[400] text-[#8F8F8F]  space-x-[10px] whitespace-nowrap">
-                  <p>120 orders</p>
-                  <Image
-                    src={Divider}
-                    alt="divider"
-                    className="w-[1px] mt-[10px] h-[12px]"
-                  />
-                  <p>99.50% completion</p>
-                  <Image
-                    src={Divider}
-                    alt="divider"
-                    className="w-[1px] mt-[10px] h-[12px]"
-                  />
-                  {/*second*/}{" "}
-                </div>
-                <div className="flex items-center text-[14px] font-[400]  text-[#8F8F8F] mt-[-20px] ml-[5px] space-x-[10px]">
-                  <Image
-                    src={Thumbs}
-                    alt="thunbs"
-                    className="w-[12px] h-[12px]"
-                  />
-                  <p>99.00</p>
-                  <Image src={Divider} alt="divider" className="mt-[-10px]" />
-                  <Image src={Timer} alt="timer" />
-                  <p>12 min</p>
-                  {/*3rd */}{" "}
-                </div>
-                {/*div for flex col of a container first row*/}{" "}
-              </div>
-              <div className="flex mt-[-10px] flex-col ml-[30px]  ">
-                <div className="flex      mt-[50px] space-x-[10px] whitespace-nowrap">
-                  <p className="text-[12px] font-[500] text-[#FCFCFC]">
-                    USD{" "}
-                    <span className="text-[18px] font-[700] text-[#FCFCFC]">
-                      95,000.00
-                    </span>
-                  </p>
-                </div>
-                <p className="text-[14px] font-[400] mt-[-5px]    text-[#8F8F8F]  space-x-[20px]">
-                  1 USD = 0.0000110 BTC
-                </p>
-                {/*div for second column flex-col*/}{" "}
-              </div>
-              <div className="flex flex-col mt-[-10px] ml-[30px]  ">
-                <div className="flex  ml-[20px] mt-[25px] space-x-[10px] whitespace-nowrap">
-                  <p className="text-[14px] font-[400] text-[#8F8F8F]">
-                    Available:
-                  </p>
-
-                  <p className="text-[14px] font-[400] text-[#8F8F8F]">
-                    25,000{" "}
-                    <span className="text-[14px] font-[400] text-[#8F8F8F]">
-                      BTC
-                    </span>
-                  </p>
-                </div>
-
-                <div className="flex  space-x-[5px] ml-[20px] mt-[-20px] whitespace-nowrap">
-                  <p className="text-[14px] font-[400] text-[#8F8F8F]">
-                    {" "}
-                    Order limit:
-                  </p>
-
-                  <p className="text-[14px] font-[400] text-[#8F8F8F]">
-                    220.00{" "}
-                    <span className="text-[14px] font-[400] text-[#8F8F8F]">
-                      BTC
-                    </span>
-                  </p>
-                  <Image src={Dminus} alt="minus" className="mt-[20px]" />
-                  <p className="text-[14px] font-[400] text-[#8F8F8F]">
-                    220.00{" "}
-                    <span className="text-[14px] font-[400] text-[#8F8F8F]">
-                      BTC
-                    </span>
-                  </p>
-                </div>
-                <div className="flex ml-[20px] mt-[-5px]">
-                  <Image src={Dgreen} alt="dgreen" className="w-[2px]" />
-                  <p className="text-[12px] font-[500] ml-[5px] mt-[3px] text-[#DBDBDB]">
-                    Mobile Payments
-                  </p>
-                </div>
-
-                {/*div for flex col in third column */}
-              </div>
-              <div className="w-[78px] h-[28px] whitespace-nowrap mt-[60px] ml-[55px]">
-                <button
-                 onClick={() => router.push("/buy_btc")}
-                  className=" bg-[#4DF2BE] text-[14px] text-[#0F1012] font-[700] rounded-full"
-                  style={{ border: "1px solid #4DF2BE", padding: "8px 10px" }}
-                >
-                  Buy BTC
-                </button>
-              </div>
-              {/*div for flex in  fifth container*/}{" "}
-            </div>
-
-            {/*sixth container */}
-            <div className="flex bg-[#222222]  ml-[-15px] p-[12px] w-[809px] h-[100px] rounded-[12px]">
-              <div className="flex mt-[-10px] flex-col">
-                <div
-                  className="flex items-center mt-[20px]  bg-[#4A4A4A] w-[24px] h-[24px]  rounded-full"
-                  style={{ padding: "3px 2px" }}
-                >
-                  <p className="text-[10px] ml-[5px]  font-[700] text-[#8F8F8F] ">
-                    DM
-                  </p>
-                  <Image src={Vector} alt="vector" className="mt-[20px]" />
-                  <p className="text-[14px] ml-[10px] text-[#FCFCFC] font-[500] whitespace-nowrap">
-                    David Miller
-                  </p>
-
-                  <Image
-                    src={Mark_green}
-                    alt="mark"
-                    className="ml-[10px] w-[12.541px] h-[12.541px]"
-                  />
-                </div>
-                <div className="flex  text-[14px] font-[400] text-[#8F8F8F]  space-x-[10px] whitespace-nowrap">
-                  <p>90 orders</p>
-                  <Image
-                    src={Divider}
-                    alt="divider"
-                    className="w-[1px] mt-[10px] h-[12px]"
-                  />
-                  <p>97.25% completion</p>
-                  <Image
-                    src={Divider}
-                    alt="divider"
-                    className="w-[1px] mt-[10px] h-[12px]"
-                  />
-                  {/*second*/}{" "}
-                </div>
-                <div className="flex items-center text-[14px] font-[400]  text-[#8F8F8F] mt-[-20px] ml-[5px] space-x-[10px]">
-                  <Image
-                    src={Thumbs}
-                    alt="thunbs"
-                    className="w-[12px] h-[12px]"
-                  />
-                  <p>97.50</p>
-                  <Image src={Divider} alt="divider" className="mt-[-10px]" />
-                  <Image src={Timer} alt="timer" />
-                  <p>8 min</p>
-                  {/*3rd */}{" "}
-                </div>
-                {/*div for flex col of a container first row*/}{" "}
-              </div>
-              <div className="flex mt-[-10px] flex-col ml-[30px]  ">
-                <div className="flex      mt-[50px] space-x-[10px] whitespace-nowrap">
-                  <p className="text-[12px] font-[500] text-[#FCFCFC]">
-                    USD{" "}
-                    <span className="text-[18px] font-[700] text-[#FCFCFC]">
-                      85,500.00
-                    </span>
-                  </p>
-                </div>
-                <p className="text-[14px] font-[400] mt-[-5px]    text-[#8F8F8F]  space-x-[20px]">
-                  1 USD = 0.0000090 BTC
-                </p>
-                {/*div for second column flex-col*/}{" "}
-              </div>
-              <div className="flex flex-col mt-[-10px] ml-[30px]  ">
-                <div className="flex  ml-[20px] mt-[25px] space-x-[10px] whitespace-nowrap">
-                  <p className="text-[14px] font-[400] text-[#8F8F8F]">
-                    Available:
-                  </p>
-
-                  <p className="text-[14px] font-[400] text-[#8F8F8F]">
-                    35,000{" "}
-                    <span className="text-[14px] font-[400] text-[#8F8F8F]">
-                      BTC
-                    </span>
-                  </p>
-                </div>
-
-                <div className="flex  space-x-[5px] ml-[20px] mt-[-20px] whitespace-nowrap">
-                  <p className="text-[14px] font-[400] text-[#8F8F8F]">
-                    {" "}
-                    Order limit:
-                  </p>
-
-                  <p className="text-[14px] font-[400] text-[#8F8F8F]">
-                    190.00{" "}
-                    <span className="text-[14px] font-[400] text-[#8F8F8F]">
-                      BTC
-                    </span>
-                  </p>
-                  <Image src={Dminus} alt="minus" className="mt-[20px]" />
-                  <p className="text-[14px] font-[400] text-[#8F8F8F]">
-                    190.00{" "}
-                    <span className="text-[14px] font-[400] text-[#8F8F8F]">
-                      BTC
-                    </span>
-                  </p>
-                </div>
-                <div className="flex ml-[20px] mt-[-5px]">
-                  <Image src={Dyellow} alt="dyellow" className="w-[2px]" />
-                  <p className="text-[12px] font-[500] ml-[5px] mt-[3px] text-[#DBDBDB]">
-                    PayPal
-                  </p>
-                </div>
-
-                {/*div for flex col in third column */}
-              </div>
-              <div className="w-[78px] h-[28px] whitespace-nowrap mt-[60px] ml-[55px]">
-                <button
-                 onClick={() => router.push("/buy_btc")}
-                  className=" bg-[#4DF2BE] text-[14px] text-[#0F1012] font-[700] rounded-full"
-                  style={{ border: "1px solid #4DF2BE", padding: "8px 10px" }}
-                >
-                  Buy BTC
-                </button>
-              </div>
-              {/*div for flex in  sixth container*/}{" "}
-            </div>
-
-            {/*seventh container */}
-            <div className="flex bg-[#222222]  ml-[-15px] p-[12px] w-[809px] h-[100px] rounded-[12px]">
-              <div className="flex mt-[-10px] flex-col">
-                <div
-                  className="flex items-center mt-[20px]  bg-[#4A4A4A] w-[24px] h-[24px]  rounded-full"
-                  style={{ padding: "3px 2px" }}
-                >
-                  <p className="text-[10px] ml-[5px]  font-[700] text-[#8F8F8F] ">
-                    EM
-                  </p>
-                  <Image src={Vector} alt="vector" className="mt-[20px]" />
-                  <p className="text-[14px] ml-[10px] text-[#FCFCFC] font-[500] whitespace-nowrap">
-                    Emily Davis
-                  </p>
-
-                  <Image
-                    src={Mark_green}
-                    alt="mark"
-                    className="ml-[10px] w-[12.541px] h-[12.541px]"
-                  />
-                </div>
-                <div className="flex  text-[14px] font-[400] text-[#8F8F8F]  space-x-[10px] whitespace-nowrap">
-                  <p>110 orders</p>
-                  <Image
-                    src={Divider}
-                    alt="divider"
-                    className="w-[1px] mt-[10px] h-[12px]"
-                  />
-                  <p>100.00% completion</p>
-                  <Image
-                    src={Divider}
-                    alt="divider"
-                    className="w-[1px] mt-[10px] h-[12px]"
-                  />
-                  {/*second*/}{" "}
-                </div>
-                <div className="flex items-center text-[14px] font-[400]  text-[#8F8F8F] mt-[-20px] ml-[5px] space-x-[10px]">
-                  <Image
-                    src={Thumbs}
-                    alt="thunbs"
-                    className="w-[12px] h-[12px]"
-                  />
-                  <p>100.00</p>
-                  <Image src={Divider} alt="divider" className="mt-[-10px]" />
-                  <Image src={Timer} alt="timer" />
-                  <p>7 min</p>
-                  {/*3rd */}{" "}
-                </div>
-                {/*div for flex col of a container first row*/}{" "}
-              </div>
-              <div className="flex mt-[-10px] flex-col ml-[30px]  ">
-                <div className="flex      mt-[50px] space-x-[10px] whitespace-nowrap">
-                  <p className="text-[12px] font-[500] text-[#FCFCFC]">
-                    USD{" "}
-                    <span className="text-[18px] font-[700] text-[#FCFCFC]">
-                      88,000.00
-                    </span>
-                  </p>
-                </div>
-                <p className="text-[14px] font-[400] mt-[-5px]    text-[#8F8F8F]  space-x-[20px]">
-                  1 USD = 0.0000102 BTC
-                </p>
-                {/*div for second column flex-col*/}{" "}
-              </div>
-              <div className="flex flex-col mt-[-10px] ml-[30px]  ">
-                <div className="flex  ml-[20px] mt-[25px] space-x-[10px] whitespace-nowrap">
-                  <p className="text-[14px] font-[400] text-[#8F8F8F]">
-                    Available:
-                  </p>
-
-                  <p className="text-[14px] font-[400] text-[#8F8F8F]">
-                    45,000{" "}
-                    <span className="text-[14px] font-[400] text-[#8F8F8F]">
-                      BTC
-                    </span>
-                  </p>
-                </div>
-
-                <div className="flex  space-x-[5px] ml-[20px] mt-[-20px] whitespace-nowrap">
-                  <p className="text-[14px] font-[400] text-[#8F8F8F]">
-                    {" "}
-                    Order limit:
-                  </p>
-
-                  <p className="text-[14px] font-[400] text-[#8F8F8F]">
-                    210.00{" "}
-                    <span className="text-[14px] font-[400] text-[#8F8F8F]">
-                      BTC
-                    </span>
-                  </p>
-                  <Image src={Dminus} alt="minus" className="mt-[20px]" />
-                  <p className="text-[14px] font-[400] text-[#8F8F8F]">
-                    210.00{" "}
-                    <span className="text-[14px] font-[400] text-[#8F8F8F]">
-                      BTC
-                    </span>
-                  </p>
-                </div>
-                <div className="flex ml-[20px] mt-[-5px]">
-                  <Image src={Dyellow} alt="dyellow" className="w-[2px]" />
-                  <p className="text-[12px] font-[500] ml-[5px] mt-[3px] text-[#DBDBDB]">
-                    Bank Transfers
-                  </p>
-                </div>
-
-                {/*div for flex col in third column */}
-              </div>
-              <div className="w-[78px] h-[28px] whitespace-nowrap mt-[60px] ml-[55px]">
-                <button
-                 onClick={() => router.push("/buy_btc")}
-                  className=" bg-[#4DF2BE] text-[14px] text-[#0F1012] font-[700] rounded-full"
-                  style={{ border: "1px solid #4DF2BE", padding: "8px 10px" }}
-                >
-                  Buy BTC
-                </button>
-              </div>
-              {/*div for flex in  seventh container*/}{" "}
-            </div>
-
-            {/*eigth container */}
-
-            <div className="flex bg-[#222222]  ml-[-15px] p-[12px] w-[809px] h-[100px] rounded-[12px]">
-              <div className="flex mt-[-10px] flex-col">
-                <div
-                  className="flex items-center mt-[20px]  bg-[#4A4A4A] w-[24px] h-[24px]  rounded-full"
-                  style={{ padding: "3px 2px" }}
-                >
-                  <p className="text-[10px] ml-[5px]  font-[700] text-[#8F8F8F] ">
-                    GH
-                  </p>
-                  <Image src={Vector} alt="vector" className="mt-[20px]" />
-                  <p className="text-[14px] ml-[10px] text-[#FCFCFC] font-[500] whitespace-nowrap">
-                    Grace Hall
-                  </p>
-
-                  <Image
-                    src={Mark_green}
-                    alt="mark"
-                    className="ml-[10px] w-[12.541px] h-[12.541px]"
-                  />
-                </div>
-                <div className="flex  text-[14px] font-[400] text-[#8F8F8F]  space-x-[10px] whitespace-nowrap">
-                  <p>130 orders</p>
-                  <Image
-                    src={Divider}
-                    alt="divider"
-                    className="w-[1px] mt-[10px] h-[12px]"
-                  />
-                  <p>96.50% completion</p>
-                  <Image
-                    src={Divider}
-                    alt="divider"
-                    className="w-[1px] mt-[10px] h-[12px]"
-                  />
-                  {/*second*/}{" "}
-                </div>
-                <div className="flex items-center text-[14px] font-[400]  text-[#8F8F8F] mt-[-20px] ml-[5px] space-x-[10px]">
-                  <Image
-                    src={Thumbs}
-                    alt="thunbs"
-                    className="w-[12px] h-[12px]"
-                  />
-                  <p>96.00</p>
-                  <Image src={Divider} alt="divider" className="mt-[-10px]" />
-                  <Image src={Timer} alt="timer" />
-                  <p>11 min</p>
-                  {/*3rd */}{" "}
-                </div>
-                {/*div for flex col of a container first row*/}{" "}
-              </div>
-              <div className="flex mt-[-10px] flex-col ml-[30px]  ">
-                <div className="flex      mt-[50px] space-x-[10px] whitespace-nowrap">
-                  <p className="text-[12px] font-[500] text-[#FCFCFC]">
-                    USD{" "}
-                    <span className="text-[18px] font-[700] text-[#FCFCFC]">
-                      92,000.00
-                    </span>
-                  </p>
-                </div>
-                <p className="text-[14px] font-[400] mt-[-5px]    text-[#8F8F8F]  space-x-[20px]">
-                  1 USD = 0.0000115 BTC
-                </p>
-                {/*div for second column flex-col*/}{" "}
-              </div>
-              <div className="flex flex-col mt-[-10px] ml-[30px]  ">
-                <div className="flex  ml-[20px] mt-[25px] space-x-[10px] whitespace-nowrap">
-                  <p className="text-[14px] font-[400] text-[#8F8F8F]">
-                    Available:
-                  </p>
-
-                  <p className="text-[14px] font-[400] text-[#8F8F8F]">
-                    50,000{" "}
-                    <span className="text-[14px] font-[400] text-[#8F8F8F]">
-                      BTC
-                    </span>
-                  </p>
-                </div>
-
-                <div className="flex  space-x-[5px] ml-[20px] mt-[-20px] whitespace-nowrap">
-                  <p className="text-[14px] font-[400] text-[#8F8F8F]">
-                    {" "}
-                    Order limit:
-                  </p>
-
-                  <p className="text-[14px] font-[400] text-[#8F8F8F]">
-                    230.00{" "}
-                    <span className="text-[14px] font-[400] text-[#8F8F8F]">
-                      BTC
-                    </span>
-                  </p>
-                  <Image src={Dminus} alt="minus" className="mt-[20px]" />
-                  <p className="text-[14px] font-[400] text-[#8F8F8F]">
-                    230.00{" "}
-                    <span className="text-[14px] font-[400] text-[#8F8F8F]">
-                      BTC
-                    </span>
-                  </p>
-                </div>
-                <div className="flex ml-[20px] mt-[-5px]">
-                  <Image src={Dpurple} alt="dpurple" className="w-[2px]" />
-                  <p className="text-[12px] font-[500] ml-[5px] mt-[3px] text-[#DBDBDB]">
-                    Credit Cards
-                  </p>
-                </div>
-
-                {/*div for flex col in third column */}
-              </div>
-              <div className="w-[78px] h-[28px] whitespace-nowrap mt-[60px] ml-[55px]">
-                <button
-                 onClick={() => router.push("/buy_btc")}
-                  className=" bg-[#4DF2BE] text-[14px] text-[#0F1012] font-[700] rounded-full"
-                  style={{ border: "1px solid #4DF2BE", padding: "8px 10px" }}
-                >
-                  Buy BTC
-                </button>
-              </div>
-              {/*div for flex in  eight container*/}{" "}
-            </div>
-
-            {/*ninth container */}
-            <div className="flex bg-[#222222]  ml-[-15px] p-[12px] w-[809px] h-[100px] rounded-[12px]">
-              <div className="flex mt-[-10px] flex-col">
-                <div
-                  className="flex items-center mt-[20px]  bg-[#4A4A4A] w-[24px] h-[24px]  rounded-full"
-                  style={{ padding: "3px 2px" }}
-                >
-                  <p className="text-[10px] ml-[5px]  font-[700] text-[#8F8F8F] ">
-                    IH
-                  </p>
-                  <Image src={Vector} alt="vector" className="mt-[20px]" />
-                  <p className="text-[14px] ml-[10px] text-[#FCFCFC] font-[500] whitespace-nowrap">
-                    Isaac Hunter
-                  </p>
-
-                  <Image
-                    src={Mark_green}
-                    alt="mark"
-                    className="ml-[10px] w-[12.541px] h-[12.541px]"
-                  />
-                </div>
-                <div className="flex  text-[14px] font-[400] text-[#8F8F8F]  space-x-[10px] whitespace-nowrap">
-                  <p>140 orders</p>
-                  <Image
-                    src={Divider}
-                    alt="divider"
-                    className="w-[1px] mt-[10px] h-[12px]"
-                  />
-                  <p>99.00% completion</p>
-                  <Image
-                    src={Divider}
-                    alt="divider"
-                    className="w-[1px] mt-[10px] h-[12px]"
-                  />
-                  {/*second*/}{" "}
-                </div>
-                <div className="flex items-center text-[14px] font-[400]  text-[#8F8F8F] mt-[-20px] ml-[5px] space-x-[10px]">
-                  <Image
-                    src={Thumbs}
-                    alt="thunbs"
-                    className="w-[12px] h-[12px]"
-                  />
-                  <p>99.50</p>
-                  <Image src={Divider} alt="divider" className="mt-[-10px]" />
-                  <Image src={Timer} alt="timer" />
-                  <p>9 min</p>
-                  {/*3rd */}{" "}
-                </div>
-                {/*div for flex col of a container first row*/}{" "}
-              </div>
-              <div className="flex mt-[-10px] flex-col ml-[30px]  ">
-                <div className="flex      mt-[50px] space-x-[10px] whitespace-nowrap">
-                  <p className="text-[12px] font-[500] text-[#FCFCFC]">
-                    USD{" "}
-                    <span className="text-[18px] font-[700] text-[#FCFCFC]">
-                      102,500.00
-                    </span>
-                  </p>
-                </div>
-                <p className="text-[14px] font-[400] mt-[-5px]    text-[#8F8F8F]  space-x-[20px]">
-                  1 USD = 0.0000125 BTC
-                </p>
-                {/*div for second column flex-col*/}{" "}
-              </div>
-              <div className="flex flex-col mt-[-10px] ml-[30px]  ">
-                <div className="flex  ml-[20px] mt-[25px] space-x-[10px] whitespace-nowrap">
-                  <p className="text-[14px] font-[400] text-[#8F8F8F]">
-                    Available:
-                  </p>
-
-                  <p className="text-[14px] font-[400] text-[#8F8F8F]">
-                    55,000{" "}
-                    <span className="text-[14px] font-[400] text-[#8F8F8F]">
-                      BTC
-                    </span>
-                  </p>
-                </div>
-
-                <div className="flex  space-x-[5px] ml-[20px] mt-[-20px] whitespace-nowrap">
-                  <p className="text-[14px] font-[400] text-[#8F8F8F]">
-                    {" "}
-                    Order limit:
-                  </p>
-
-                  <p className="text-[14px] font-[400] text-[#8F8F8F]">
-                    240.00{" "}
-                    <span className="text-[14px] font-[400] text-[#8F8F8F]">
-                      BTC
-                    </span>
-                  </p>
-                  <Image src={Dminus} alt="minus" className="mt-[20px]" />
-                  <p className="text-[14px] font-[400] text-[#8F8F8F]">
-                    240.00{" "}
-                    <span className="text-[14px] font-[400] text-[#8F8F8F]">
-                      BTC
-                    </span>
-                  </p>
-                </div>
-                <div className="flex ml-[20px] mt-[-5px]">
-                  <Image src={Dgreen} alt="dgreen" className="w-[2px]" />
-                  <p className="text-[12px] font-[500] ml-[5px] mt-[3px] text-[#DBDBDB]">
-                    Mobile Payments
-                  </p>
-                </div>
-
-                {/*div for flex col in third column */}
-              </div>
-              <div className="w-[78px] h-[28px] whitespace-nowrap mt-[60px] ml-[55px]">
-                <button
-                 onClick={() => router.push("/buy_btc")}
-                  className=" bg-[#4DF2BE] text-[14px] text-[#0F1012] font-[700] rounded-full"
-                  style={{ border: "1px solid #4DF2BE", padding: "8px 10px" }}
-                >
-                  Buy BTC
-                </button>
-              </div>
-              {/*div for flex in  ninth container*/}{" "}
             </div>
 
             {/* div of flex-col of container in new line */}

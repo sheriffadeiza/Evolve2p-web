@@ -12,16 +12,33 @@ import Lessthan from "../../public/Assets/Evolve2p_lessthan/Makretplace/arrow-le
 const ForgotPin: React.FC = () => {
   const router = useRouter();
   const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
+  const handleForgotPassword = () => {
+    router.push("/reset-password");
+  };
+
   const handleContinue = async () => {
-    if (!password) return;
+    if (!password) return alert("Please enter your password before continuing.");
+
+    try {
+      // ✅ Save password in localStorage
+      localStorage.setItem("reset_password", password);
+    } catch (error) {
+      console.error("Error saving password:", error);
+      alert("Unable to save password. Please try again.");
+      return;
+    }
+
     setIsLoading(true);
+
+    // Delay for smoother UX and ensure localStorage saves before routing
     setTimeout(() => {
       setIsLoading(false);
-      router.push("/change-pin/newpin"); // proceed to the "Enter new pin" page
-    }, 1000);
+      router.push("/change-pin/fnewpin"); // proceed to the next page
+    }, 800);
   };
 
   return (
@@ -74,12 +91,12 @@ const ForgotPin: React.FC = () => {
                     className="w-[380px] h-[56px] mt-[10px] bg-[#222222] text-[#DBDBDB] text-[14px] font-[500] pl-[15px] pr-10 rounded-[10px] border-2 border-[#222222] focus:outline-none focus:border-[#4DF2BE]"
                     placeholder="Enter your password"
                   />
-                
+
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                  className="absolute top-[58%] border-0 right-2 ml-[90%] bg-[#222222] -translate-y-1/2 text-[#DBDBDB]"
-                  disabled={isLoading}
+                    className="absolute top-[45%] border-0 right-2 ml-[90%] bg-[#222222] -translate-y-1/2 text-[#DBDBDB]"
+                    disabled={isLoading}
                   >
                     <Image
                       src={ViewSlash}
@@ -88,25 +105,27 @@ const ForgotPin: React.FC = () => {
                       height={20}
                     />
                   </button>
-                </div>   //
-              </div>
 
-              {/* Forgot Password */}
-              <p
-                onClick={() => router.push("/forgot-password")}
-                className="text-[14px] font-[700] ml-[46%] text-[#FFFFFF] mt-[20px] cursor-pointer hover:underline mt-[10px]"
-              >
-                Forgot password?
-              </p>
+                  <div
+                    onClick={handleForgotPassword}
+                    className="ml-[70%] mt-[10px] text-[14px] font-[700] text-[#FCFCFC] hover:underline cursor-pointer"
+                  >
+                    Forgot password
+                  </div>
+
+                  {/* show error message (if any) */}
+                  {error && (
+                    <div className="text-[#FE857D] mt-3 font-[600]">{error}</div>
+                  )}
+                </div>
+              </div>
 
               {/* Continue Button */}
               <button
                 onClick={handleContinue}
                 disabled={!password || isLoading}
                 className={`w-[395px] h-[48px] mt-[40px] bg-[#4DF2BE] text-[#0F1012] font-[700] text-[14px] rounded-full border border-[#4DF2BE] transition-all ${
-                  !password || isLoading
-                    ? "opacity-50 cursor-not-allowed"
-                    : ""
+                  !password || isLoading ? "opacity-50 cursor-not-allowed" : ""
                 }`}
               >
                 {isLoading ? (
@@ -123,7 +142,7 @@ const ForgotPin: React.FC = () => {
                     height: 20px;
                     border: 3px solid rgba(255, 255, 255, 0.3);
                     border-radius: 50%;
-                    border-top-color: #0F1012;
+                    border-top-color: #0f1012;
                     animation: spin 1s ease-in-out infinite;
                   }
                   @keyframes spin {

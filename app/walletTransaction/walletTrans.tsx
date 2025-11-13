@@ -55,7 +55,7 @@ const WalletTransactions = () => {
 
   if (loading) {
     return (
-      <p className="text-[#C7C7C7] text-sm mt-4">Loading transactions...</p>
+      <p className="text-[#C7C7C7] text-sm mt-[38%]">Loading transactions...</p>
     );
   }
 

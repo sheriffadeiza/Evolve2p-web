@@ -68,7 +68,7 @@ const KYCVbd = () => {
   };
 
   const handleVerifyLater = () => {
-    router.push("/Loader");
+    router.push("/Logins/login");
   };
 
   const handleModalBackgroundClick = (e: React.MouseEvent<HTMLDivElement>) => {
