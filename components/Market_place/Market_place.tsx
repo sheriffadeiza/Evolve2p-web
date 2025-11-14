@@ -410,14 +410,25 @@ useEffect(() => {
             Reset
           </button>
           <button
-            onClick={handleCreateOffer}
             className="bg-[#4DF2BE] text-[#0F1012] text-[14px] font-[700] px-6 py-2 rounded-full w-[266px] h-[48px]"
             style={{ border: "1px solid #4DF2BE" }}
           >
-            {loadingOffers ? "Creating..." : "Find offer"}
+            {loadingOffers ? "Finding..." : "Find offer"}
           </button>
         </div>
+
+
+          <button
+            onClick={handleCreateOffer}
+            className="bg-[#4DF2BE] mt-[50px] text-[#0F1012] text-[14px] font-[700] px-6 py-2 rounded-full w-[266px] h-[48px]"
+            style={{ border: "1px solid #4DF2BE" }}
+          >
+            {loadingOffers ? "Creating..." : "Create offer"}
+          </button>
+          
           </div>
+
+         
           {/*right_div  */}
           {/*right_div  */}
           <div className="flex items-center w-[141px] h-[36px] space-x-[15px]">
