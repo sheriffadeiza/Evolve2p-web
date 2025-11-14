@@ -76,6 +76,7 @@ const Wallet: React.FC<QRCodeBoxProps> = ({ value }) => {
   useEffect(() => {
     (async () => {
       const res = await fetchCoinData();
+      console.log(res);
       setCoinData(res);
     })();
   }, []);
@@ -282,7 +283,7 @@ const Wallet: React.FC<QRCodeBoxProps> = ({ value }) => {
                     {/* QR Code */}
                     <div className="flex justify-center mt-[30px]">
                       <QRCodeCanvas
-                        value={currentWallet?.id || ""}
+                        value={currentWallet?.address || ""}
                         size={206}
                         bgColor="#3A3A3A"
                         fgColor="#FFFFFF"
@@ -297,8 +298,10 @@ const Wallet: React.FC<QRCodeBoxProps> = ({ value }) => {
                           Network
                         </p>
                         <strong className="text-[14px] font-[500] text-[#FCFCFC]">
-                          {currentCoin === "USDC" || currentCoin === "USDT"
-                            ? "ERC-20"
+                          {currentCoin === "USDC"
+                            ? "BSC"
+                            : currentCoin == "USDT"
+                            ? "TRON"
                             : currentCoin}
                         </strong>
                       </div>
@@ -328,8 +331,10 @@ const Wallet: React.FC<QRCodeBoxProps> = ({ value }) => {
                       <p className="text-[#DBDBDB] text-[14px] font-[400]">
                         Make sure to only send {currentCoin} through the
                         selected network: <br />
-                        {currentCoin === "USDC" || currentCoin === "USDT"
-                          ? "ERC-20"
+                        {currentCoin === "USDC"
+                          ? "BSC"
+                          : currentCoin == "USDT"
+                          ? "TRON"
                           : currentCoin}{" "}
                         . Sending incompatible cryptocurrencies or sending
                         through a <br />
@@ -345,10 +350,10 @@ const Wallet: React.FC<QRCodeBoxProps> = ({ value }) => {
                         <p className="text-[14px] font-[700] text-[#FCFCFC] ">
                           {" "}
                           {currentWallet?.id
-                            ? `${currentWallet.id.substring(
+                            ? `${currentWallet.address.substring(
                                 0,
                                 4
-                              )}...${currentWallet.id.substring(
+                              )}...${currentWallet.address.substring(
                                 currentWallet.id.length - 4
                               )}`
                             : "Generating address..."}{" "}
