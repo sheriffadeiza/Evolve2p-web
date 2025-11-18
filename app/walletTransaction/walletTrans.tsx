@@ -25,7 +25,7 @@ import { formatHashOrAddress } from "@/utils";
 const WalletTransactions = () => {
   const { filteredTransactions, loading } = useTransaction();
 
-  console.log(filteredTransactions);
+  
 
   const statusColors: Record<string, string> = {
     Processing: "bg-[#23303C] text-[#66B9FF]",
@@ -146,7 +146,7 @@ const WalletTransactions = () => {
         </table>
       ) : (
         // 👇 placeholder if no transactions
-        <div className="flex-1 flex flex-col items-center ml-[40%] mt-[5%] justify-center">
+        <div className="flex-1 flex flex-col items-center ml-[40px] mt-[5%] justify-center">
           <Image src={G19} alt="group19" />
           <p className="text-[14px] font-[400] text-[#8F8F8F]">
             Your 10 most recent transactions will appear here
@@ -155,7 +155,6 @@ const WalletTransactions = () => {
       )}
 
       {/* Divider */}
-      <div className="w-[153.8%] ml-[-10%] h-[1px] bg-[#fff] mt-[40%] opacity-20 my-8"></div>
     </div>
   );
 };

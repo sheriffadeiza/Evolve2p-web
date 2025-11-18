@@ -40,7 +40,7 @@ const [errorMethods, setErrorMethods] = useState("");
   const [selected2Method, setSelected2Method] =
     useState<string>("Payment Method");
   const [isFunnelOpen, setIsFunnelOpen] = useState(false);
-  const [paymentMethod, setPaymentMethod] = useState("Bank Transfer");
+  const [paymentMethod, setPaymentMethod] = useState<string | number>("Bank Transfer");
   const [payment2Method, setPayment2Method] = useState("Bank Transfer");
   const [isPayment2Open, setIsPayment2Open] = useState(false);
   const [isCurrencyOpen, setIsCurrencyOpen] = useState(false);
@@ -79,13 +79,13 @@ const [errorMethods, setErrorMethods] = useState("");
     { name: "USDC", icon: USDC },
   ];
 
-  const [methods, setMethods] = useState<string[]>([
-  "Bank Transfer",
-  "PayPal",
-  "Credit Card",
-  "Cryptocurrency Wallet",
-  "Mobile Payment App",
-]);
+  const [methods, setMethods] = useState<{ id: string | number; name: string }[]>([
+    { id: "bank", name: "Bank Transfer" },
+    { id: "paypal", name: "PayPal" },
+    { id: "card", name: "Credit Card" },
+    { id: "crypto", name: "Cryptocurrency Wallet" },
+    { id: "mobile", name: "Mobile Payment App" },
+  ]);
 
   const methods2 = [
     "Bank Transfer",
@@ -126,17 +126,24 @@ const [errorMethods, setErrorMethods] = useState("");
   className={`w-[15px] h-[15px] rounded-full transition-transform duration-300
     ${enabled ? "translate-x-[25px] bg-[#000]" : "translate-x-0 bg-[#fff]"}
   `}
-/>
+  />
       </div>
     );
   };
 
 
+
    
+
 
   
 
 useEffect(() => {
+    const normalizeMethods = (arr: any[]) =>
+      arr.map((m, i) =>
+        typeof m === "string" ? { id: i, name: m } : { id: m.id ?? i, name: m.name ?? String(m) }
+      );
+
     const fetchPaymentMethods = async () => {
       setLoadingMethods(true);
       setErrorMethods("");
@@ -152,17 +159,22 @@ useEffect(() => {
 
         console.log("💳 Payment Methods API Response:", data);
 
-        // Handle multiple possible formats
+        // Handle multiple possible formats and normalize to {id,name} objects
         if (Array.isArray(data)) {
-          setMethods(data);
+          setMethods(normalizeMethods(data));
         } else if (Array.isArray(data.methods)) {
-          setMethods(data.methods);
+          setMethods(normalizeMethods(data.methods));
         } else if (Array.isArray(data.data)) {
-          setMethods(data.data);
+          setMethods(normalizeMethods(data.data));
         } else if (typeof data === "object" && data !== null) {
+          // Try to extract string values or object entries
           const values = Object.values(data).filter((v) => typeof v === "string");
-          if (values.length > 0) setMethods(values);
-          else setErrorMethods("Unexpected response format");
+          if (values.length > 0) setMethods(values.map((v, i) => ({ id: i, name: v })));
+          else {
+            const entries = Object.entries(data).map(([k, v]) => ({ id: k, name: typeof v === "string" ? v : String(v) }));
+            if (entries.length > 0) setMethods(entries);
+            else setErrorMethods("Unexpected response format");
+          }
         } else {
           setErrorMethods("Unexpected response format");
         }
@@ -187,6 +199,7 @@ useEffect(() => {
   };
 
   // 🚀 Create Offer
+ // ...existing code...
   const handleCreateOffer = async () => {
     if (!minAmount || !maxAmount) {
       setErrorOffers("Please fill in both min and max limits.");
@@ -197,33 +210,90 @@ useEffect(() => {
     setErrorOffers("");
 
     try {
+      // get token from localStorage
+      const userDataRaw = typeof window !== "undefined" ? localStorage.getItem("UserData") : null;
+      if (!userDataRaw) throw new Error("No userData in localStorage");
+      let userData;
+      try {
+        userData = JSON.parse(userDataRaw);
+      } catch (e) {
+        throw new Error("Invalid userData in localStorage");
+      }
+
+      const token = userData?.accessToken || userData?.token;
+      if (!token) throw new Error("No access token found");
+
+      // Ensure we send payment method id if available
+      let pmToSend: string | number = paymentMethod;
+      if (!pmToSend || typeof pmToSend === "string") {
+        // try to resolve id from methods array when paymentMethod is name or default
+        const matched = methods.find((m) => String(m.name) === String(selectedMethod) || String(m.id) === String(paymentMethod));
+        if (matched) pmToSend = matched.id;
+      }
+
+      const payload = {
+        type: activeTab?.toLowerCase(),
+        crypto: selectedCoin?.name,
+        currency,
+        margin: 2.5,
+        paymentMethod: pmToSend, // send id when available
+        minLimit: Number(minAmount),
+        maxLimit: Number(maxAmount),
+        paymentTerms: "Send only from your verified bank account.",
+        paymentTime: "30 minutes",
+      };
+
+      
+
       const response = await fetch("https://evolve2p-backend.onrender.com/api/create-offer", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          type: activeTab.toLowerCase(),
-          crypto: selectedCoin.name,
-          currency,
-          margin: 2.5,
-          paymentMethod,
-          minLimit: Number(minAmount),
-          maxLimit: Number(maxAmount),
-          paymentTerms: "Send only from your verified bank account.",
-          paymentTime: "30 minutes",
-        }),
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(payload),
       });
 
-      if (!response.ok) throw new Error("Failed to create offer");
+      // try to read response body for debugging
+      const text = await response.text();
+      let data;
+      try {
+        data = text ? JSON.parse(text) : null;
+      } catch {
+        data = text;
+      }
 
-      const data = await response.json();
+      if (!response.ok) {
+        console.error("Create offer failed:", response.status, data);
+        throw new Error(data?.message || data || `Server error ${response.status}`);
+      }
+
+      
+
+      console.log("Create offer success:", data);
       setOffers((prev) => [...prev, data.offer || data]);
     } catch (err: any) {
+      console.error("Error in handleCreateOffer:", err);
       setErrorOffers(err.message || "Error creating offer");
     } finally {
       setLoadingOffers(false);
     }
   };
 
+  const [clientUser, setClientUser] = useState<any>(null);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const raw = localStorage.getItem("UserData");
+    if (!raw) return;
+    try {
+      const parsed = JSON.parse(raw);
+      // stored shape may be { userData: {...} } or the user object directly
+      setClientUser(parsed.userData ?? parsed);
+    } catch (e) {
+      console.error("Failed parsing UserData from localStorage", e);
+    }
+  }, []);
 
   return (
     <main className="min-h-screen bg-[#0F1012] pr-[10px] mt-[30px] pl-[30px] text-white md:p-8">
@@ -412,19 +482,14 @@ useEffect(() => {
           <button
             className="bg-[#4DF2BE] text-[#0F1012] text-[14px] font-[700] px-6 py-2 rounded-full w-[266px] h-[48px]"
             style={{ border: "1px solid #4DF2BE" }}
+            onClick={handleCreateOffer}
           >
-            {loadingOffers ? "Finding..." : "Find offer"}
+            {loadingOffers ? "Finding..." : "Create Offer"}
           </button>
         </div>
 
 
-          <button
-            onClick={handleCreateOffer}
-            className="bg-[#4DF2BE] mt-[50px] text-[#0F1012] text-[14px] font-[700] px-6 py-2 rounded-full w-[266px] h-[48px]"
-            style={{ border: "1px solid #4DF2BE" }}
-          >
-            {loadingOffers ? "Creating..." : "Create offer"}
-          </button>
+          
           
           </div>
 
@@ -631,17 +696,17 @@ useEffect(() => {
        {errorMethods ? (
             <p className="text-red-400 text-center text-sm">{errorMethods}</p>
           ) : methods.length > 0 ? (
-            methods.map((method, index) => (
+            methods.map((method) => (
               <p
-                key={index}
+                key={method.id}
                 className="text-[#FFFFFF] text-[16px] font-[500] py-2 cursor-pointer hover:text-emerald-400"
                 onClick={() => {
-                  setSelectedMethod(method);
-                  setPaymentMethod(method);
+                  setSelectedMethod(method.name);
+                  setPaymentMethod(method.id);
                   setIsPaymentOpen(false);
                 }}
               >
-                {method}
+                {method.name}
               </p>
             ))
           ) : (
@@ -983,60 +1048,89 @@ useEffect(() => {
           offers.map((offer, i) => (
             <div
               key={i}
-              className="flex bg-[#222222] ml-[-15px] p-[12px] w-[809px] h-[100px] rounded-[12px]"
+              className="flex bg-[#222222] mt-[10px] ml-[-15px] p-[12px] w-[830px] h-[100px] rounded-[12px]"
             >
               {/* Seller info */}
-              <div className="flex mt-[-10px] flex-col">
-                <div className="flex items-center mt-[20px] bg-[#4A4A4A] w-fit px-[8px] py-[4px] rounded-full">
-                  <p className="text-[12px] font-[700] text-[#8F8F8F]">
-                    {offer.user?.username?.[0] || "U"}
-                  </p>
-                  <p className="ml-[8px] text-[14px] text-[#FCFCFC] font-[500] whitespace-nowrap">
-                    {offer.user?.username || "Unknown User"}
-                  </p>
+                <div className="flex  flex-col">
+                <div className="flex items-center   w-fit px-[8px] py-[4px] rounded-full">
+                  {/*
+                    Prefer offer.user.username (server). Fallback to local UserData.
+                    Show initial and display username with leading @ if missing.
+                  */}
+                  {(() => {
+                    const rawName =
+                      offer?.user?.username ||
+                      clientUser?.username ||
+                      clientUser?.user?.username ||
+                      clientUser?.email ||
+                      "User";
+                    const username = typeof rawName === "string" ? rawName : String(rawName);
+                    const displayName = username ? (username.startsWith("@") ? username : `@${username}`) : "User";
+                    const initial = (username && username.length > 0) ? username[0] : "U";
+                    return (
+                      <>
+                        <p className="flex items-center justify-center  rounded-full text-[12px] w-[24px] h-[24px] bg-[#4A4A4A] font-[700] text-[#C7C7C7]">
+                          {initial}
+                        </p>
+                        <p className="ml-[8px] text-[14px] text-[#FCFCFC] font-[500] whitespace-nowrap">
+                          {displayName}
+                        </p>
+                      </>
+                    );
+                     })()}
                   <Image src={Mark_green} alt="mark" className="ml-[8px] w-[12px] h-[12px]" />
                 </div>
-                <div className="flex text-[14px] font-[400] text-[#8F8F8F] space-x-[10px] mt-[5px]">
-                  <p>Type: {offer.type}</p>
-                  <Image src={Divider} alt="divider" className="w-[1px] h-[12px]" />
-                  <p>{offer.paymentTime}</p>
-                </div>
-                <div className="flex items-center text-[14px] font-[400] text-[#8F8F8F] mt-[5px] space-x-[10px]">
+                
+                <div className="flex text-[14px]  ml-[10px] font-[400] text-[#8F8F8F] space-x-[10px] mt-[5px]">
+                  <p className="whitespace-nowrap">Type: {offer.type}</p>
+                  <Image src={Divider} alt="divider" className="w-[1px] h-[12px] mt-[15px]" />
+                  <div className="flex items-center space-x-[5px]">
                   <Image src={Thumbs} alt="thumbs" className="w-[12px] h-[12px]" />
-                  <p>Margin: {offer.margin}%</p>
-                  <Image src={Timer} alt="timer" />
-                  <p>{offer.paymentTime}</p>
+                  <p className="whitespace-nowrap">Margin: {offer.margin}%</p>
+                  </div>
+                  <div className="flex items-center space-x-[5px]">
+                  <Image src={Timer} alt="timer"  />
+                  <p className="whitespace-nowrap">{offer.time}</p> 
+                  </div>
                 </div>
+               
               </div>
 
               {/* Price section */}
               <div className="flex flex-col ml-[30px] mt-[10px]">
-                <p className="text-[12px] font-[500] text-[#FCFCFC]">
+                <p className="text-[12px] mt-[15px] ml-[50%] font-[500] text-[#C7C7C7]">
                   {offer.currency}{" "}
                   <span className="text-[18px] font-[700]">{offer.maxLimit}</span>
                 </p>
-                <p className="text-[14px] font-[400] text-[#8F8F8F]">
-                  Min: {offer.minLimit} | Max: {offer.maxLimit}
+                <div className="flex items-center mt-[-20px] ml-[50%]">
+                <p className="text-[14px] ] font-[400] text-[#8F8F8F]">
+                  Min: {offer.minLimit} 
                 </p>
+                <Image src={Divider} alt="divider" className="w-[1px] h-[12px] mx-[10px]" /> 
+                  <p className="text-[14px]  font-[400] text-[#8F8F8F]">
+                    Max: {offer.maxLimit}
+                 </p>
+               
+                </div>
               </div>
 
               {/* Payment Info */}
               <div className="flex flex-col ml-[30px] mt-[10px]">
-                <p className="text-[14px] text-[#8F8F8F]">
-                  Payment: {offer.paymentMethod}
+                <p className="flex text-[14px] ml-[80%] text-[#8F8F8F]">
+                  Payment: {offer.userId}
                 </p>
-                <p className="text-[12px] font-[500] text-[#DBDBDB]">
-                  {offer.paymentTerms}
+                <p className=" flex text-[12px] mt-[-80px]  ml-[250%] font-[500] text-[#DBDBDB]">
+                 PaymentTerms: {offer.terms}
                 </p>
               </div>
-
+    
               {/* Action button */}
-              <div className="w-[78px] h-[28px] mt-[60px] ml-[55px] whitespace-nowrap">
+             <div className="w-[78px] h-[28px] mt-[60px] ml-[30%] whitespace-nowrap">
                 <button
                   className="bg-[#4DF2BE] text-[14px] text-[#0F1012] font-[700] rounded-full"
                   style={{ border: "1px solid #4DF2BE", padding: "8px 10px" }}
                 >
-                  {offer.type === "buy" ? "Buy" : "Sell"} {offer.crypto}
+                  {String(offer.type || "").toLowerCase() === "buy" ? "Buy" : "Sell"} {offer.crypto}
                 </button>
               </div>
             </div>

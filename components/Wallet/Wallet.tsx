@@ -76,7 +76,6 @@ const Wallet: React.FC<QRCodeBoxProps> = ({ value }) => {
   useEffect(() => {
     (async () => {
       const res = await fetchCoinData();
-      console.log(res);
       setCoinData(res);
     })();
   }, []);
@@ -132,7 +131,6 @@ const Wallet: React.FC<QRCodeBoxProps> = ({ value }) => {
   useEffect(() => {
     if (currentCoin !== "") {
       if (clientUser && clientUser.wallets) {
-        console.log("Client User", clientUser);
         const wallet = clientUser.wallets.find(
           (w: any) =>
             String(w.currency).toUpperCase() == currentCoin?.toUpperCase()
@@ -145,7 +143,7 @@ const Wallet: React.FC<QRCodeBoxProps> = ({ value }) => {
     }
   }, [currentCoin, clientUser]);
 
-  console.log(currentWallet);
+  
 
   useEffect(() => {
     setMyDate(new Date().toLocaleString());
