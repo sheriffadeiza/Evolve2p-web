@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Nav from "../../components/NAV/Nav";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
@@ -28,6 +28,7 @@ const BuyBTC = () => {
    const router = useRouter();
   const [isTermsOpen, setIsTermsOpen] = useState(false);
   const [isSellerOpen, setIsSellerOpen] = useState(false);
+  const [clientUser, setClientUser] = useState<any>(null);
 
   const toggleSeller = () => setIsSellerOpen((prev) => !prev);
 
@@ -38,31 +39,23 @@ const BuyBTC = () => {
 
   const [activeTab, setActiveTab] = useState("offers");
 
-  // Handle USD input → calculate BTC
-  const handlePayChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value;
-    setPay(value);
+  useEffect(() => {
+   if (typeof window === "undefined") return;
+   const raw = localStorage.getItem("UserData");
+   if (!raw) return;
+   try {
+     const parsed = JSON.parse(raw);
+     const resolved = parsed.userData ?? parsed;
+     setClientUser(resolved);
+     console.log("clientUser:", resolved);
+   } catch (e) {
+     // fallback when UserData is a plain string
+     setClientUser(raw);
+     console.log("clientUser (raw):", raw);
+   }
+ }, []);
 
-    const usd = parseFloat(value);
-    if (!isNaN(usd)) {
-      setReceive((usd / BTC_PRICE).toFixed(8)); // 8 decimal places
-    } else {
-      setReceive("");
-    }
-  };
-
-  // Handle BTC input → calculate USD
-  const handleReceiveChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value;
-    setReceive(value);
-
-    const btc = parseFloat(value);
-    if (!isNaN(btc)) {
-      setPay((btc * BTC_PRICE).toFixed(2)); // 2 decimal places
-    } else {
-      setPay("");
-    }
-  };
+// Handle USD input → calculate BTC
 
   return (
     <main className="min-h-screen bg-[#0F1012] pr-[10px] mt-[30px] pl-[30px] text-white md:p-8">
@@ -79,21 +72,38 @@ const BuyBTC = () => {
           <div className="flex flex-col">
             {/* first container left */}
             <div
-              className="w-[498px] h-[219px] bg-[#222222] rounded-[12px]"
-              style={{ padding: "12px 16px" }}
+              className="w-[498px] h-[219px] bg-[#222222] rounded-[12px] p-[12px_16px]"
+              
             >
               <div
-                className="flex items-center  bg-[#4A4A4A] w-[24px] h-[24px]  rounded-full"
-                style={{ padding: "3px 2px" }}
+                className="flex items-center   bg-[#4A4A4A] w-[24px] h-[24px]  rounded-full p-[3px_2px]"
+                
               >
-                <p className="text-[10px] ml-[5px]  font-[700] text-[#8F8F8F] ">
-                  CB
-                </p>
-                <Image src={Vector} alt="vector" className="mt-[20px]" />
-                <p className="text-[14px] ml-[10px] text-[#FCFCFC] font-[500] whitespace-nowrap">
-                  CryptoBoss
-                </p>
+                 
+                {(() => {
+                  const rawName =
+                    clientUser?.username ||
+                    clientUser?.user?.username ||
+                    clientUser?.email ||
+                   "CryptoBoss";
+                  const uname = typeof rawName === "string" ? rawName : String(rawName);
+                  const displayName = uname ? (uname.startsWith("@") ? uname : `@${uname}`) : "CryptoBoss";
+                  const initial = uname && uname.length > 0 ? uname[0] : "C";
+                  return (
+                    <>
+                    
 
+                      <p className="text-[20px] ml-[8px]  font-[700] text-[#8F8F8F] ">
+                        {initial}
+                      </p>
+                      
+                      <Image src={Vector} alt="vector" className="mt-[20px]" />
+                      <p className="text-[14px] ml-[10px] text-[#FCFCFC] font-[500] whitespace-nowrap">
+                        {displayName}
+                      </p>
+                    </>
+                 );
+ })()}
                 <Image
                   src={Mark_green}
                   alt="mark"
@@ -632,7 +642,7 @@ const BuyBTC = () => {
             >
               <div>
                 <div className="text-[#C7C7C7] text-[14px] font-[500]">
-                  You pay
+                  You Receive
                 </div>
 
                 <div className="flex items-center justify-between">

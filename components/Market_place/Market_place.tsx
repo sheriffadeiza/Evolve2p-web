@@ -304,7 +304,7 @@ useEffect(() => {
           {/*left_div  */}
           <div className="bg-[#222222]  pl-[30px] pt-[20px] w-[395px] h-[498.79999]">
             <h2 className="text-[24px] text-[#FCFCFC] font-[700]">
-              Find an Offer
+              Create an Offer
             </h2>
             <p className="text-[#DBDBDB] text-[14px] font-[400] w-[355px] h-[40px] ">
               Let us know your trading needs, and we’ll assist you in narrowing
@@ -484,7 +484,7 @@ useEffect(() => {
             style={{ border: "1px solid #4DF2BE" }}
             onClick={handleCreateOffer}
           >
-            {loadingOffers ? "Finding..." : "Create Offer"}
+            {loadingOffers ? "Creating..." : "Create Offer"}
           </button>
         </div>
 
@@ -1097,29 +1097,28 @@ useEffect(() => {
               </div>
 
               {/* Price section */}
-              <div className="flex flex-col ml-[30px] mt-[10px]">
-                <p className="text-[12px] mt-[15px] ml-[50%] font-[500] text-[#C7C7C7]">
-                  {offer.currency}{" "}
-                  <span className="text-[18px] font-[700]">{offer.maxLimit}</span>
+              <div className="flex flex-col ml-[30px] mt-[25px]">
+                <p className="text-[12px] whitespace-nowrap mt-[15px] ml-[50%] font-[500] text-[#C7C7C7]">
+                 Currency: {offer.currency}{" "}
                 </p>
                 <div className="flex items-center mt-[-20px] ml-[50%]">
                 <p className="text-[14px] ] font-[400] text-[#8F8F8F]">
-                  Min: {offer.minLimit} 
+                  Min: ${offer.minLimit} 
                 </p>
                 <Image src={Divider} alt="divider" className="w-[1px] h-[12px] mx-[10px]" /> 
                   <p className="text-[14px]  font-[400] text-[#8F8F8F]">
-                    Max: {offer.maxLimit}
+                    Max: ${offer.maxLimit}
                  </p>
                
                 </div>
               </div>
 
               {/* Payment Info */}
-              <div className="flex flex-col ml-[30px] mt-[10px]">
-                <p className="flex text-[14px] ml-[80%] text-[#8F8F8F]">
-                  Payment: {offer.userId}
+              <div className="flex flex-col ml-[30px] mt-[25px]">
+                <p className="flex flex-col text-[14px]  ml-[80%] text-[#8F8F8F]">
+                  Payment: <p className="text-[#4DF2BE] whitespace-nowrap">{selectedMethod}</p>
                 </p>
-                <p className=" flex text-[12px] mt-[-80px]  ml-[250%] font-[500] text-[#DBDBDB]">
+                <p className=" flex text-[12px] mt-[-70px]  ml-[250%] font-[500] text-[#DBDBDB]">
                  PaymentTerms: {offer.terms}
                 </p>
               </div>
@@ -1129,8 +1128,13 @@ useEffect(() => {
                 <button
                   className="bg-[#4DF2BE] text-[14px] text-[#0F1012] font-[700] rounded-full"
                   style={{ border: "1px solid #4DF2BE", padding: "8px 10px" }}
+                   onClick={() => String(offer.type || "").toLowerCase() === "buy" 
+                  ? router.push("/buy_btc")
+                  : router.push("/sell_btc")
+                  }
                 >
                   {String(offer.type || "").toLowerCase() === "buy" ? "Buy" : "Sell"} {offer.crypto}
+                 
                 </button>
               </div>
             </div>
