@@ -92,8 +92,8 @@ const EmailForm = () => {
   };
 
   return (
-    <div className="pl-[100px] pt-[30px]">
-      <div className="flex flex-col gap-2 max-w-md">
+    <div className=" lg:pt-[30px] w-full lg:mx-0 ">
+      <div className="flex flex-col gap-2 lg:max-w-md mx-auto p-8 max-w-sm">
         <h1 className="text-[24px] font-[700] text-[#FCFCFC]">
           Create account
         </h1>
@@ -110,7 +110,7 @@ const EmailForm = () => {
           value={email}
           onChange={handleEmailChange}
           placeholder="Enter your email address"
-          className="p-3 rounded-[8px] w-[400px] mt-[10px] h-[56px] bg-[#222222] pl-[20px] text-[14px] font-[500] text-[#FCFCFC] border-none focus:outline-none"
+          className="p-3 rounded-[8px] w-full lg:w-[400px] mt-[10px] h-[56px] bg-[#222222] pl-[20px] text-[14px] font-[500] text-[#FCFCFC] border-none focus:outline-none"
         />
 
         {error && (
@@ -118,7 +118,7 @@ const EmailForm = () => {
         )}
 
         <button
-          className={`p-3 w-[420px] h-[56px] mt-[8%] bg-[#4DF2BE] text-[#0F1012] rounded-[100px] border border-brand-green ${
+          className={`p-3 w-full lg:w-[100%] h-[56px] mt-[8%] bg-[#4DF2BE] text-[#0F1012] rounded-[100px] border border-brand-green ${
             isLoading
               ? "opacity-50 cursor-not-allowed"
               : "cursor-pointer hover:bg-[#3dd9ab]"
@@ -129,7 +129,7 @@ const EmailForm = () => {
           {isLoading ? "Processing..." : "Continue"}
         </button>
 
-        <div className="flex flex-col items-center ml-[-20%] gap-4">
+        <div className="flex flex-col items-center lg:ml-[-20%] gap-4 ">
           <p className="text-14px font-[400] text-[#DBDBDB]">
             Already have an account?{" "}
             <a

@@ -1,27 +1,19 @@
-
-
-import React from 'react';
-import Header from '@/components/Signup/SignupEmail/Header';
-import Resetpnav from '@/components/Login/LoginReset/Resetpnav';
-import Resetpbd from '@/components/Login/LoginReset/Resetpbd';
-
+import React from "react";
+import Header from "@/components/Signup/SignupEmail/Header";
+import Resetpnav from "@/components/Login/LoginReset/Resetpnav";
+import Resetpbd from "@/components/Login/LoginReset/Resetpbd";
 
 const page = () => {
   return (
-    <div className="min-h-screen flex flex-col bg-[#0F1012]">
+    <div className="min-h-screen flex flex-col bg-[#0F1012] ">
       {/* Header Section */}
       <Header />
-      
-      {/* Main Content */}
-      <div className="">
-        
-          <Resetpnav/>
-          <Resetpbd/>
-         
-        </div>
-        
 
-     
+      {/* Main Content */}
+      <div className="mx-auto flex flex-col h-dvh justify-center items-center w-full">
+        <Resetpnav />
+        <Resetpbd />
+      </div>
     </div>
   );
 };

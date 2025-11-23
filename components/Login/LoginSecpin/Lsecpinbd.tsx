@@ -106,7 +106,8 @@ const Lsecpinbd: React.FC = () => {
         Enter security PIN
       </h2>
       <p className="text-[16px] font-[400] mt-[-10px] mb-6 text-[#8F8F8F]">
-        Your PIN helps you log in faster and approve transactions <br /> securely.
+        Your PIN helps you log in faster and approve transactions <br />{" "}
+        securely.
       </p>
 
       {error && (

@@ -162,65 +162,67 @@ const VerifyEmailbd: React.FC = () => {
   const isPinComplete = pin.every((d) => d !== "");
 
   return (
-    <div className="max-w-md mx-auto ml-[120px] mt-10 px-4 text-white">
-      <h1 className="text-[24px] text-[#FCFCFC] font-[700] mb-2">
-        Verify Email
-      </h1>
-      <p className="text-[16px] font-[400] text-[#8F8F8F] mb-6">
-        Please enter the 6-digit code sent to <br />
-        <span className="text-[#DBDBDB]">{email || "your email"}</span>
-      </p>
+    <div className="w-full lg:mx-0  flex justify-center">
+      <div className="lg:max-w-lg max-w-sm  p-4 mx-auto lg:ml-[120px] mt-10 lg:px-4 text-white ">
+        <h1 className="text-[24px] text-[#FCFCFC] font-[700] mb-2">
+          Verify Email
+        </h1>
+        <p className="text-[16px] font-[400] text-[#8F8F8F] mb-6">
+          Please enter the 6-digit code sent to <br />
+          <span className="text-[#DBDBDB]">{email || "your email"}</span>
+        </p>
 
-      {error && (
-        <div className="text-[#F5918A] text-[14px] font-[500] mb-4">
-          {error}
+        {error && (
+          <div className="text-[#F5918A] text-[14px] font-[500] mb-4">
+            {error}
+          </div>
+        )}
+
+        {success && (
+          <div className="text-[#1ECB84] text-[14px] font-[500] mb-4">
+            Email verified successfully! Redirecting...
+          </div>
+        )}
+
+        <div className="flex gap-[5px]  justify-center mb-6   lg:w-full">
+          {pin.map((digit, idx) => (
+            <input
+              key={idx}
+              id={`pin-${idx}`}
+              maxLength={1}
+              value={pin[idx]}
+              onChange={(e) => handleChange(e.target.value, idx)}
+              className=" w-full lg:w-[55px] h-[56px] rounded-[10px] border-none bg-[#222222] text-center text-[14px] font-[500] text-[#FCFCFC] focus:outline-none focus:ring-1 focus:ring-[#4DF2BE"
+              type="password"
+              inputMode="numeric"
+              pattern="[0-9]*"
+              disabled={isLoading}
+            />
+          ))}
         </div>
-      )}
 
-      {success && (
-        <div className="text-[#1ECB84] text-[14px] font-[500] mb-4">
-          Email verified successfully! Redirecting...
-        </div>
-      )}
-
-      <div className="flex gap-[5px] ml-[-150px] justify-center mb-6">
-        {pin.map((digit, idx) => (
-          <input
-            key={idx}
-            id={`pin-${idx}`}
-            maxLength={1}
-            value={pin[idx]}
-            onChange={(e) => handleChange(e.target.value, idx)}
-            className="w-[55px] h-[56px] rounded-[10px] border-none bg-[#222222] text-center text-[14px] font-[500] text-[#FCFCFC] focus:outline-none focus:ring-1 focus:ring-[#4DF2BE]"
-            type="password"
-            inputMode="numeric"
-            pattern="[0-9]*"
+        {isPinComplete && (
+          <button
+            className=" w-full lg:w-[100%] h-[48px] mt-[10px] lg:ml-[-10px] bg-[#4DF2BE] border-none text-[#0F1012] rounded-[100px] font-[700] disabled:opacity-50 "
+            onClick={() => verifyCode(pin.join(""))}
             disabled={isLoading}
-          />
-        ))}
-      </div>
+          >
+            {isLoading ? "Verifying..." : "Verify Email"}
+          </button>
+        )}
 
-      {isPinComplete && (
-        <button
-          className="w-[300px] h-[48px] mt-[10px] ml-[55px] bg-[#4DF2BE] border-none text-[#0F1012] rounded-[100px] font-[700] disabled:opacity-50"
-          onClick={() => verifyCode(pin.join(""))}
-          disabled={isLoading}
-        >
-          {isLoading ? "Verifying..." : "Verify Email"}
-        </button>
-      )}
-
-      <div className="text-center text-[14px] font-[400] text-[#DBDBDB] ml-[-25%] mt-[20px]">
-        Didn't receive code?{" "}
-        <button
-          onClick={handleResendCode}
-          disabled={!canResend || isLoading}
-          className={`text-[#FFFFFF] w-[149px] h-[40px] text-[14px] ml-[10px] rounded-[100px] bg-[#222222] border-none font-[700] hover:underline ${
-            !canResend || isLoading ? "opacity-50 cursor-not-allowed" : ""
-          }`}
-        >
-          {canResend ? "Resend code" : `Resend code ${resendTimer}s`}
-        </button>
+        <div className="text-center text-[14px] font-[400] text-[#DBDBDB] lg:ml-[-5%] mt-[20px] ">
+          Didn't receive code?{" "}
+          <button
+            onClick={handleResendCode}
+            disabled={!canResend || isLoading}
+            className={`text-[#FFFFFF] w-[149px] h-[40px] text-[14px] ml-[30px] rounded-[100px] bg-[#222222] border-none font-[700] hover:underline ${
+              !canResend || isLoading ? "opacity-50 cursor-not-allowed" : ""
+            }`}
+          >
+            {canResend ? "Resend code" : `Resend code ${resendTimer}s`}
+          </button>
+        </div>
       </div>
     </div>
   );

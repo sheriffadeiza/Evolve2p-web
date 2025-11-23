@@ -212,248 +212,258 @@ const Profilebd = () => {
   );
 
   return (
-    <div className="flex flex-col px-8 py-16 ml-[100px] gap-2 w-full max-w-[400px] text-white">
-      {/* Success Modal */}
-      {showSuccessModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-70 ml-[30%]  flex items-center justify-center z-50">
-          <div className="bg-[#222222] h-[40vh] p-6 rounded-[10px] w-[500px] text-center">
-            <h3 className="text-[#4DF2BE] text-[18px] font-bold mb-2">
-              Success!
-            </h3>
-            <p className="text-[#FCFCFC] mt-[50px]">
-              Registration completed successfully
-            </p>
-            <button
-              onClick={handleContinueToSecurityPin}
-              className="w-[250px] h-[50px] mt-[50px] border-none bg-[#4DF2BE] text-[#000] py-2 rounded-[100px] font-bold hover:bg-[#3dd9ab] transition"
-            >
-              Continue to Security Pin
-            </button>
+    <div className="w-full lg:mx-0 ">
+      <div className="flex flex-col px-4 lg:px-4 mx-auto py-16 lg:ml-[100px] gap-2 w-full max-w-[400px] text-white">
+        {/* Success Modal */}
+        {showSuccessModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-70 ml-[30%]  flex items-center justify-center z-50">
+            <div className="bg-[#222222] h-[40vh] p-6 rounded-[10px] w-[500px] text-center">
+              <h3 className="text-[#4DF2BE] text-[18px] font-bold mb-2">
+                Success!
+              </h3>
+              <p className="text-[#FCFCFC] mt-[50px]">
+                Registration completed successfully
+              </p>
+              <button
+                onClick={handleContinueToSecurityPin}
+                className="w-[250px] h-[50px] mt-[50px] border-none bg-[#4DF2BE] text-[#000] py-2 rounded-[100px] font-bold hover:bg-[#3dd9ab] transition"
+              >
+                Continue to Security Pin
+              </button>
+            </div>
+          </div>
+        )}
+
+        <h1 className="text-[24px] text-[#FCFCFC] font-[700]">
+          Complete Your Profile
+        </h1>
+        <p className="text-[16px] font-[400] mt-[-5px] text-[#8F8F8F] mb-6">
+          This helps personalize your experience.
+        </p>
+
+        {errorMessage && (
+          <div className="w-[370px] p-3 mb-4 text-[#F5918A] text-sm">
+            {errorMessage}
+          </div>
+        )}
+
+        {/* Username Input */}
+        <div className="mt-[20px] w-full">
+          <label className="text-[14px] mt-2 font-[500] text-[#8F8F8F]">
+            Username
+          </label>
+          <div
+            className={`relative w-full lg:w-full rounded-t-[10px] border-2 border-gray-600 ${
+              usernameStatus === "invalid"
+                ? "border border-[#F5918A]"
+                : "border border-[#2E2E2E]"
+            }`}
+          >
+            <span className="text-[#DBDBDB] absolute ml-[10px] mt-[18px]">
+              @
+            </span>
+            <input
+              type="text"
+              value={formData.username}
+              onChange={handleUsernameChange}
+              className="w-full lg:w-[360px] h-[56px] text-[#FCFCFC] rounded-t-[10px] px-4 py-3 bg-[#222222] border-none pl-[25px] focus:outline-none"
+              required
+              disabled={isLoadingCountries}
+            />
+          </div>
+          <div
+            className={`w-full h-[30px] pl-[20px] flex items-center px-4 bg-[#222222] rounded-b-[10px] ${
+              usernameStatus === "invalid"
+                ? "border border-[#F5918A] border-t-0"
+                : "border border-[#2E2E2E] border-t-0"
+            }`}
+          >
+            {usernameStatus === "checking" && (
+              <span className="text-[12px] text-[#8F8F8F]">
+                Checking username...
+              </span>
+            )}
+            {usernameStatus === "valid" && (
+              <span className="text-[12px] text-[#1ECB84]">
+                Username available
+              </span>
+            )}
+            {usernameStatus === "invalid" && (
+              <span className="text-[12px] text-[#F5918A]">
+                {formData.username.length < 4
+                  ? "Minimum 4 characters"
+                  : "Username not available"}
+              </span>
+            )}
+            {usernameStatus === "" && formData.username.trim() === "" && (
+              <span className="text-[12px] text-[#8F8F8F]">
+                Enter a username
+              </span>
+            )}
           </div>
         </div>
-      )}
 
-      <h1 className="text-[24px] text-[#FCFCFC] font-[700]">
-        Complete Your Profile
-      </h1>
-      <p className="text-[16px] font-[400] mt-[-5px] text-[#8F8F8F] mb-6">
-        This helps personalize your experience.
-      </p>
-
-      {errorMessage && (
-        <div className="w-[370px] p-3 mb-4 text-[#F5918A] text-sm">
-          {errorMessage}
+        {/* Country Dropdown */}
+        <div className="mt-[20px] ">
+          <label className="text-[14px] font-[500] text-[#8F8F8F] mb-2 block">
+            Country
+          </label>
+          <div className="relative w-full lg:w-[350px">
+            {isLoadingCountries ? (
+              <div className="w-[370px] h-[56px] bg-[#222222] mt-[10px] pl-[15px] pr-12 border border-[#2E2E2E] rounded-[10px] flex items-center">
+                <span className="text-[#8F8F8F]">Loading countries...</span>
+              </div>
+            ) : (
+              <>
+                <div className="absolute left-4 top-1/2 mt-[5px] ml-[10px] -translate-y-1/2 flex items-center pointer-events-none">
+                  {formData.countryCode && (
+                    <img
+                      src={`https://flagcdn.com/w20/${formData.countryCode.toLowerCase()}.png`}
+                      alt={`${formData.country} flag`}
+                      width={20}
+                      height={20}
+                      className="rounded-sm"
+                    />
+                  )}
+                </div>
+                <div className="relati">
+                  <input
+                    type="text"
+                    className="w-full  lg:w-[365px] h-[56px] bg-[#222222] mt-[10px] pl-[20px] pr-12 border border-[#2E2E2E] rounded-[10px] text-[14px] font-[500] text-[#FCFCFC] focus:outline-none"
+                    placeholder="Type to search country..."
+                    value={countrySearch}
+                    onChange={(e) => setCountrySearch(e.target.value)}
+                    onFocus={() => setShowCountrySearch(true)}
+                    required
+                    disabled={isLoadingCountries}
+                  />
+                  {showCountrySearch && (
+                    <div className="absolute top-[60px]   left-0 w-full z-20 bg-[#222222] border border-[#2E2E2E] rounded-[10px] p-2">
+                      <div className="max-h-[200px] ml-[10px] overflow-y-auto">
+                        {countries.filter((country) =>
+                          country.name
+                            .toLowerCase()
+                            .includes(countrySearch.toLowerCase())
+                        ).length === 0 && (
+                          <div className="text-[#8F8F8F] px-2 py-1">
+                            No country found
+                          </div>
+                        )}
+                        {countries
+                          .filter((country) =>
+                            country.name
+                              .toLowerCase()
+                              .includes(countrySearch.toLowerCase())
+                          )
+                          .map((country) => (
+                            <div
+                              key={country.code}
+                              className="flex items-center mb-[10px]  gap-2 px-2 py-2 cursor-pointer hover:bg-[#333] rounded"
+                              onClick={() => {
+                                setFormData((prev) => ({
+                                  ...prev,
+                                  country: country.name,
+                                  countryCode: country.code,
+                                }));
+                                setCountrySearch(country.name);
+                                setShowCountrySearch(false);
+                              }}
+                            >
+                              <img
+                                src={`https://flagcdn.com/w20/${country.code.toLowerCase()}.png`}
+                                alt={`${country.name} flag`}
+                                width={20}
+                                height={20}
+                                className="rounded-sm"
+                              />
+                              <span className="text-[#FCFCFC]">
+                                {country.name}
+                              </span>
+                            </div>
+                          ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
+          </div>
         </div>
-      )}
 
-      {/* Username Input */}
-      <div className="mt-[20px]">
-        <label className="text-[14px] mt-2 font-[500] text-[#8F8F8F]">
-          Username
+        {/* Phone Input */}
+        <label className="text-[14px] mt-[30px] font-[500] text-[#8F8F8F] mb-2 ">
+          Phone number
         </label>
         <div
-          className={`relative w-[388px] rounded-t-[10px] ${
-            usernameStatus === "invalid"
-              ? "border border-[#F5918A]"
-              : "border border-[#2E2E2E]"
+          className={`flex items-center pl-[10px]  w-full mt-[10px] bg-[#222222] border rounded-[10px] ${
+            formData.phone.trim() === ""
+              ? "border-[#F5918A]"
+              : "border-[#2E2E2E]"
           }`}
         >
-          <span className="text-[#DBDBDB] absolute ml-[10px] mt-[18px]">@</span>
+          <span className="text-[#DBDBDB] w-[51px] h-[24px] pt-[5px] text-center text-[14px] font-[500] bg-[#3A3A3A] px-4 py-4 rounded-[100px] ">
+            {countries.find((c) => c.code === formData.countryCode)?.dialCode ||
+              "+234"}
+          </span>
           <input
-            type="text"
-            value={formData.username}
-            onChange={handleUsernameChange}
-            className="w-[360px] h-[56px] text-[#FCFCFC] rounded-t-[10px] px-4 py-3 bg-[#222222] border-none pl-[25px] focus:outline-none"
+            type="tel"
+            value={formData.phone}
+            onChange={(e) => {
+              const value = e.target.value.replace(/\D/g, "");
+              setFormData((prev) => ({ ...prev, phone: value }));
+            }}
+            className="flex-1 h-[56px] bg-transparent border-none outline-none text-[#FCFCFC] pl-4"
+            placeholder="Phone number"
             required
             disabled={isLoadingCountries}
           />
         </div>
-        <div
-          className={`w-[368px] h-[30px] pl-[20px] flex items-center px-4 bg-[#222222] rounded-b-[10px] ${
-            usernameStatus === "invalid"
-              ? "border border-[#F5918A] border-t-0"
-              : "border border-[#2E2E2E] border-t-0"
+
+        {/* Continue Button */}
+        <button
+          onClick={handleSubmit}
+          className={`w-full  h-[48px] border-none bg-[#2DE3A3] text-[#0F1012] text-[14px] font-[700] mt-[40px] py-3 rounded-full font-medium hover:opacity-90 transition flex items-center justify-center ${
+            !allFieldsValid() || isLoading
+              ? "opacity-50 cursor-not-allowed"
+              : ""
           }`}
+          disabled={!allFieldsValid() || isLoading}
         >
-          {usernameStatus === "checking" && (
-            <span className="text-[12px] text-[#8F8F8F]">
-              Checking username...
-            </span>
-          )}
-          {usernameStatus === "valid" && (
-            <span className="text-[12px] text-[#1ECB84]">
-              Username available
-            </span>
-          )}
-          {usernameStatus === "invalid" && (
-            <span className="text-[12px] text-[#F5918A]">
-              {formData.username.length < 4
-                ? "Minimum 4 characters"
-                : "Username not available"}
-            </span>
-          )}
-          {usernameStatus === "" && formData.username.trim() === "" && (
-            <span className="text-[12px] text-[#8F8F8F]">Enter a username</span>
-          )}
-        </div>
-      </div>
-
-      {/* Country Dropdown */}
-      <div className="mt-[20px]">
-        <label className="text-[14px] font-[500] text-[#8F8F8F] mb-2 block">
-          Country
-        </label>
-        <div className="relative w-[350px]">
-          {isLoadingCountries ? (
-            <div className="w-[370px] h-[56px] bg-[#222222] mt-[10px] pl-[15px] pr-12 border border-[#2E2E2E] rounded-[10px] flex items-center">
-              <span className="text-[#8F8F8F]">Loading countries...</span>
-            </div>
+          {isLoading ? (
+            <div className="loader-small"></div>
           ) : (
-            <>
-              <div className="absolute left-4 top-1/2 mt-[5px] ml-[10px] -translate-y-1/2 flex items-center pointer-events-none">
-                {formData.countryCode && (
-                  <img
-                    src={`https://flagcdn.com/w20/${formData.countryCode.toLowerCase()}.png`}
-                    alt={`${formData.country} flag`}
-                    width={20}
-                    height={20}
-                    className="rounded-sm"
-                  />
-                )}
-              </div>
-              <div className="relative">
-                <input
-                  type="text"
-                  className="w-[365px] h-[56px] bg-[#222222] mt-[10px] pl-[20px] pr-12 border border-[#2E2E2E] rounded-[10px] text-[14px] font-[500] text-[#FCFCFC] focus:outline-none"
-                  placeholder="Type to search country..."
-                  value={countrySearch}
-                  onChange={(e) => setCountrySearch(e.target.value)}
-                  onFocus={() => setShowCountrySearch(true)}
-                  required
-                  disabled={isLoadingCountries}
-                />
-                {showCountrySearch && (
-                  <div className="absolute top-[60px]   left-0 w-full z-20 bg-[#222222] border border-[#2E2E2E] rounded-[10px] p-2">
-                    <div className="max-h-[200px] ml-[10px] overflow-y-auto">
-                      {countries.filter((country) =>
-                        country.name
-                          .toLowerCase()
-                          .includes(countrySearch.toLowerCase())
-                      ).length === 0 && (
-                        <div className="text-[#8F8F8F] px-2 py-1">
-                          No country found
-                        </div>
-                      )}
-                      {countries
-                        .filter((country) =>
-                          country.name
-                            .toLowerCase()
-                            .includes(countrySearch.toLowerCase())
-                        )
-                        .map((country) => (
-                          <div
-                            key={country.code}
-                            className="flex items-center mb-[10px]  gap-2 px-2 py-2 cursor-pointer hover:bg-[#333] rounded"
-                            onClick={() => {
-                              setFormData((prev) => ({
-                                ...prev,
-                                country: country.name,
-                                countryCode: country.code,
-                              }));
-                              setCountrySearch(country.name);
-                              setShowCountrySearch(false);
-                            }}
-                          >
-                            <img
-                              src={`https://flagcdn.com/w20/${country.code.toLowerCase()}.png`}
-                              alt={`${country.name} flag`}
-                              width={20}
-                              height={20}
-                              className="rounded-sm"
-                            />
-                            <span className="text-[#FCFCFC]">
-                              {country.name}
-                            </span>
-                          </div>
-                        ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-            </>
+            "Complete Registration"
           )}
-        </div>
-      </div>
+        </button>
 
-      {/* Phone Input */}
-      <label className="text-[14px] mt-[30px] font-[500] text-[#8F8F8F] mb-2">
-        Phone number
-      </label>
-      <div
-        className={`flex items-center pl-[10px] w-[375px] mt-[10px] bg-[#222222] border rounded-[10px] ${
-          formData.phone.trim() === "" ? "border-[#F5918A]" : "border-[#2E2E2E]"
-        }`}
-      >
-        <span className="text-[#DBDBDB] w-[51px] h-[24px] pt-[5px] text-center text-[14px] font-[500] bg-[#3A3A3A] px-4 py-4 rounded-[100px]">
-          {countries.find((c) => c.code === formData.countryCode)?.dialCode ||
-            "+234"}
-        </span>
-        <input
-          type="tel"
-          value={formData.phone}
-          onChange={(e) => {
-            const value = e.target.value.replace(/\D/g, "");
-            setFormData((prev) => ({ ...prev, phone: value }));
-          }}
-          className="flex-1 h-[56px] bg-transparent border-none outline-none text-[#FCFCFC] pl-4"
-          placeholder="Phone number"
-          required
-          disabled={isLoadingCountries}
-        />
-      </div>
-
-      {/* Continue Button */}
-      <button
-        onClick={handleSubmit}
-        className={`w-[388px] h-[48px] border-none bg-[#2DE3A3] text-[#0F1012] text-[14px] font-[700] mt-[40px] py-3 rounded-full font-medium hover:opacity-90 transition flex items-center justify-center ${
-          !allFieldsValid() || isLoading ? "opacity-50 cursor-not-allowed" : ""
-        }`}
-        disabled={!allFieldsValid() || isLoading}
-      >
-        {isLoading ? (
-          <div className="loader-small"></div>
-        ) : (
-          "Complete Registration"
-        )}
-      </button>
-
-      <style jsx global>{`
-        .loader-small {
-          width: 20px;
-          height: 20px;
-          position: relative;
-        }
-        .loader-small::after {
-          content: "";
-          position: absolute;
-          top: 0;
-          left: 0;
-          width: 100%;
-          height: 100%;
-          border: 3px solid #333333;
-          border-top-color: #4df2be;
-          border-radius: 50%;
-          animation: spin 0.8s linear infinite;
-        }
-        @keyframes spin {
-          0% {
-            transform: rotate(0deg);
+        <style jsx global>{`
+          .loader-small {
+            width: 20px;
+            height: 20px;
+            position: relative;
           }
-          100% {
-            transform: rotate(360deg);
+          .loader-small::after {
+            content: "";
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            border: 3px solid #333333;
+            border-top-color: #4df2be;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
           }
-        }
-      `}</style>
+          @keyframes spin {
+            0% {
+              transform: rotate(0deg);
+            }
+            100% {
+              transform: rotate(360deg);
+            }
+          }
+        `}</style>
+      </div>
     </div>
   );
 };

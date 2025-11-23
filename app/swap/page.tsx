@@ -1,12 +1,12 @@
-import React from 'react';
+import React from "react";
 import Swap from "../../components/Swap/Swap";
 
 const page = () => {
   return (
     <div>
-      <Swap/>
+      <Swap />
     </div>
-  )
-}
+  );
+};
 
-export default page
+export default page;
