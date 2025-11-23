@@ -23,12 +23,20 @@ import Arrow_great from "../../public/Assets/Evolve2p_Larrow/arrow-right-01.svg"
 import Times from "../../public/Assets/Evolve2p_times/Icon container.png";
 import Footer from "../../components/Footer/Footer";
 
+
+
+
 const BuyBTC = () => {
+
+  
 
    const router = useRouter();
   const [isTermsOpen, setIsTermsOpen] = useState(false);
   const [isSellerOpen, setIsSellerOpen] = useState(false);
   const [clientUser, setClientUser] = useState<any>(null);
+
+  const [offers, setOffers] = useState<any>(null);
+  const [loadingOffers, setLoadingOffers] = useState(false);
 
   const toggleSeller = () => setIsSellerOpen((prev) => !prev);
 
@@ -55,8 +63,60 @@ const BuyBTC = () => {
    }
  }, []);
 
-// Handle USD input → calculate BTC
 
+
+useEffect(() => {
+    const fetchoffers = async () => {
+      setLoadingOffers(true);
+      try {
+        const res = await fetch(
+          "https://evolve2p-backend.onrender.com/api/get-offers",
+          {
+            method: "GET",
+            headers: { "Content-Type": "application/json" },
+          }
+        );
+
+        const data = await res.json();
+        console.log("STATUS:", res.status);
+        console.log("OFFERS DATA:", data);
+
+        if (!res.ok) throw new Error(data?.message || "Request Failed");
+
+        // Safely handle offers array
+        if (Array.isArray(data.data)) {
+          setOffers(
+            data.data.map((offer: any) => ({
+              id: offer.id || "",
+              crypto: offer.crypto || "BTC",
+              currency: offer.currency || "USD",
+              margin: offer.margin || 0,
+              minLimit: offer.minLimit || 0,
+              maxLimit: offer.maxLimit || 0,
+              status: offer.status || "ACTIVE",
+              time: offer.time || "30 minutes",
+              createdAt: offer.createdAt || "",
+              paymentMethod: offer.paymentMethod || "Bank Transfer",
+              paymentTerms: offer.paymentTerms || "",
+              paymentTime: offer.paymentTime || "30 minutes",
+              type: offer.type || "SELL",
+            }))
+          );
+        } else {
+          setOffers([]);
+        }
+      } catch (error) {
+        console.error("Error fetching offers:", error);
+        setOffers([]);
+      } finally {
+        setLoadingOffers(false);
+      }
+    };
+
+    fetchoffers();
+  }, []);
+
+ 
   return (
     <main className="min-h-screen bg-[#0F1012] pr-[10px] mt-[30px] pl-[30px] text-white md:p-8">
       <div className="max-w-7xl mx-auto">
@@ -64,7 +124,7 @@ const BuyBTC = () => {
 
         <div className="flex items-center ml-[15px] gap-[10px] text-[16px] font-[500] text-[#FFFFFF]">
           <Image src={Less_than} alt="lessthan" />
-          <p> Buy BTC</p>
+          <p> Buy {offers?.crypto}</p>
         </div>
         {/* general_div */}
         <div className="flex gap-[25px] mt-[20px] ml-[100px]">
@@ -94,7 +154,7 @@ const BuyBTC = () => {
                     
 
                       <p className="text-[20px] ml-[8px]  font-[700] text-[#8F8F8F] ">
-                        {initial}
+                        {initial} 
                       </p>
                       
                       <Image src={Vector} alt="vector" className="mt-[20px]" />

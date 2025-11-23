@@ -1115,9 +1115,9 @@ useEffect(() => {
 
               {/* Payment Info */}
               <div className="flex flex-col ml-[30px] mt-[25px]">
-                <p className="flex flex-col text-[14px]  ml-[80%] text-[#8F8F8F]">
+                <div className="flex flex-col text-[14px] mt-[15px] ml-[80%] text-[#8F8F8F]">
                   Payment: <p className="text-[#4DF2BE] whitespace-nowrap">{selectedMethod}</p>
-                </p>
+                </div>
                 <p className=" flex text-[12px] mt-[-70px]  ml-[250%] font-[500] text-[#DBDBDB]">
                  PaymentTerms: {offer.terms}
                 </p>
