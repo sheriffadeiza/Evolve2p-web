@@ -146,7 +146,7 @@ const KYCVbd = () => {
             <div className="space-y-3 mt-[60px]">
               <div className="relative">
                 <button
-                  className="w-full lg:w-[430px] h-[48px] py-3 bg-[#4DF2BE]  text-white text-[14px] font-[700] border-none rounded-[100px] transition-colors flex items-center justify-center"
+                  className="w-full lg:w-[430px] h-[48px] text-[#222222] py-3 bg-[#4DF2BE]   text-[14px] font-[700] border-none rounded-[100px] transition-colors flex items-center justify-center"
                   onClick={handleVerifyClick}
                   disabled={loading}
                 >
@@ -155,7 +155,7 @@ const KYCVbd = () => {
                   ) : (
                     <>
                       Verify with
-                      <div className="ml-[5px] flex items-center">
+                      <div className="ml-[5px]  flex items-center">
                         <svg
                           width="138.728"
                           height="33.045"
@@ -165,12 +165,12 @@ const KYCVbd = () => {
                         >
                           <path
                             d="M0.337787 14.1653H9.70548C9.85825 14.1654 10.0047 14.2354 10.1128 14.3599C10.2208 14.4844 10.2815 14.6533 10.2815 14.8295V15.7065C10.2815 15.8827 10.2207 16.0515 10.1127 16.1761C10.0047 16.3006 9.85824 16.3706 9.70548 16.3707H0.337669C0.184946 16.3706 0.0385055 16.3006 -0.0694857 16.1761C-0.177477 16.0516 -0.238187 15.8828 -0.238281 15.7067V14.8296C-0.238187 14.6535 -0.177468 14.4846 -0.0694583 14.36C0.0385517 14.2355 0.185022 14.1654 0.337787 14.1653Z"
-                            fill="#7379FD"
+                            fill="#2f2f2f"
                           />
                           <text
                             x="12"
                             y="15"
-                            className="font-poppins text-[#ffffff]"
+                            className="font-poppins text-[#2D2D2D]"
                             fill="currentColor"
                             fontWeight="700"
                             fontSize="14"

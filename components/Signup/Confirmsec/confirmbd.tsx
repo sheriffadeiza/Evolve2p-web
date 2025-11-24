@@ -102,8 +102,8 @@ const Confirmbd: React.FC = () => {
       <div className="text-whitemt-[30px]  lg:max-w-md mx-auto p-8 max-w-sm">
         {/* Success Modal */}
         {showSuccess && (
-          <div className="fixed inset-0 bg-[#3e3e3e] ml-[25%] h- bg-opacity-70 flex items-center justify-center z-50">
-            <div className=" text-white w-[450px] h-[250px] p-6 rounded-[10px] text-center  z-[100]">
+          <div className="fixed inset-0  bg-black bg-opacity-70 flex items-center justify-center z-50">
+            <div className=" text-white w-[300px] h-[250px] bg-[#222222] p-6 rounded-[10px] text-center  z-[100]">
               <h3 className="text-[#4DF2BE] text-[18px] font-bold mb-2">
                 Success!
               </h3>
@@ -112,7 +112,7 @@ const Confirmbd: React.FC = () => {
               </p>
               <button
                 onClick={handleContinue}
-                className="bg-[#4DF2BE] border-none w-[250px] h-[30px]  text-[16px]  mt-[30px] transition-colors duration-200 text-black font-semibold py-2 px-4 rounded-full"
+                className="flex items-center justify-center bg-[#4DF2BE] mt-[50px] border-none w-[250px] h-[30px]  text-[16px]  mt-[30px] transition-colors duration-200 text-black font-semibold py-2 px-4 rounded-full"
               >
                 Continue to KYC
               </button>

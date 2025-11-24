@@ -26,32 +26,29 @@ const Profilebd = () => {
 
   const [errorMessage, setErrorMessage] = useState("");
 
-  // Fetch countries
+  // ------------------------------
+  // ✅ FIXED COUNTRY FETCH WITH DIAL CODES FROM API
+  // ------------------------------
   useEffect(() => {
     const fetchCountries = async () => {
       try {
         const response = await fetch(
-          "https://restcountries.com/v3.1/all?fields=name,cca2,flags,capital"
+          "https://restcountries.com/v3.1/all?fields=name,cca2,flags,idd"
         );
         const data = await response.json();
 
         const formattedCountries = data
-          .map((country: any) => ({
-            name: country.name.common,
-            code: country.cca2,
-            dialCode:
-              country.cca2 === "NG"
-                ? "+234"
-                : country.cca2 === "US"
-                ? "+1"
-                : country.cca2 === "GB"
-                ? "+44"
-                : country.cca2 === "CA"
-                ? "+1"
-                : country.cca2 === "GH"
-                ? "+233"
-                : "+1",
-          }))
+          .map((country: any) => {
+            const root = country?.idd?.root || "";
+            const suffix = country?.idd?.suffixes?.[0] || "";
+            const dial = root && suffix ? `${root}${suffix}` : root || "+1";
+
+            return {
+              name: country.name.common,
+              code: country.cca2,
+              dialCode: dial,
+            };
+          })
           .sort((a: any, b: any) => a.name.localeCompare(b.name));
 
         setCountries(formattedCountries);
@@ -135,6 +132,7 @@ const Profilebd = () => {
       const selectedCountry = countries.find(
         (c) => c.code === formData.countryCode
       );
+
       const phoneNumber = selectedCountry
         ? `${selectedCountry.dialCode}${formData.phone}`
         : formData.phone;
@@ -148,7 +146,6 @@ const Profilebd = () => {
         phone: phoneNumber,
       };
 
-      // Send profile data to backend with Authorization header if token exists
       const SignupResponse = await fetch(BASE_URL + "auth/register", {
         method: "POST",
         headers: {
@@ -164,11 +161,9 @@ const Profilebd = () => {
         return;
       }
 
-      // Always use accessToken for consistency
       let token = data?.accessToken;
 
       if (token) {
-        // Get user data - exactly matches login flow
         const userResponse = await fetch(BASE_URL + "get-user", {
           method: "POST",
           headers: {
@@ -180,7 +175,6 @@ const Profilebd = () => {
         const userData = await userResponse.json();
 
         if (userData?.success) {
-          // Store data in same format as login
           localStorage.removeItem("UserReg");
           localStorage.setItem(
             "UserData",
@@ -190,7 +184,6 @@ const Profilebd = () => {
             })
           );
           setShowSuccessModal(true);
-          // router.push("/Signups/Secpin");
         }
       }
     } catch (error: any) {
@@ -202,22 +195,17 @@ const Profilebd = () => {
       setIsLoading(false);
     }
   };
-  // --- Country Search State ---
-  const [showCountrySearch, setShowCountrySearch] = useState(false);
-  const [countrySearchInput, setCountrySearchInput] = useState("");
 
-  // Filtered countries for search
-  const filteredCountries = countries.filter((country) =>
-    country.name.toLowerCase().includes(countrySearchInput.toLowerCase())
-  );
+  const [showCountrySearch, setShowCountrySearch] = useState(false);
 
   return (
     <div className="w-full lg:mx-0 ">
       <div className="flex flex-col px-4 lg:px-4 mx-auto py-16 lg:ml-[100px] gap-2 w-full max-w-[400px] text-white">
+
         {/* Success Modal */}
         {showSuccessModal && (
-          <div className="fixed inset-0 bg-black bg-opacity-70 ml-[30%]  flex items-center justify-center z-50">
-            <div className="bg-[#222222] h-[40vh] p-6 rounded-[10px] w-[500px] text-center">
+          <div className="fixed inset-0 bg-black bg-opacity-70  flex items-center justify-center z-50">
+            <div className="bg-[#222222] h-[40vh] p-6 rounded-[10px] ml-[-10px] w-[300px] text-center">
               <h3 className="text-[#4DF2BE] text-[18px] font-bold mb-2">
                 Success!
               </h3>
@@ -247,32 +235,28 @@ const Profilebd = () => {
           </div>
         )}
 
-        {/* Username Input */}
+        {/* Username */}
         <div className="mt-[20px] w-full">
           <label className="text-[14px] mt-2 font-[500] text-[#8F8F8F]">
             Username
           </label>
           <div
-            className={`relative w-full lg:w-full rounded-t-[10px] border-2 border-gray-600 ${
+            className={`relative w-full rounded-t-[10px] border-2 ${
               usernameStatus === "invalid"
-                ? "border border-[#F5918A]"
-                : "border border-[#2E2E2E]"
+                ? "border-[#F5918A]"
+                : "border-[#2E2E2E]"
             }`}
           >
-            <span className="text-[#DBDBDB] absolute ml-[10px] mt-[18px]">
-              @
-            </span>
+            <span className="text-[#DBDBDB] absolute ml-[10px] mt-[18px]">@</span>
             <input
               type="text"
               value={formData.username}
               onChange={handleUsernameChange}
-              className="w-full lg:w-[360px] h-[56px] text-[#FCFCFC] rounded-t-[10px] px-4 py-3 bg-[#222222] border-none pl-[25px] focus:outline-none"
-              required
-              disabled={isLoadingCountries}
+              className="w-full h-[56px] text-[#FCFCFC] rounded-t-[10px] px-4 py-3 bg-[#222222] border-none pl-[25px] focus:outline-none"
             />
           </div>
           <div
-            className={`w-full h-[30px] pl-[20px] flex items-center px-4 bg-[#222222] rounded-b-[10px] ${
+            className={`w-full h-[30px] pl-[20px] flex items-center bg-[#222222] rounded-b-[10px] ${
               usernameStatus === "invalid"
                 ? "border border-[#F5918A] border-t-0"
                 : "border border-[#2E2E2E] border-t-0"
@@ -303,118 +287,115 @@ const Profilebd = () => {
           </div>
         </div>
 
-        {/* Country Dropdown */}
-        <div className="mt-[20px] ">
+        {/* Country Search */}
+        <div className="mt-[20px]">
           <label className="text-[14px] font-[500] text-[#8F8F8F] mb-2 block">
             Country
           </label>
-          <div className="relative w-full lg:w-[350px">
+          <div className="relative w-full">
             {isLoadingCountries ? (
               <div className="w-[370px] h-[56px] bg-[#222222] mt-[10px] pl-[15px] pr-12 border border-[#2E2E2E] rounded-[10px] flex items-center">
                 <span className="text-[#8F8F8F]">Loading countries...</span>
               </div>
             ) : (
               <>
-                <div className="absolute left-4 top-1/2 mt-[5px] ml-[10px] -translate-y-1/2 flex items-center pointer-events-none">
+                <div className="absolute left-4 top-1/2  mt-[5px] ml-[10px] -translate-y-1/2 flex items-center pointer-events-none">
                   {formData.countryCode && (
                     <img
                       src={`https://flagcdn.com/w20/${formData.countryCode.toLowerCase()}.png`}
-                      alt={`${formData.country} flag`}
                       width={20}
                       height={20}
                       className="rounded-sm"
                     />
                   )}
                 </div>
-                <div className="relati">
-                  <input
-                    type="text"
-                    className="w-full  lg:w-[365px] h-[56px] bg-[#222222] mt-[10px] pl-[20px] pr-12 border border-[#2E2E2E] rounded-[10px] text-[14px] font-[500] text-[#FCFCFC] focus:outline-none"
-                    placeholder="Type to search country..."
-                    value={countrySearch}
-                    onChange={(e) => setCountrySearch(e.target.value)}
-                    onFocus={() => setShowCountrySearch(true)}
-                    required
-                    disabled={isLoadingCountries}
-                  />
-                  {showCountrySearch && (
-                    <div className="absolute top-[60px]   left-0 w-full z-20 bg-[#222222] border border-[#2E2E2E] rounded-[10px] p-2">
-                      <div className="max-h-[200px] ml-[10px] overflow-y-auto">
-                        {countries.filter((country) =>
+                <input
+                  type="text"
+                  className="w-full h-[56px] bg-[#222222] mt-[10px] pl-[60px] pr-12 border border-[#2E2E2E] rounded-[10px] text-[14px] font-[500] text-[#FCFCFC] focus:outline-none"
+                  placeholder="Type to search country..."
+                  value={countrySearch}
+                  onChange={(e) => setCountrySearch(e.target.value)}
+                  onFocus={() => setShowCountrySearch(true)}
+                />
+
+                {showCountrySearch && (
+                  <div className="absolute top-[60px] left-0 w-full z-20 bg-[#222222] border border-[#2E2E2E] rounded-[10px] p-2">
+                    <div className="max-h-[200px] ml-[10px] overflow-y-auto">
+                      {countries.filter((country) =>
+                        country.name
+                          .toLowerCase()
+                          .includes(countrySearch.toLowerCase())
+                      ).length === 0 && (
+                        <div className="text-[#8F8F8F] px-2 py-1">
+                          No country found
+                        </div>
+                      )}
+
+                      {countries
+                        .filter((country) =>
                           country.name
                             .toLowerCase()
                             .includes(countrySearch.toLowerCase())
-                        ).length === 0 && (
-                          <div className="text-[#8F8F8F] px-2 py-1">
-                            No country found
+                        )
+                        .map((country) => (
+                          <div
+                            key={country.code}
+                            className="flex items-center mb-[10px] gap-2 px-2 py-2 cursor-pointer hover:bg-[#333] rounded"
+                            onClick={() => {
+                              setFormData((prev) => ({
+                                ...prev,
+                                country: country.name,
+                                countryCode: country.code,
+                              }));
+                              setCountrySearch(country.name);
+                              setShowCountrySearch(false);
+                            }}
+                          >
+                            <img
+                              src={`https://flagcdn.com/w20/${country.code.toLowerCase()}.png`}
+                              width={20}
+                              height={20}
+                              className="rounded-sm"
+                            />
+                            <span className="text-[#FCFCFC]">
+                              {country.name}
+                            </span>
                           </div>
-                        )}
-                        {countries
-                          .filter((country) =>
-                            country.name
-                              .toLowerCase()
-                              .includes(countrySearch.toLowerCase())
-                          )
-                          .map((country) => (
-                            <div
-                              key={country.code}
-                              className="flex items-center mb-[10px]  gap-2 px-2 py-2 cursor-pointer hover:bg-[#333] rounded"
-                              onClick={() => {
-                                setFormData((prev) => ({
-                                  ...prev,
-                                  country: country.name,
-                                  countryCode: country.code,
-                                }));
-                                setCountrySearch(country.name);
-                                setShowCountrySearch(false);
-                              }}
-                            >
-                              <img
-                                src={`https://flagcdn.com/w20/${country.code.toLowerCase()}.png`}
-                                alt={`${country.name} flag`}
-                                width={20}
-                                height={20}
-                                className="rounded-sm"
-                              />
-                              <span className="text-[#FCFCFC]">
-                                {country.name}
-                              </span>
-                            </div>
-                          ))}
-                      </div>
+                        ))}
                     </div>
-                  )}
-                </div>
+                  </div>
+                )}
               </>
             )}
           </div>
         </div>
 
         {/* Phone Input */}
-        <label className="text-[14px] mt-[30px] font-[500] text-[#8F8F8F] mb-2 ">
+        <label className="text-[14px] mt-[30px] font-[500] text-[#8F8F8F] mb-2">
           Phone number
         </label>
+
         <div
-          className={`flex items-center pl-[10px]  w-full mt-[10px] bg-[#222222] border rounded-[10px] ${
+          className={`flex items-center pl-[10px] w-full mt-[10px] bg-[#222222] border rounded-[10px] ${
             formData.phone.trim() === ""
               ? "border-[#F5918A]"
               : "border-[#2E2E2E]"
           }`}
         >
-          <span className="text-[#DBDBDB] w-[51px] h-[24px] pt-[5px] text-center text-[14px] font-[500] bg-[#3A3A3A] px-4 py-4 rounded-[100px] ">
+          <span className="flex items-center justify-center text-[#DBDBDB] w-[51px] h-[24px]  bg-[#3A3A3A] text-[14px] font-[500] rounded-[100px]">
             {countries.find((c) => c.code === formData.countryCode)?.dialCode ||
-              "+234"}
+              "+1"}
           </span>
+
           <input
             type="tel"
             value={formData.phone}
             onChange={(e) => {
-              const value = e.target.value.replace(/\D/g, "");
+              const value = e.target.value.replace(/\D/g, ""); 
               setFormData((prev) => ({ ...prev, phone: value }));
             }}
             className="flex-1 h-[56px] bg-transparent border-none outline-none text-[#FCFCFC] pl-4"
             placeholder="Phone number"
-            required
             disabled={isLoadingCountries}
           />
         </div>
@@ -422,18 +403,14 @@ const Profilebd = () => {
         {/* Continue Button */}
         <button
           onClick={handleSubmit}
-          className={`w-full  h-[48px] border-none bg-[#2DE3A3] text-[#0F1012] text-[14px] font-[700] mt-[40px] py-3 rounded-full font-medium hover:opacity-90 transition flex items-center justify-center ${
+          className={`w-full h-[48px] border-none bg-[#2DE3A3] text-[#0F1012] text-[14px] font-[700] mt-[40px] py-3 rounded-full flex items-center justify-center ${
             !allFieldsValid() || isLoading
               ? "opacity-50 cursor-not-allowed"
               : ""
           }`}
           disabled={!allFieldsValid() || isLoading}
         >
-          {isLoading ? (
-            <div className="loader-small"></div>
-          ) : (
-            "Complete Registration"
-          )}
+          {isLoading ? <div className="loader-small"></div> : "Complete Registration"}
         </button>
 
         <style jsx global>{`
