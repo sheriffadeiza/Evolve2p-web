@@ -101,7 +101,7 @@ const Loginbd: React.FC = () => {
 
   return (
     <div className="w-full lg:mx-0  flex justify-center">
-      <div className="text-white p-8 max-w-sm  lg:max-w-lg lg:mx-auto ">
+      <div className="text-white space-y-[20px]  p-8 max-w-sm  lg:max-w-lg lg:mx-auto ">
         <h2 className="text-[24px] font-[700] text-[#FCFCFC]">Welcome Back!</h2>
         <p className="text-[16px] font-[400] mt-[-10px] text-[#8F8F8F]">
           Log in to continue trading securely.

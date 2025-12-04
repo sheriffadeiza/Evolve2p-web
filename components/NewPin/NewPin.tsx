@@ -9,13 +9,13 @@ import Footer from "../../components/Footer/Footer";
 import { useRouter } from "next/navigation";
 
 const UPDATE_PIN_ENDPOINT =
-  "https://evolve2p-backend.onrender.com/api/update-user"; // make sure this is correct
+  "https://evolve2p-backend.onrender.com/api/update-user";
 
 const NewPin: React.FC = () => {
   const router = useRouter();
 
   const [pin, setPin] = useState<string[]>(["", "", "", ""]);
-  const inputsRef = useRef<Array<HTMLInputElement | null>>([]);
+  const inputsRef = useRef<(HTMLInputElement | null)[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [userData, setUserData] = useState<{ accessToken: string; userData: any } | null>(null);
 
@@ -34,6 +34,11 @@ const NewPin: React.FC = () => {
       console.error("Failed to parse user data", err);
     }
   }, [router]);
+
+  // Proper ref callback function
+  const setInputRef = (index: number) => (el: HTMLInputElement | null) => {
+    inputsRef.current[index] = el;
+  };
 
   const updatePinAt = (index: number, value: string) => {
     setPin((prev) => {
@@ -100,7 +105,6 @@ const NewPin: React.FC = () => {
       console.log("Backend response:", data);
 
       if (!res.ok || !data?.success) {
-        // Safely handle object messages
         const message =
           data?.message && typeof data.message === "string"
             ? data.message
@@ -122,37 +126,41 @@ const NewPin: React.FC = () => {
   };
 
   return (
-    <main className="min-h-screen bg-[#0F1012] pr-[10px] mt-[30px] pl-[30px] text-white md:p-8">
-      <div className="max-w-7xl mx-auto">
+    <main className="min-h-screen bg-[#0F1012] text-white">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 md:py-8">
         <Nav />
-        <div className="flex items-start mt-[20px] mr-[40px]">
-          <Settings />
-          <div className="w-[809px] h-[784px] bg-[#1A1A1A] rounded-r-[8px] p-[64px] flex flex-col">
+        
+        <div className="flex flex-col lg:flex-row gap-6 mt-6">
+          {/* Settings Sidebar */}
+          <div className="lg:w-64">
+            <Settings />
+          </div>
+
+          {/* Main Content */}
+          <div className="flex-1 bg-[#1A1A1A] rounded-xl p-4 lg:p-8">
             {/* Back Button */}
             <div
-              className="flex items-center gap-[10px] w-[85px] h-[36px] p-[8px-14px] cursor-pointer rounded-full bg-[#2D2D2D]"
+              className="flex items-center gap-2 w-fit px-4 h-9 cursor-pointer rounded-full bg-[#2D2D2D] hover:bg-[#3A3A3A] transition-colors mb-6 lg:mb-8"
               onClick={() => router.push("/change-pin")}
             >
-              <Image src={Lessthan} alt="lessthan" width={16} height={16} className="ml-[10px]" />
-              <p className="text-[14px] font-[700] text-[#FFFFFF]">Back</p>
+              <Image src={Lessthan} alt="back" width={16} height={16} />
+              <p className="text-sm font-semibold text-white">Back</p>
             </div>
 
-            <div className="flex flex-col ml-[110px] p-[24px_20px]">
-              <p className="text-[24px] font-[700] text-[#FFFFFF]">Enter new PIN</p>
-              <p className="text-[16px] text-[#C7C7C7] font-[400] mt-[8px]">
-                Your PIN helps you log in faster and approve
-                <br />
-                transactions securely.
+            <div className="flex flex-col items-center lg:items-start max-w-lg mx-auto lg:mx-0">
+              <p className="text-xl lg:text-2xl font-bold text-white text-center lg:text-left">
+                Enter new PIN
+              </p>
+              <p className="text-sm lg:text-base text-[#C7C7C7] font-normal mt-2 text-center lg:text-left leading-relaxed">
+                Your PIN helps you log in faster and approve transactions securely.
               </p>
 
               {/* PIN Input Boxes */}
-              <div className="flex items-center ml-[35px] gap-[12px] mt-[20px]">
+              <div className="flex justify-center lg:justify-start gap-3 lg:gap-4 mt-6 lg:mt-8">
                 {[0, 1, 2, 3].map((_, index) => (
                   <input
                     key={index}
-                    ref={(el) => {
-                      inputsRef.current[index] = el;
-                    }}
+                    ref={setInputRef(index)}
                     type="text"
                     inputMode="numeric"
                     pattern="[0-9]*"
@@ -161,7 +169,7 @@ const NewPin: React.FC = () => {
                     onChange={handleChange(index)}
                     onKeyDown={handleKeyDown(index)}
                     onPaste={handlePaste}
-                    className="w-[67.75px] h-[56px] text-center text-[14px] font-[500] text-[#FFFFFF] bg-[#222222] border border-[#2E2E2E] rounded-[12px] focus:outline-none focus:border-[#4DF2BE] caret-transparent"
+                    className="w-14 h-14 lg:w-16 lg:h-16 text-center text-base lg:text-lg font-medium text-white bg-[#222222] border border-[#2E2E2E] rounded-lg focus:outline-none focus:border-[#4DF2BE] caret-transparent transition-colors"
                   />
                 ))}
               </div>
@@ -170,40 +178,24 @@ const NewPin: React.FC = () => {
               <button
                 onClick={handleContinue}
                 disabled={!allFilled || isLoading}
-                className={`w-[395px] h-[48px] mt-[40px] border-[1px] bg-[#4DF2BE] border-[#4DF2BE] text-[#0F1012] font-[700] text-[14px] rounded-full transition-all ${
-                  !allFilled || isLoading ? "opacity-50 cursor-not-allowed" : ""
-                }`}
+                className={`w-full max-w-xs lg:max-w-sm h-12 mt-6 lg:mt-8 border border-[#4DF2BE] bg-[#4DF2BE] text-[#0F1012] font-semibold text-sm lg:text-base rounded-full transition-all hover:bg-[#3fe0ad] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-[#4DF2BE]`}
               >
                 {isLoading ? (
                   <div className="flex items-center justify-center gap-2">
-                    <div className="loader"></div>
+                    <div className="w-5 h-5 border-2 border-[#0F1012] border-t-transparent rounded-full animate-spin"></div>
+                    Updating...
                   </div>
                 ) : (
                   "Continue"
                 )}
-
-                <style jsx>{`
-                  .loader {
-                    width: 20px;
-                    height: 20px;
-                    border: 3px solid rgba(255, 255, 255, 0.3);
-                    border-radius: 50%;
-                    border-top-color: #0F1012;
-                    animation: spin 1s ease-in-out infinite;
-                  }
-                  @keyframes spin {
-                    to {
-                      transform: rotate(360deg);
-                    }
-                  }
-                `}</style>
               </button>
             </div>
           </div>
         </div>
 
-        <div className="w-[106%] ml-[-5%] h-[1px] bg-[#fff] mt-[10%] opacity-20 my-8"></div>
-        <div className="mb-[80px] mt-[30%]">
+        <div className="w-full h-px bg-white/20 my-8"></div>
+        
+        <div className="mb-16 mt-8">
           <Footer />
         </div>
       </div>

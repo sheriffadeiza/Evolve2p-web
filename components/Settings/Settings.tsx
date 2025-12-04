@@ -8,7 +8,6 @@ import { usePathname, useRouter } from "next/navigation";
 import E2p_logo from "../../public/Assets/Evolve2p_E2p/Profile/Logo.svg";
 import Mark_green from "../../public/Assets/Evolve2p_mark/elements.svg";
 import Lg_arrow from "../../public/Assets/Evolve2p_Lgarrow/Profile/arrow-right-01.svg";
-import G_AccountL from "../../public/Assets/Evolve2p_G_AccountL/Profile/user-check-01.svg";
 import Arrow_great from "../../public/Assets/Evolve2p_Larrow/arrow-right-01.svg";
 import Gbell from "../../public/Assets/Evolve2p_Gbell/Profile/elements.svg";
 import Gclock from "../../public/Assets/Evolve2p_Gclock/Profile/elements.svg";
@@ -22,6 +21,7 @@ import Switch from "../../public/Assets/Evolve2p_switch/Profile/elements.svg";
 const Settings = () => {
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [clientUser, setClientUser] = useState<{ username?: string } | null>(null);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const pathname = usePathname();
   const router = useRouter();
 
@@ -57,28 +57,106 @@ const Settings = () => {
     }
   };
 
+  // Menu items data for better organization
+  const menuSections = [
+    {
+      title: "PREFERENCES",
+      items: [
+        {
+          href: "/notifications",
+          icon: Gbell,
+          label: "Notification",
+          path: "/notifications"
+        },
+        {
+          href: "/translim",
+          icon: Gclock,
+          label: "Transaction Limits",
+          path: "/translim"
+        }
+      ]
+    },
+    {
+      title: "SECURITY",
+      items: [
+        {
+          href: "/changep",
+          icon: Changep,
+          label: "Change Password",
+          path: "/changep"
+        },
+        {
+          href: "/tfa",
+          icon: Glocked,
+          label: "Two Factor Authentication",
+          path: "/tfa"
+        },
+        {
+          href: "/change-pin",
+          icon: Gpin,
+          label: "Change your Security PIN",
+          path: "/change-pin"
+        }
+      ]
+    },
+    {
+      title: "OTHERS",
+      items: [
+        {
+          href: "/support",
+          icon: Ghead,
+          label: "Talk to support",
+          path: "/support"
+        }
+      ]
+    }
+  ];
+
   return (
     <div>
-      {/* Left side */}
-      <div className="w-[395px] bg-[#222222] border-r-[2px] border-r-[#3A3A3A]">
-        <div className="p-[12px_20px]">
-          <p className="text-[24px] font-[700] text-[#FFFFFF]">Settings</p>
+      {/* Mobile Menu Button */}
+      <div className="lg:hidden mb-4">
+        <button
+          onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+          className="w-full bg-[#222222] text-white p-3 rounded-lg flex items-center justify-between"
+        >
+          <span className="text-lg font-bold">Settings Menu</span>
+          <svg
+            className={`w-5 h-5 transition-transform ${isMobileMenuOpen ? 'rotate-180' : ''}`}
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+          </svg>
+        </button>
+      </div>
+
+      {/* Settings Sidebar */}
+      <div className={`
+        bg-[#222222] border-r-[2px] border-r-[#3A3A3A]
+        ${isMobileMenuOpen ? 'block' : 'hidden'} 
+        lg:block lg:w-64 xl:w-80
+        w-full max-h-[80vh] lg:max-h-none overflow-y-auto
+      `}>
+        <div className="p-3 lg:p-4">
+          <p className="text-xl lg:text-2xl font-bold text-white">Settings</p>
         </div>
 
-        <div className="w-[355px] p-[12px_20px] ">
+        <div className="p-3 lg:p-4 space-y-4 lg:space-y-6">
           {/* Profile */}
-          <Link href="/profile" className="no-underline">
+          <Link href="/profile" className="no-underline" onClick={() => setIsMobileMenuOpen(false)}>
             <div
-              className={`flex items-center gap-[15px] h-[62px] p-[12px] rounded-[8px] cursor-pointer transition-colors duration-300 ${
+              className={`flex items-center gap-3 h-16 lg:h-20 p-3 rounded-lg cursor-pointer transition-colors duration-300 ${
                 pathname.startsWith("/profile") ? "bg-[#20342E]" : "bg-[#2D2D2D]"
               }`}
             >
-              <Image src={E2p_logo} alt="e2p" sizes="28" />
-              <div className="flex items-center gap-[160px]">
-                <div className="flex flex-col items-center">
+              <Image src={E2p_logo} alt="e2p" className="w-6 h-6 lg:w-7 lg:h-7" />
+              <div className="flex items-center justify-between flex-1">
+                <div className="flex flex-col">
                   <div className="flex items-center">
                     <p
-                      className={`text-[14px] ml-[-20px] font-[500] ${
+                      className={`text-sm lg:text-base font-medium ${
                         pathname.startsWith("/profile")
                           ? "text-[#4DF2BE]"
                           : "text-[#DBDBDB]"
@@ -89,11 +167,11 @@ const Settings = () => {
                     <Image
                       src={Mark_green}
                       alt="mark"
-                      className="ml-[10px] w-[12px] h-[12px]"
+                      className="ml-2 w-3 h-3"
                     />
                   </div>
                   <p
-                    className={`text-[12px] mt-[-10px] font-[500] ${
+                    className={`text-xs mt-1 ${
                       pathname.startsWith("/profile")
                         ? "text-[#4DF2BE]"
                         : "text-[#DBDBDB]"
@@ -102,220 +180,85 @@ const Settings = () => {
                     Your unique Identity
                   </p>
                 </div>
-                <Image src={Lg_arrow} alt="lgarrow" />
+                <Image src={Lg_arrow} alt="lgarrow" className="w-4 h-4 lg:w-5 lg:h-5" />
               </div>
             </div>
           </Link>
 
-          {/* ACCOUNT SECTION */}
-          <div className="mt-[50px]">
-            <p className="text-[12px] font-[500] text-[#C7C7C7]">ACCOUNT</p>
-            <div className="w-[355px]">
-              <Link href="/accountL" className="no-underline">
-                <div
-                  className={`h-[45px] border-b-[1px] border-b-[#3A3A3A] rounded-t-[8px] p-[8px_12px] cursor-pointer ${
-                    pathname.startsWith("/accountL")
-                      ? "bg-[#20342E]"
-                      : "bg-[#2D2D2D]"
-                  }`}
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-[20px]">
-                      <Image src={G_AccountL} alt="account" />
-                      <p
-                        className={`text-[14px] font-[500] ${
-                          pathname.startsWith("/accountL")
-                            ? "text-[#4DF2BE]"
-                            : "text-[#DBDBDB]"
-                        }`}
-                      >
-                        Account Level
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-[10px]">
-                      <div className="flex items-center w-[43px] h-[22px] p-[2px_8px] bg-[#3A3A3A] rounded-[16px]">
-                        <p className="text-[12px] font-[500] text-[#DBDBDB]">Tier 1</p>
+          {/* Menu Sections */}
+          {menuSections.map((section, sectionIndex) => (
+            <div key={sectionIndex} className="space-y-2">
+              <p className="text-xs font-medium mt-[20px] text-[#C7C7C7] uppercase tracking-wide">
+                {section.title}
+              </p>
+              
+              <div className="space-y-px rounded-lg overflow-hidden">
+                {section.items.map((item, itemIndex) => (
+                  <Link 
+                    key={itemIndex} 
+                    href={item.href} 
+                    className="no-underline"
+                    onClick={() => setIsMobileMenuOpen(false)}
+                  >
+                    <div
+                      className={`flex items-center justify-between p-3 cursor-pointer transition-colors ${
+                        pathname.startsWith(item.path)
+                          ? "bg-[#20342E]"
+                          : "bg-[#2D2D2D] hover:bg-[#3A3A3A]"
+                      }`}
+                    >
+                      <div className="flex items-center gap-3 lg:gap-4">
+                        <Image 
+                          src={item.icon} 
+                          alt={item.label} 
+                          className="w-5 h-5 lg:w-6 lg:h-6" 
+                        />
+                        <p
+                          className={`text-sm lg:text-base font-medium ${
+                            pathname.startsWith(item.path)
+                              ? "text-[#4DF2BE]"
+                              : "text-[#DBDBDB]"
+                          }`}
+                        >
+                          {item.label}
+                        </p>
                       </div>
-                      <Image src={Arrow_great} alt="great" />
+                      <div className="flex items-center gap-2 lg:gap-3">
+                        <Image 
+                          src={Arrow_great} 
+                          alt="arrow" 
+                          className="w-3 h-3 lg:w-4 lg:h-4" 
+                        />
+                      </div>
                     </div>
-                  </div>
-                </div>
-              </Link>
-
-              <Link href="/notifications" className="no-underline">
-                <div
-                  className={`flex items-center justify-between h-[45px] border-b-[1px] border-b-[#3A3A3A] p-[8px_12px] cursor-pointer ${
-                    pathname.startsWith("/notifications")
-                      ? "bg-[#20342E]"
-                      : "bg-[#2D2D2D]"
-                  }`}
-                >
-                  <div className="flex items-center gap-[20px]">
-                    <Image src={Gbell} alt="gbell" />
-                    <p
-                      className={`text-[14px] font-[500] ${
-                        pathname.startsWith("/notifications")
-                          ? "text-[#4DF2BE]"
-                          : "text-[#DBDBDB]"
-                      }`}
-                    >
-                      Notification
-                    </p>
-                  </div>
-                  <Image src={Arrow_great} alt="great" />
-                </div>
-              </Link>
-
-              <Link href="/translim" className="no-underline">
-                <div
-                  className={`flex items-center justify-between h-[45px] border-b-[1px] border-b-[#3A3A3A] p-[8px_12px] cursor-pointer ${
-                    pathname.startsWith("/translim")
-                      ? "bg-[#20342E]"
-                      : "bg-[#2D2D2D]"
-                  }`}
-                >
-                  <div className="flex items-center gap-[20px]">
-                    <Image src={Gclock} alt="gclock" />
-                    <p
-                      className={`text-[14px] font-[500] ${
-                        pathname.startsWith("/translim")
-                          ? "text-[#4DF2BE]"
-                          : "text-[#DBDBDB]"
-                      }`}
-                    >
-                      Transaction Limits
-                    </p>
-                  </div>
-                  <Image src={Arrow_great} alt="great" />
-                </div>
-              </Link>
-            </div>
-          </div>
-
-          {/* SECURITY SECTION */}
-          <div className="mt-[20px]">
-            <p className="text-[12px] font-[500] text-[#C7C7C7]">SECURITY</p>
-            <div className="w-[355px]">
-              <Link href="/changep" className="no-underline">
-                <div
-                  className={`h-[45px] border-b-[1px] border-b-[#3A3A3A] p-[8px_12px] cursor-pointer ${
-                    pathname.startsWith("/changep")
-                      ? "bg-[#20342E]"
-                      : "bg-[#2D2D2D]"
-                  }`}
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-[20px]">
-                      <Image src={Changep} alt="changep" />
-                      <p
-                        className={`text-[14px] font-[500] ${
-                          pathname.startsWith("/changep")
-                            ? "text-[#4DF2BE]"
-                            : "text-[#DBDBDB]"
-                        }`}
-                      >
-                        Change Password
-                      </p>
-                    </div>
-                    <Image src={Arrow_great} alt="great" />
-                  </div>
-                </div>
-              </Link>
-
-              <Link href="/tfa" className="no-underline">
-                <div
-                  className={`flex items-center justify-between h-[45px] border-b-[1px] border-b-[#3A3A3A] p-[8px_12px] cursor-pointer ${
-                    pathname.startsWith("/tfa")
-                      ? "bg-[#20342E]"
-                      : "bg-[#2D2D2D]"
-                  }`}
-                >
-                  <div className="flex items-center gap-[20px]">
-                    <Image src={Glocked} alt="glocked" />
-                    <p
-                      className={`text-[14px] font-[500] ${
-                        pathname.startsWith("/tfa")
-                          ? "text-[#4DF2BE]"
-                          : "text-[#DBDBDB]"
-                      }`}
-                    >
-                      Two Factor Authentication
-                    </p>
-                  </div>
-                  <Image src={Arrow_great} alt="great" />
-                </div>
-              </Link>
-
-              <Link href="/change-pin" className="no-underline">
-                <div
-                  className={`flex items-center justify-between h-[45px] border-b-[1px] border-b-[#3A3A3A] p-[8px_12px] cursor-pointer ${
-                    pathname.startsWith("/change-pin")
-                      ? "bg-[#20342E]"
-                      : "bg-[#2D2D2D]"
-                  }`}
-                >
-                  <div className="flex items-center gap-[20px]">
-                    <Image src={Gpin} alt="gpin" />
-                    <p
-                      className={`text-[14px] font-[500] ${
-                        pathname.startsWith("/change-pin")
-                          ? "text-[#4DF2BE]"
-                          : "text-[#DBDBDB]"
-                      }`}
-                    >
-                      Change your Security PIN
-                    </p>
-                  </div>
-                  <Image src={Arrow_great} alt="great" />
-                </div>
-              </Link>
-            </div>
-          </div>
-
-          {/* OTHERS */}
-          <div className="mt-[20px]">
-            <p className="text-[12px] font-[500] text-[#C7C7C7]">OTHERS</p>
-            <Link href="/support" className="no-underline">
-              <div
-                className={`flex items-center justify-between h-[45px] rounded-[8px] p-[8px_12px] cursor-pointer ${
-                  pathname.startsWith("/support")
-                    ? "bg-[#20342E]"
-                    : "bg-[#2D2D2D]"
-                }`}
-              >
-                <div className="flex items-center gap-[20px]">
-                  <Image src={Ghead} alt="ghead" />
-                  <p
-                    className={`text-[14px] font-[500] ${
-                      pathname.startsWith("/support")
-                        ? "text-[#4DF2BE]"
-                        : "text-[#DBDBDB]"
-                    }`}
-                  >
-                    Talk to support
-                  </p>
-                </div>
-                <Image src={Arrow_great} alt="great" />
+                  </Link>
+                ))}
               </div>
-            </Link>
+            </div>
+          ))}
 
-            {/* Logout */}
-            <div className="flex items-center mt-[20px] justify-between h-[62px] bg-[#2D2D2D] rounded-[8px] p-[8px_12px]">
-              <div className="flex items-center gap-[20px]">
-                <Image src={Logout} alt="logout" />
+          {/* Logout Section */}
+          <div className="space-y-2">
+            <p className="text-xs font-medium text-[#C7C7C7] uppercase tracking-wide">
+              SESSION
+            </p>
+            
+            <div 
+              className="flex items-center justify-between h-16 lg:h-20 bg-[#2D2D2D] rounded-lg p-3 cursor-pointer hover:bg-[#3A3A3A] transition-colors"
+              onClick={() => setShowLogoutModal(true)}
+            >
+              <div className="flex items-center gap-3 lg:gap-4">
+                <Image src={Logout} alt="logout" className="w-5 h-5 lg:w-6 lg:h-6" />
                 <div>
-                  <p
-                    onClick={() => setShowLogoutModal(true)}
-                    className="text-[14px] cursor-pointer font-[500] text-[#FE857D]"
-                  >
+                  <p className="text-sm lg:text-base font-medium text-[#FE857D]">
                     Logout
                   </p>
-                  <p className="text-[12px] font-[500] mt-[-10px] text-[#DBDBDB]">
+                  <p className="text-xs text-[#DBDBDB] mt-1">
                     Version 1.0
                   </p>
                 </div>
               </div>
-              <Image src={Arrow_great} alt="great" />
+              <Image src={Arrow_great} alt="arrow" className="w-3 h-3 lg:w-4 lg:h-4" />
             </div>
           </div>
         </div>
@@ -323,36 +266,39 @@ const Settings = () => {
 
       {/* ✅ Logout Modal */}
       {showLogoutModal && (
-        <div className="fixed inset-0 top-[80px] ml-[40%] flex items-center justify-center bg-black bg-opacity-50 z-50">
-          <div className="bg-[#0F1012] rounded-[16px] w-[420px] h-[485px] text-center text-white shadow-lg">
-            <div className="flex items-center h-[108px] justify-center p-[36px_126px_16px_126px]">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4">
+          <div className="bg-[#0F1012] rounded-2xl w-full max-w-md text-center text-white shadow-lg">
+            {/* Header */}
+            <div className="flex items-center justify-center p-6 lg:p-8">
               <Image
                 src={Switch}
                 alt="switch"
-                className="p-[2.334px_4.667px_2.333px_4.667px] w-[56px] h-[56px]"
+                className="w-12 h-12 lg:w-14 lg:h-14"
               />
             </div>
 
-            <div className="flex flex-col items-center h-[152px] p-[24px_20px]">
-              <h2 className="text-[20px] font-[700] text-[#FFFFFF]">
+            {/* Content */}
+            <div className="px-4 lg:px-6 pb-4">
+              <h2 className="text-lg lg:text-xl font-bold text-white mb-3">
                 Are you sure you want to log out?
               </h2>
-              <p className="text-[#C7C7C7] text-[16px] font-[400]">
-                You are about to log out of your account. Make sure you’ve saved any
+              <p className="text-[#C7C7C7] text-sm lg:text-base font-normal leading-relaxed">
+                You are about to log out of your account. Make sure you've saved any
                 important information before proceeding.
               </p>
             </div>
 
-            <div className="h-[148px] space-y-[10px] p-[8px_0_32px_0]">
+            {/* Buttons */}
+            <div className="p-4 lg:p-6 space-y-3">
               <button
-                onClick={handleLogout} // ✅ logs out and redirects
-                className="w-[380px] h-[48px] bg-[#FE857D] text-[14px] border-[1px] border-[#FE857D] rounded-full text-[#0F1012] font-[700] mb-3"
+                onClick={handleLogout}
+                className="w-full h-12 bg-[#FE857D] text-sm lg:text-base border border-[#FE857D] rounded-full text-[#0F1012] font-bold transition-opacity hover:opacity-90"
               >
                 Log out
               </button>
               <button
                 onClick={() => setShowLogoutModal(false)}
-                className="w-[380px] h-[48px] bg-[#2D2D2D] text-[#FFFFFF] rounded-full border-none text-[14px] font-[700]"
+                className="w-full h-12 bg-[#2D2D2D] text-white rounded-full border-none text-sm lg:text-base font-bold transition-colors hover:bg-[#3A3A3A]"
               >
                 Cancel
               </button>

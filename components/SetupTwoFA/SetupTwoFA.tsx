@@ -22,8 +22,8 @@ const SetupTwoFA: React.FC = () => {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
-  // refs for the 6 input boxes
-  const inputsRef = useRef<Array<HTMLInputElement | null>>([]);
+  // refs for the 6 input boxes - properly typed
+  const inputsRef = useRef<(HTMLInputElement | null)[]>([]);
 
   const toggleModal1 = () => setShowModal((prev) => !prev);
   const toggleModal2 = () => setShowVerifyModal((prev) => !prev);
@@ -131,6 +131,11 @@ const SetupTwoFA: React.FC = () => {
     }
   }, [showVerifyModal]);
 
+  // Proper ref callback function
+  const setInputRef = (index: number) => (el: HTMLInputElement | null) => {
+    inputsRef.current[index] = el;
+  };
+
   // handle individual input change: auto-advance
   const handleDigitChange = (index: number) => (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value.replace(/\D/g, ""); // keep digits only
@@ -211,113 +216,114 @@ const SetupTwoFA: React.FC = () => {
   };
 
   return (
-    <main className="min-h-screen bg-[#0F1012] pr-[10px] mt-[30px] pl-[30px] text-white md:p-8">
-      <div className="max-w-7xl mx-auto">
+    <main className="min-h-screen bg-[#0F1012] text-white">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 md:py-8">
         <Nav />
 
-        <div className="flex items-start mt-[20px] mr-[40px]">
-          <Settings />
+        <div className="flex flex-col lg:flex-row gap-6 mt-6">
+          {/* Settings Sidebar */}
+          <div className="lg:w-64">
+            <Settings />
+          </div>
 
-          <div className="w-[809px] h-[865px] bg-[#1A1A1A] p-[24px_64px] rounded-[10px]">
-            <p className="text-[24px] font-[700] text-[#FFFFFF] mb-[10px]">
+          {/* Main Content */}
+          <div className="flex-1 bg-[#1A1A1A] rounded-xl p-4 lg:p-6">
+            <p className="text-xl lg:text-2xl font-bold text-white mb-4">
               Two Factor Authentication
             </p>
 
-            <div className="flex flex-col p-[24px_20px]">
-              <p className="text-[20px]  font-[700] text-[#FFFFFF] mb-[40px]">
+            <div className="flex flex-col p-4 lg:p-6">
+              <p className="text-lg lg:text-xl font-bold text-white mb-6">
                 Choose Your 2FA Method
               </p>
 
-              <p className="text-[16px] mt-[-30px] text-[#C7C7C7] font-[400]">
+              <p className="text-sm lg:text-base text-[#C7C7C7] font-normal">
                 Select how you want to receive your verification codes.
               </p>
             </div>
 
-            <div className="space-y-[20px] p-[0px_20px]">
+            <div className="space-y-4 p-4">
               {/* Security App Option */}
               <div
                 onClick={() => {
                   setShowModal(true);
                   generateSecret();
                 }}
-                className="flex justify-between w-[641px] h-[64px] p-[12px] items-center bg-[#222222] p-[20px] rounded-[8px] cursor-pointer hover:bg-[#2E2E2E] transition"
+                className="flex justify-between w-full p-4 items-center bg-[#222222] rounded-lg cursor-pointer hover:bg-[#2E2E2E] transition border border-transparent hover:border-[#3A3A3A]"
               >
-                <div className="flex items-center gap-[16px]">
-                  <Image src={ShieldKey} alt="icon" width={16} height={16} />
+                <div className="flex items-center gap-4">
+                  <Image src={ShieldKey} alt="icon" className="w-5 h-5 lg:w-6 lg:h-6" />
                   <div className="flex flex-col">
-                    <div className="flex items-center gap-[10px]">
-                      <p className="text-[16px] font-[600] text-[#FFFFFF]">
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+                      <p className="text-base lg:text-lg font-semibold text-white">
                         Security App
                       </p>
-                      <div className="flex items-center justify-center w-[98px] h-[22px] bg-[#23303C] rounded-[16px] p-[2px_8px]">
-                        <p className="text-[#66B9FF] font-[500] text-[12px]">
+                      <div className="flex items-center justify-center w-fit px-3 h-6 bg-[#23303C] rounded-2xl">
+                        <p className="text-[#66B9FF] font-medium text-xs">
                           Recommended
                         </p>
                       </div>
                     </div>
-                    <p className="text-[12px] mt-[-5px] font-[500] text-[#DBDBDB]">
+                    <p className="text-xs lg:text-sm font-medium text-[#DBDBDB] mt-1">
                       Use an authenticator app like Authy or Google Authenticator.
                     </p>
                   </div>
                 </div>
-                <Image src={Arrow_great} alt="arrowgreat" />
+                <Image src={Arrow_great} alt="arrowgreat" className="w-4 h-4 lg:w-5 lg:h-5" />
               </div>
             </div>
           </div>
         </div>
 
-        <div className="w-[106%] ml-[-5%] h-[1px] bg-[#fff] mt-[10%] opacity-20 my-8"></div>
-
-        <div className="mb-[80px] mt-[30%]">
-          <Footer />
-        </div>
+         <div className="w-[100%]  h-[1px] bg-[#fff] mt-[50%] opacity-20 my-8"></div>
+        
+                <div className=" mb-[80px] mt-[10%] ">
+                  <Footer />
+                </div>
       </div>
 
       {/* ====================== MODAL 1: GENERATE SECRET ====================== */}
       {showModal && (
-        <div className="fixed inset-0 top-[100px] ml-[30%] bg-black bg-opacity-70 flex justify-center items-center z-50">
-          <div className="bg-[#1A1A1A] rounded-[16px] p-[32px] w-[560px] max-h-[65vh] overflow-y-auto scrollbar-thin scrollbar-thumb-[#DBDBDB] scrollbar-track-[#2D2D2D] relative shadow-xl border border-[#2E2E2E]">
-            <div className="flex items-center ">
-              <h2 className="text-[16px] font-[700] text-[#FFFFFF] mb-[8px]">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-70 p-4">
+          <div className="bg-[#1A1A1A] rounded-2xl p-4 lg:p-8 w-full max-w-lg lg:max-w-2xl max-h-[90vh] overflow-y-auto relative shadow-xl border border-[#2E2E2E]">
+            {/* Header */}
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-lg lg:text-xl font-bold text-white">
                 Enable 2FA
               </h2>
-
-              <p>
-                <Image
-                  src={Times}
-                  alt={"times"}
-                  width={10}
-                  height={10}
-                  className="absolute top-[35px] w-[32px] h-[32px] ml-[60%] cursor-pointer"
-                  onClick={toggleModal1}
-                />
-              </p>
+              <Image
+                src={Times}
+                alt="close"
+                className="w-6 h-6 lg:w-8 lg:h-8 cursor-pointer hover:opacity-70 transition"
+                onClick={toggleModal1}
+              />
             </div>
 
-            <div className="mt-[60px]">
-              <p className="text-[24px] font-[700] text-[#FFFFFF]">
+            <div className="mb-4">
+              <p className="text-xl lg:text-2xl font-bold text-white">
                 Enable security app
               </p>
             </div>
 
-            <p className="text-[#C7C7C7] text-[14px] mb-[24px]">
+            <p className="text-[#C7C7C7] text-sm lg:text-base mb-6">
               To enable 2FA, you will have to install an authenticator app on
-              your phone <br />
-              and scan the QR code below to add Evolve2P.
+              your phone and scan the QR code below to add Evolve2P.
             </p>
 
             {loadingSecret ? (
-              <div className="flex justify-center mt-[40px] mb-[16px]">
-                <p className="text-[#C7C7C7] text-[14px] animate-pulse">
+              <div className="flex justify-center my-8">
+                <p className="text-[#C7C7C7] text-sm lg:text-base animate-pulse">
                   Generating secret key...
                 </p>
               </div>
             ) : secretKey ? (
               <>
-                <div className="flex justify-center mt-[30px] mb-[16px]">
+                {/* QR Code */}
+                <div className="flex justify-center my-6">
                   <QRCodeCanvas
                     value={`otpauth://totp/Evolve2P?secret=${secretKey}&issuer=Evolve2P`}
-                    size={206}
+                    size={180}
+                    className="w-40 h-40 lg:w-52 lg:h-52"
                     bgColor="#3A3A3A"
                     fgColor="#FFFFFF"
                     level="H"
@@ -325,19 +331,20 @@ const SetupTwoFA: React.FC = () => {
                   />
                 </div>
 
-                <p className="text-[14px] font-[500] text-[#DBDBDB] mb-[8px]">
-                  Can’t scan the QR code? Configure your app with this key
+                <p className="text-sm lg:text-base font-medium text-[#DBDBDB] mb-3">
+                  Can't scan the QR code? Configure your app with this key
                 </p>
 
-                <div className="flex items-center mt-[20px] w-[496px] h-[56px] justify-between bg-[#222222] rounded-[8px] p-[8px_8px_8px_16px] mb-[24px]">
-                  <span className="text-[#FFFFFF] text-[14px] font-[500] break-all">
+                {/* Secret Key */}
+                <div className="flex flex-col sm:flex-row items-center gap-3 bg-[#222222] rounded-lg p-4 mb-6">
+                  <span className="text-white text-sm lg:text-base font-medium break-all flex-1 text-center sm:text-left">
                     {secretKey}
                   </span>
                   <button
                     onClick={handleCopy}
-                    className="flex items-center gap-[10px] w-[88px] h-[36px] bg-[#2D2D2D] p-[8px_14px] rounded-full border-none text-[#4DF2BE] text-[14px] font-[600]"
+                    className="flex items-center gap-2 w-full sm:w-auto px-4 h-10 bg-[#2D2D2D] rounded-full border-none text-[#4DF2BE] text-sm font-semibold hover:bg-[#3A3A3A] transition"
                   >
-                    <Image src={Copy} alt="copy" />
+                    <Image src={Copy} alt="copy" className="w-4 h-4" />
                     Copy
                   </button>
                 </div>
@@ -346,18 +353,17 @@ const SetupTwoFA: React.FC = () => {
                   onClick={() => {
                     setShowModal(false);
                     setShowVerifyModal(true);
-                    // ensure code cleared on opening verify modal
                     setCode("");
                     setError("");
                     setSuccess("");
                   }}
-                  className="w-[478px] h-[48px] bg-[#4DF2BE] ml-[30px] border-none rounded-full p-[12px_20px] text-[#000] font-[600] hover:bg-[#3fe0ad] transition"
+                  className="w-full h-12 bg-[#4DF2BE] border-none rounded-full text-black font-semibold hover:bg-[#3fe0ad] transition text-sm lg:text-base"
                 >
                   Continue
                 </button>
               </>
             ) : (
-              <p className="text-red-500 text-center">Failed to load secret.</p>
+              <p className="text-red-500 text-center text-sm lg:text-base">Failed to load secret.</p>
             )}
           </div>
         </div>
@@ -365,37 +371,34 @@ const SetupTwoFA: React.FC = () => {
 
       {/* ====================== MODAL 2: VERIFY 6-DIGIT CODE ====================== */}
       {showVerifyModal && (
-        <div className="fixed inset-0 top-[80px]  ml-[500px] bg-black bg-opacity-70 flex justify-center items-center z-50">
-          <div className="bg-[#1A1A1A] rounded-[16px] p-[32px] w-[560px] h-[450px] relative shadow-xl border border-[#2E2E2E]">
-            <div className="flex items-center ">
-              <p className="text-[16px] font-[700] text-[#FFFFFF]">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-70 p-4">
+          <div className="bg-[#1A1A1A] rounded-2xl p-4 lg:p-8 w-full max-w-lg lg:max-w-2xl relative shadow-xl border border-[#2E2E2E]">
+            {/* Header */}
+            <div className="flex justify-between items-center mb-4">
+              <p className="text-lg lg:text-xl font-bold text-white">
                 Enable security app
               </p>
-
-              <p>
-                <Image
-                  src={Times}
-                  alt={"times"}
-                  width={10}
-                  height={10}
-                  className="absolute top-[35px] w-[32px] h-[32px] ml-[60%] cursor-pointer"
-                  onClick={toggleModal2}
-                />
-              </p>
+              <Image
+                src={Times}
+                alt="close"
+                className="w-6 h-6 lg:w-8 lg:h-8 cursor-pointer hover:opacity-70 transition"
+                onClick={toggleModal2}
+              />
             </div>
 
-            <h2 className="text-[24px] mt-[50px] text-[#FFFFFF] font-[700] mb-[8px] text-center">
+            <h2 className="text-xl lg:text-2xl text-white font-bold mb-3 text-center">
               Enter Your 6-Digit Code
             </h2>
-            <p className="text-[#C7C7C7] text-[14px] mb-[24px] text-center">
+            <p className="text-[#C7C7C7] text-sm lg:text-base mb-6 text-center">
               Enter the code from your security app to complete setup.
             </p>
 
-            <div className="flex justify-center mt-[50px] space-x-[10px] mb-6">
+            {/* Code Inputs */}
+            <div className="flex justify-center gap-2 lg:gap-3 mb-6">
               {Array.from({ length: 6 }).map((_, i) => (
                 <React.Fragment key={i}>
                   <input
-                    ref={(el) => (inputsRef.current[i] = el)}
+                    ref={setInputRef(i)} 
                     maxLength={1}
                     type="text"
                     inputMode="numeric"
@@ -403,10 +406,10 @@ const SetupTwoFA: React.FC = () => {
                     onChange={handleDigitChange(i)}
                     onKeyDown={handleKeyDown(i)}
                     onPaste={handlePaste}
-                    className="w-[66.83334px] h-[56px] p-[8px] text-center bg-[#222222] border-none rounded-[12px] text-[14px] font-[500] text-[#FFFFFF] focus:outline-none focus:ring-2 focus:ring-[#00735A]"
+                    className="w-12 h-12 lg:w-14 lg:h-14 text-center bg-[#222222] border-2 border-transparent rounded-lg text-base lg:text-lg font-medium text-white focus:outline-none focus:border-[#00735A] focus:ring-2 focus:ring-[#00735A] transition"
                   />
                   {i === 2 && (
-                    <span className="text-[#C7C7C7] text-[28px] mt-[25px] font-bold mx-[6px]">
+                    <span className="text-[#C7C7C7] text-xl lg:text-2xl font-bold mx-1 lg:mx-2 flex items-center">
                       -
                     </span>
                   )}
@@ -414,11 +417,12 @@ const SetupTwoFA: React.FC = () => {
               ))}
             </div>
 
+            {/* Messages */}
             {error && (
-              <p className="text-[#FFFFFF] text-sm text-center mb-3">{error}</p>
+              <p className="text-red-400 text-sm lg:text-base text-center mb-4">{error}</p>
             )}
             {success && (
-              <p className="text-[#FFFFFF] text-sm text-center mb-3">
+              <p className="text-green-400 text-sm lg:text-base text-center mb-4">
                 {success}
               </p>
             )}
@@ -426,9 +430,13 @@ const SetupTwoFA: React.FC = () => {
             <button
               onClick={verifySecret}
               disabled={loading}
-              className="w-[496px] ml-[30px] h-[48px] p-[12px_20px] bg-[#00735A] border-none mt-[50px] hover:bg-[#009067] rounded-full font-semibold mt-2 flex items-center justify-center"
+              className="w-full h-12 bg-[#00735A] border-none rounded-full font-semibold text-white hover:bg-[#009067] transition flex items-center justify-center text-sm lg:text-base disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {loading ? <div className="loader" /> : "Verify & Enable"}
+              {loading ? (
+                <div className="loader w-6 h-6 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+              ) : (
+                "Verify & Enable"
+              )}
             </button>
           </div>
         </div>
@@ -436,24 +444,22 @@ const SetupTwoFA: React.FC = () => {
 
       {/* ====================== MODAL 3: SUCCESS ====================== */}
       {showSuccessModal && (
-        <div className="fixed inset-0 top-[200px] ml-[500px] bg-black bg-opacity-70 flex justify-center items-center z-50">
-          <div className="bg-[#1A1A1A] rounded-[16px] p-[32px] w-[480px] text-center relative shadow-xl border border-[#2E2E2E]">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-70 p-4">
+          <div className="bg-[#1A1A1A] rounded-2xl p-6 lg:p-8 w-full max-w-md text-center relative shadow-xl border border-[#2E2E2E]">
             <Image
               src={ModalC}
               alt="success"
-              width={80}
-              height={80}
-              className="mx-auto mb-6"
+              className="w-16 h-16 lg:w-20 lg:h-20 mx-auto mb-4"
             />
-            <h2 className="text-[24px] font-[700] mb-[8px] text-[#FFFFFF]">
+            <h2 className="text-xl lg:text-2xl font-bold mb-3 text-white">
               Two-Factor Authentication Enabled!
             </h2>
-            <p className="text-[#C7C7C7] text-[14px] mb-[24px]">
+            <p className="text-[#C7C7C7] text-sm lg:text-base mb-6">
               Your account is now protected with two-factor authentication.
             </p>
             <button
               onClick={toggleModal3}
-              className="w-[300px] h-[48px] bg-[#4DF2BE] border-none rounded-full text-[#000] font-[600] hover:bg-[#3fe0ad] transition"
+              className="w-full max-w-xs h-12 bg-[#4DF2BE] border-none rounded-full text-black font-semibold hover:bg-[#3fe0ad] transition text-sm lg:text-base mx-auto"
             >
               Done
             </button>
@@ -461,22 +467,13 @@ const SetupTwoFA: React.FC = () => {
         </div>
       )}
 
-      {/* ============= Custom Loader ============= */}
+      {/* ============= Custom Loader Styles ============= */}
       <style jsx global>{`
         .loader {
-          width: 30px;
-          height: 30px;
-          position: relative;
-        }
-        .loader::after {
-          content: "";
-          position: absolute;
-          top: 0;
-          left: 0;
-          width: 70%;
-          height: 70%;
-          border: 5px solid #333333;
-          border-top-color: #4df2be;
+          width: 24px;
+          height: 24px;
+          border: 2px solid #ffffff;
+          border-top: 2px solid transparent;
           border-radius: 50%;
           animation: spin 1s linear infinite;
         }

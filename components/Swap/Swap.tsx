@@ -129,7 +129,7 @@ export function convertCoinValue(
 
 const Swap: React.FC = () => {
   const [isSwapModal, setIsSwapModal] = useState(false);
-  const [IsSecpinModal, setIsSecpinModal] = useState(false); // declared so JSX references are safe
+  const [IsSecpinModal, setIsSecpinModal] = useState(false);
   const [SecDropdownOpen, setSecDropdownOpen] = useState(false);
   const [SecDropdownOpenTwo, setSecDropdownOpenTwo] = useState(false);
   const [clientUser, setClientUser] = useState<any>(null);
@@ -150,10 +150,12 @@ const Swap: React.FC = () => {
 
   const toggleSecDropdown = () => {
     setSecDropdownOpen((prev) => !prev);
+    setSecDropdownOpenTwo(false); // Close other dropdown
   };
 
   const toggleSecDropdownTwo = () => {
     setSecDropdownOpenTwo((prev) => !prev);
+    setSecDropdownOpen(false); // Close other dropdown
   };
 
   // initial fetch
@@ -171,15 +173,8 @@ const Swap: React.FC = () => {
     { name: "USDC", icon: USDC },
   ];
 
-  const coins2 = [
-    { name: "BTC", icon: BTC },
-    { name: "ETH", icon: ETH },
-    { name: "USDT", icon: USDT },
-    { name: "USDC", icon: USDC },
-  ];
-
   const [selectedCoin, setSelectedCoin] = useState(coins[0]);
-  const [selectedCoinTwo, setSelectedCoinTwo] = useState(coins2[1]);
+  const [selectedCoinTwo, setSelectedCoinTwo] = useState(coins[1]);
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -225,7 +220,7 @@ const Swap: React.FC = () => {
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [/* empty - run once */]);
+  }, []);
 
   const handleSwap = async () => {
     if (!fromCoinValue) return;
@@ -345,62 +340,303 @@ const Swap: React.FC = () => {
     return isFinite(rate) ? rate.toFixed(6) : "0";
   };
 
+  // Custom Tabs Component
+  const CustomTabs = () => {
+    const tabs = [
+      { id: "balance", label: "Balance" },
+      { id: "transaction", label: "Transaction" },
+      { id: "swap", label: "Swap" },
+    ];
+
+    return (
+      <div className="flex bg-[#2D2D2D] rounded-[56px] w-full md:w-[296px] h-[48px] p-1">
+        {tabs.map((tab) => (
+          <button
+            key={tab.id}
+            onClick={() => {
+              if (tab.id === "balance") {
+                router.push("/wallet");
+              } else if (tab.id === "transaction") {
+                router.push("/wallet?tab=transaction");
+              } else {
+                // Swap tab - stay on current page
+                setActiveTab(tab.id);
+              }
+            }}
+            className={`flex-1 flex items-center justify-center rounded-[56px] text-[16px] font-[500] transition-all ${
+              tab.id === "swap"
+                ? "bg-[#4A4A4A] text-[#FCFCFC]"
+                : "text-[#DBDBDB] hover:text-[#FCFCFC]"
+            }`}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+    );
+  };
+
+  const [activeTab, setActiveTab] = useState("swap");
+
   return (
-    <main className="min-h-screen bg-[#0F1012] pr-[10px] mt-[30px] pl-[30px] text-white md:p-8">
-      <div className="max-w-7xl mx-auto">
+    <main className="min-h-screen bg-[#0F1012] text-white">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <Nav />
 
-        <div className="flex bg-[#2D2D2D] rounded-[56px] mt-8 w-[296px] h-[48px] p-1 items-center justify-between">
-          <TabsNav />
+        {/* Custom Tabs Navigation */}
+        <div className="flex justify-center md:justify-start mt-8">
+          <CustomTabs />
         </div>
 
-        <div className="w-[1224px] h-[463px] bg-[#1A1A1A] mt-[20px] rounded-[12px] p-[32px] ">
-          {isSwapModal && (
-            <div
-              className={`fixed inset-0 bg-black bg-opacity-50 top-[30px] left-[28%] flex items-center justify-center ${
-                IsSecpinModal ? "opacity-30 pointer-events-none" : "opacity-100"
-              } z-[1000]`}
-            >
-              <div className="bg-[#1A1A1A]  rounded-[12px] w-[560px] max-h-[85vh] p-[24px] overflow-y-auto scrollbar-thin scrollbar-thumb-[#DBDBDB] scrollbar-track-[#2D2D2D]">
-                <div className="flex  items-center justify-between">
-                  <p className="text-[16px] font-[700] text-[#FFFFFF]">
-                    Confirm Swap
+        {/* Main Swap Container */}
+        <div className="bg-[#1A1A1A] mt-6 rounded-[12px] p-6 lg:p-8">
+          {/* Header */}
+          <div className="mb-6">
+            <h1 className="text-[24px] font-[700] text-[#FCFCFC]">Swap Crypto</h1>
+          </div>
+
+          {/* Swap Cards Container */}
+          <div className="flex flex-col lg:flex-row gap-4 lg:gap-6 relative">
+            {/* From Card */}
+            <div className="bg-[#222222] rounded-[12px] p-4 lg:p-6 flex-1">
+              <div className="mb-4">
+                <p className="text-[14px] text-[#8F8F8F] font-[400]">You are swapping</p>
+              </div>
+
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                <div className="flex-1">
+                  <input
+                    value={fromCoinValue}
+                    onChange={(e) => setFromCoinValue(e.target.value)}
+                    placeholder="0"
+                    className="bg-transparent border-none outline-none text-[24px] lg:text-[30px] w-full text-[#FCFCFC] placeholder-[#8F8F8F]"
+                  />
+                </div>
+                
+                {/* Coin Selector */}
+                <div className="relative">
+                  <div 
+                    className="w-[96px] h-[32px] flex items-center justify-between bg-[#2D2D2D] rounded-full px-3 cursor-pointer"
+                    onClick={toggleSecDropdown}
+                  >
+                    <div className="flex items-center space-x-2">
+                      <Image src={selectedCoin.icon} alt={selectedCoin.name} width={24} height={24} />
+                      <p className="text-[14px] font-[700] text-[#DBDBDB]">{selectedCoin.name}</p>
+                    </div>
+                    <Image src={Arrow} alt="arrow_down" width={16} height={16} />
+                  </div>
+
+                  {SecDropdownOpen && (
+                    <div className="absolute top-full right-0 mt-2 w-[200px] bg-[#222222] rounded-[12px] shadow-lg z-50 p-4 space-y-2">
+                      {coins.map((coin) => (
+                        <div
+                          key={coin.name}
+                          onClick={() => {
+                            setSelectedCoin(coin);
+                            setSecDropdownOpen(false);
+                          }}
+                          className="flex items-center justify-between cursor-pointer hover:bg-[#2D2D2D] px-3 py-2 rounded-[8px]"
+                        >
+                          <div className="flex items-center space-x-3">
+                            <Image src={coin.icon} alt={coin.name} width={20} height={20} />
+                            <p className="text-[14px] font-[500] text-[#FFFFFF]">{coin.name}</p>
+                          </div>
+                          <div
+                            className={`w-[16px] h-[16px] rounded-full border-2 ${
+                              selectedCoin.name === coin.name ? "border-[#4DF2BE] bg-[#4DF2BE]" : "border-[#8F8F8F]"
+                            } flex items-center justify-center`}
+                          >
+                            {selectedCoin.name === coin.name && <div className="w-[6px] h-[6px] rounded-full bg-[#0F1012]"></div>}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mt-4">
+                <div className="bg-[#2D2D2D] text-[#8F8F8F] text-[12px] px-3 py-1 rounded-full whitespace-nowrap">
+                  Min: 0.0001276
+                </div>
+                <div className="flex items-center space-x-2">
+                  <p className="text-[14px] font-[400] text-[#8F8F8F]">Balance:</p>
+                  <span className="text-[14px] font-[500] text-[#FCFCFC]">
+                    {clientUser?.wallets?.find((w: any) => w?.currency === selectedCoin?.name)?.balance || 0} {selectedCoin?.name}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Swap Button */}
+            <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-10">
+              <div
+                className="w-[40px] h-[40px] rounded-full border-4 border-[#0F1012] bg-[#4DF2BE] flex items-center justify-center cursor-pointer hover:bg-[#3DD2A5] transition-colors"
+                onClick={swapCoins}
+              >
+                <Image src={Swapicon} alt="swap" width={21} height={21} />
+              </div>
+            </div>
+
+            {/* To Card */}
+            <div className="bg-[#222222] rounded-[12px] p-4 lg:p-6 flex-1">
+              <div className="mb-4">
+                <p className="text-[14px] text-[#8F8F8F] font-[400]">You will receive</p>
+              </div>
+
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                <div className="flex-1">
+                  <input
+                    disabled
+                    value={String(convertedValue)}
+                    className="bg-transparent border-none outline-none text-[24px] lg:text-[30px] w-full text-white"
+                  />
+                </div>
+                
+                {/* Coin Selector */}
+                <div className="relative">
+                  <div 
+                    className="w-[96px] h-[32px] flex items-center justify-between bg-[#2D2D2D] rounded-full px-3 cursor-pointer"
+                    onClick={toggleSecDropdownTwo}
+                  >
+                    <div className="flex items-center space-x-2">
+                      <Image src={selectedCoinTwo.icon} alt={selectedCoinTwo.name} width={24} height={24} />
+                      <p className="text-[14px] font-[700] text-[#DBDBDB]">{selectedCoinTwo.name}</p>
+                    </div>
+                    <Image src={Arrow} alt="arrow_down" width={16} height={16} />
+                  </div>
+
+                  {SecDropdownOpenTwo && (
+                    <div className="absolute top-full right-0 mt-2 w-[200px] bg-[#222222] rounded-[12px] shadow-lg z-50 p-4 space-y-2">
+                      {coins.map((coin) => (
+                        <div
+                          key={coin.name}
+                          onClick={() => {
+                            setSelectedCoinTwo(coin);
+                            setSecDropdownOpenTwo(false);
+                          }}
+                          className="flex items-center justify-between cursor-pointer hover:bg-[#2D2D2D] px-3 py-2 rounded-[8px]"
+                        >
+                          <div className="flex items-center space-x-3">
+                            <Image src={coin.icon} alt={coin.name} width={20} height={20} />
+                            <p className="text-[14px] font-[500] text-[#FFFFFF]">{coin.name}</p>
+                          </div>
+                          <div
+                            className={`w-[16px] h-[16px] rounded-full border-2 ${
+                              selectedCoinTwo.name === coin.name ? "border-[#4DF2BE] bg-[#4DF2BE]" : "border-[#8F8F8F]"
+                            } flex items-center justify-center`}
+                          >
+                            {selectedCoinTwo.name === coin.name && <div className="w-[6px] h-[6px] rounded-full bg-[#0F1012]"></div>}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mt-4">
+                <div className="bg-[#2D2D2D] text-[#FCFCFC] text-[12px] px-3 py-1 rounded-full whitespace-nowrap">
+                  $0
+                </div>
+                <div className="flex items-center space-x-2">
+                  <p className="text-[14px] font-[400] text-[#8F8F8F]">Balance:</p>
+                  <span className="text-[14px] font-[500] text-[#FCFCFC]">
+                    {clientUser?.wallets?.find((w: any) => w?.currency === selectedCoinTwo?.name)?.balance || 0} {selectedCoinTwo?.name}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Info Box */}
+          <div className="bg-[#2D2D2D] border-l-4 border-[#FFC051] rounded-r-[12px] p-4 mt-6">
+            <div className="flex items-start space-x-3">
+              <Image src={I_icon} alt="info" width={20} height={20} className="mt-1 flex-shrink-0" />
+              <p className="text-[14px] font-[400] text-[#DBDBDB]">
+                The exchange rate includes all fees from Evolv2p and our hedging counterparty
+              </p>
+            </div>
+          </div>
+
+          {/* Exchange Rate & Swap Button */}
+          <div className="bg-[#222222] rounded-[8px] p-4 mt-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="flex items-center space-x-4">
+                {/* Refresh Button */}
+                <div className="w-[28px] h-[28px] flex items-center justify-center">
+                  {isRefreshing ? (
+                    <div className="animate-spin w-6 h-6 rounded-full border-2 border-[#FFC051] border-t-transparent" />
+                  ) : (
+                    <Image 
+                      src={Rotate} 
+                      alt="rotate" 
+                      className="cursor-pointer hover:opacity-80 transition-opacity" 
+                      onClick={handleRefresh} 
+                    />
+                  )}
+                </div>
+
+                {/* Exchange Rate */}
+                <div className="flex flex-col">
+                  <div className="flex items-center space-x-2 text-[16px] font-[500]">
+                    <p className="text-[#DBDBDB]">1 {selectedCoin.name}</p>
+                    <small className="text-[#8F8F8F]">=</small>
+                    <span className="text-[#DBDBDB]">
+                      {getExchangeRateText()} {selectedCoinTwo.name}
+                    </span>
+                  </div>
+                  <p className="text-[14px] font-[400] text-[#8F8F8F] mt-1">
+                    Refreshing in <span className="text-[#FFC051] font-[500]">{refreshCountdown} Seconds</span>
                   </p>
+                </div>
+              </div>
+
+              {/* Swap Button */}
+              <button
+                onClick={() => setIsSwapModal(true)}
+                disabled={!fromCoinValue || isSwapping}
+                className="w-full sm:w-[120px] h-[44px] bg-[#4DF2BE] rounded-full text-[14px] font-[700] text-[#0F1012] border border-[#4DF2BE] hover:bg-[#3DD2A5] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isSwapping ? "Swapping..." : "Swap now"}
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Swap Confirmation Modal */}
+        {isSwapModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-[#1A1A1A] rounded-[12px] w-full max-w-md max-h-[85vh] overflow-y-auto">
+              <div className="p-6">
+                <div className="flex items-center justify-between mb-6">
+                  <h2 className="text-[16px] font-[700] text-[#FFFFFF]">Confirm Swap</h2>
                   <Image
                     src={Times}
-                    alt={"times"}
-                    width={20}
-                    height={20}
-                    className="absolute top-[20px] w-[32px] h-[32px] mt-[15px]  ml-[85%] cursor-pointer"
+                    alt="close"
+                    width={32}
+                    height={32}
+                    className="cursor-pointer hover:opacity-80"
                     onClick={closeSwapModal}
                   />
                 </div>
 
-                <p className="text-center text-[#8F8F8F] text-[16px] font-[500] mt-[30px]">
-                  Review the above before confirming <br /> Once made, your
-                  transaction is irreversible.
+                <p className="text-center text-[#8F8F8F] text-[16px] font-[500] mb-6">
+                  Review the above before confirming <br /> Once made, your transaction is irreversible.
                 </p>
 
-                <div className="flex justify-center items-center   mt-[30px]">
-                  <Image
-                    src={BTC}
-                    alt="BTC"
-                    className="w-[57.594px] ml-[-55px] h-[ 57.6px]"
-                  />
-                  <Image
-                    src={ETH}
-                    alt="ETH"
-                    className="w-[ 57.6px] ml-[-18px] h-[ 57.6px]"
-                  />
+                <div className="flex justify-center items-center mb-6">
+                  <Image src={selectedCoin.icon} alt={selectedCoin.name} width={58} height={58} />
+                  <Image src={selectedCoinTwo.icon} alt={selectedCoinTwo.name} width={58} height={58} className="-ml-4" />
                 </div>
 
-                <div className="mt-6">
-                  <p className="text-center text-[#FFFFFF] font-[700] text-[20px] rounded-[4px] py-[8px]">
+                <div className="text-center mb-6">
+                  <p className="text-[20px] font-[700] text-[#FFFFFF]">
                     Confirm swap of {selectedCoin.name} to {selectedCoinTwo.name}
                   </p>
                 </div>
 
-                <div className="mt-[40px] space-y-3">
+                <div className="space-y-3 mb-6">
                   {[
                     { label: "You are swapping", value: `${fromCoinValue} ${selectedCoin.name}` },
                     { label: "You will receive", value: `${convertedValue} ${selectedCoinTwo.name}` },
@@ -411,238 +647,39 @@ const Swap: React.FC = () => {
                   ].map((item) => (
                     <div
                       key={item.label}
-                      className="flex justify-between items-center w-[496px] h-[44px] text-[14px] mb-[5px] font-[400] text-[#DBDBDB] bg-[#222222] p-[12px] rounded-[6px]"
+                      className="flex justify-between items-center text-[14px] font-[400] text-[#DBDBDB] bg-[#222222] p-3 rounded-[6px]"
                     >
                       <span>{item.label}</span>
-                      <span>{item.value}</span>
+                      <span className="text-[#FCFCFC] font-[500]">{item.value}</span>
                     </div>
                   ))}
                 </div>
 
-                <div className="flex items-center space-x-[25px] mt-[30px]">
+                <div className="flex space-x-4">
                   <button
                     onClick={closeSwapModal}
-                    className="w-[242px] h-[48px] border-none bg-[#2D2D2D] rounded-full text-[#FFFFFF] text-[14px] font-[700]"
+                    className="flex-1 h-[48px] bg-[#2D2D2D] rounded-full text-[#FFFFFF] text-[14px] font-[700] hover:bg-[#3A3A3A] transition-colors"
                   >
                     Cancel
                   </button>
                   <button
                     disabled={isSwapping}
                     onClick={handleSwap}
-                    className="w-[242px] h-[48px] bg-[#4DF2BE] rounded-full text-[14px] text-[#0F1012] font-[700]"
-                    style={{ border: "1px solid #4DF2BE" }}
+                    className="flex-1 h-[48px] bg-[#4DF2BE] rounded-full text-[14px] text-[#0F1012] font-[700] border border-[#4DF2BE] hover:bg-[#3DD2A5] transition-colors disabled:opacity-50"
                   >
-                    {isSwapping ? "swapping..." : "Confirm Swap"}
+                    {isSwapping ? "Swapping..." : "Confirm Swap"}
                   </button>
                 </div>
               </div>
             </div>
-          )}
-          <div>
-            <p className="text-[24px] font-[700] text-[#FCFCFC]">Swap Crypto</p>
           </div>
-          {/*general div l & r*/}
-          <div className="flex items-center space-x-[10px] relative">
-            {/*div left*/}
-            <div
-              className="w-[556px] h-[139px] bg-[#222222]  rounded-[12px] flex flex-col justify-between"
-              style={{ padding: "12px 32px 24px 16px" }}
-            >
-              <div className="w-[508px] h-[20px]">
-                <p className="text-[14px] text-[#8F8F8F] font-[400]">You are swapping</p>
-              </div>
+        )}
 
-              <div className="flex items-center justify-between ">
-                <div className=" flex text-[28px]  ">
-                  <div className="text-[#FCFCFC] ">
-                    <input
-                      value={fromCoinValue}
-                      onChange={(e) => setFromCoinValue(e.target.value)}
-                      placeholder="0"
-                      className="bg-transparent border-none outline-none text-[30px] w-auto min-w-0 text-[#FCFCFC]"
-                    />
-                  </div>
+         <div className="w-[100%]  h-[1px] bg-[#fff] mt-[50%] opacity-20 my-8"></div>
+        
+                <div className=" mb-[80px] mt-[10%] ">
+                  <Footer />
                 </div>
-                {/*where dropdown one */}
-                <div className="w-[96px] h-[32px] flex items-center space-x-[10px]  justify-center bg-[#2D2D2D] rounded-full ">
-                  <Image src={selectedCoin.icon} alt={selectedCoin.name} className="w-[23.997px] h-[24px] ml-[-25px]" />
-                  <p className="text-[14px] font-[700] text-[#DBDBDB]">{selectedCoin.name}</p>
-                  <Image src={Arrow} alt="arrow_down" className="text-[#8F8F8F] w-[16px] h-[16px]" onClick={toggleSecDropdown} />
-                </div>
-
-                {SecDropdownOpen && (
-                  <div className="absolute top-[60%] left-[35%]  w-[250px]  bg-[#222222] rounded-[16px] shadow-lg z-[1500] p-8 space-y-4">
-                    {coins.map((coin) => (
-                      <div
-                        key={coin.name}
-                        onClick={() => {
-                          setSelectedCoin(coin);
-                          setSecDropdownOpen(false);
-                        }}
-                        className="flex items-center justify-between cursor-pointer hover:bg-[#2D2D2D] px-4 py-2 rounded-[12px]"
-                      >
-                        <div className="flex items-center pl-[20px]  space-x-[10px]">
-                          <Image src={coin.icon} alt={coin.name} width={19.998} height={20} />
-                          <p className="text-[16px] font-[500] text-[#FFFFFF]">{coin.name}</p>
-                        </div>
-                        {/* Selection Indicator */}
-                        <div
-                          className={`w-[20px] h-[20px] mr-[10px] rounded-full border-2 ${
-                            selectedCoin.name === coin.name ? "border-[#4DF2BE] bg-[#4DF2BE]" : "border-[#8F8F8F]"
-                          } flex items-center justify-center`}
-                        >
-                          {selectedCoin.name === coin.name && <div className="w-[10px] h-[10px]  rounded-full bg-[#0F1012]"></div>}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              <div className="flex items-center justify-between">
-                <div className="w-[115px] h-[28px] whitespace-nowrap flex items-center justify-center text-[14px] font-[400] bg-[#2D2D2D] text-[#8F8F8F] rounded-full">
-                  Min: 0.0001276
-                </div>
-
-                <div className="flex items-center">
-                  <p className="text-[14px] font-[400] text-[#8F8F8F]">Balance: </p>
-                  <span className="text-[14px] font-[500] text-[#FCFCFC]">
-                    {clientUser?.wallets?.find((w: any) => w?.currency == selectedCoin?.name)?.balance} {selectedCoin?.name}
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            {/* Swap Icon */}
-            <div className="absolute left-1/2 -translate-x-1/2 z-10">
-              <div
-                className="w-[40px] h-[40px] rounded-[48px] border-[4px] border-[#0F1012] bg-[#4DF2BE] flex items-center justify-center p-2 cursor-pointer"
-                onClick={swapCoins}
-              >
-                <Image src={Swapicon} alt="swap" width={21} height={21} className="w-[21px] h-[21px]" style={{ color: "#0F1012" }} />
-              </div>
-            </div>
-
-            {/*div right*/}
-            <div className="w-[556px] h-[139px] bg-[#222222]  rounded-[12px] flex flex-col justify-between" style={{ padding: "12px 16px 24px 32px" }}>
-              <div className="w-[508px] h-[20px]">
-                <p className="text-[14px] text-[#8F8F8F] font-[400]">You will receive</p>
-              </div>
-
-              <div className="flex items-center justify-between ">
-                <div className=" flex text-[28px]  ">
-                  <div className="text-[#FCFCFC] ">
-                    <input disabled value={String(convertedValue)} className="bg-transparent border-none outline-none text-[30px] w-auto min-w-0 text-white" />
-                  </div>
-                </div>
-
-                {/*where dropdown two */}
-                <div className="w-[96px] h-[32px] flex items-center space-x-[10px]  justify-center bg-[#2D2D2D] rounded-full ">
-                  <Image src={selectedCoinTwo.icon} alt={selectedCoinTwo.name} className="w-[23.997px] h-[24px] ml-[-25px]" />
-                  <p className="text-[14px] font-[700] text-[#DBDBDB]">{selectedCoinTwo.name}</p>
-                  <Image src={Arrow} alt="arrow_down" className="text-[#8F8F8F] w-[16px] h-[16px]" onClick={toggleSecDropdownTwo} />
-                </div>
-
-                {SecDropdownOpenTwo && (
-                  <div className="absolute top-[60%] left-[80%]  w-[250px]  bg-[#222222] rounded-[16px] shadow-lg z-[1500] p-8 space-y-4">
-                    {coins2.map((coin) => (
-                      <div
-                        key={coin.name}
-                        onClick={() => {
-                          setSelectedCoinTwo(coin);
-                          setSecDropdownOpenTwo(false);
-                        }}
-                        className="flex items-center justify-between cursor-pointer hover:bg-[#2D2D2D] px-4 py-2 rounded-[12px]"
-                      >
-                        <div className="flex items-center pl-[20px]  space-x-[10px]">
-                          <Image src={coin.icon} alt={coin.name} width={19.998} height={20} />
-                          <p className="text-[16px] font-[500] text-[#FFFFFF]">{coin.name}</p>
-                        </div>
-                        {/* Selection Indicator */}
-                        <div
-                          className={`w-[20px] h-[20px] mr-[10px] rounded-full border-2 ${
-                            selectedCoinTwo.name === coin.name ? "border-[#4DF2BE] bg-[#4DF2BE]" : "border-[#8F8F8F]"
-                          } flex items-center justify-center`}
-                        >
-                          {selectedCoinTwo.name === coin.name && <div className="w-[10px] h-[10px]  rounded-full bg-[#0F1012]"></div>}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              <div className="flex items-center justify-between">
-                <div className="w-[38px] h-[28px] whitespace-nowrap flex items-center justify-center text-[14px] font-[500] bg-[#2D2D2D] text-[#FCFCFC] rounded-full">
-                  <p>
-                    $ <span>0</span>
-                  </p>
-                </div>
-
-                <div className="flex items-center">
-                  <p className="text-[14px] font-[400] text-[#8F8F8F]">Balance: </p>
-                  <span className="text-[14px] font-[500] text-[#FCFCFC]">
-                    {clientUser?.wallets?.find((w: any) => w?.currency == selectedCoinTwo?.name)?.balance} {selectedCoinTwo?.name}
-                  </span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div
-            className="w-[1190px] h-[56px] flex items-center  mt-[20px] bg-[#2D2D2D] space-x-[10px]"
-            style={{
-              borderRadius: "0 12px 12px 0",
-              borderLeft: "2px solid #FFC051",
-              padding: "16px 16px 16px 8px",
-            }}
-          >
-            <Image src={I_icon} alt="iicon" />
-            <p className="text-[14px] font-[400] text-[#DBDBDB]">
-              The exchange rate includes all fees from Evolv2p and our hedging counterparty
-            </p>
-          </div>
-
-          <div className="w-[1190] h-[68px] flex items-center  mt-[20px] bg-[#222222] rounded-[8px] p-[12px] space-x-[10px]">
-            {/* Rotate + spinner */}
-            <div className="w-[28px] h-[28px] flex items-center justify-center">
-              {isRefreshing ? (
-                <div className="animate-spin w-6 h-6 rounded-full border-2 border-[#FFC051] border-t-transparent" />
-              ) : (
-                <Image src={Rotate} alt="rotate" className="cursor-pointer" onClick={handleRefresh} />
-              )}
-            </div>
-
-            <div className="flex flex-col ">
-              <div className="flex items-center space-x-[10px] text-[16px] font-[500]">
-                <p className="text-[#DBDBDB]">1 {selectedCoin.name}</p>{" "}
-                <small className="text-[#8F8F8F]">=</small>{" "}
-                <span className="text-[#DBDBDB]">
-                  {getExchangeRateText()} {selectedCoinTwo.name}
-                </span>
-              </div>
-
-              <div className="flex items-center mt-[-20px]">
-                <p className="text-[14px] font-[400] text-[#8F8F8F]">
-                  Refreshening in{" "}
-                  <span className="text-[#FFC051] font-[500]">{refreshCountdown} Seconds</span>
-                </p>
-              </div>
-            </div>
-
-            <button
-              onClick={() => setIsSwapModal(true)}
-              className="w-[105px] cursor-pointer h-[44px] flex  items-center justify-center rounded-full bg-[#4DF2BE] ml-auto"
-              style={{ border: "1px solid  #4DF2BE" }}
-            >
-              <p className="text-[14px] font-[700] text-[#0F1012]">Swap now</p>
-            </button>
-          </div>
-        </div>
-
-        <div className=" mb-[80px] mt-[40%] ">
-          <Footer />
-        </div>
       </div>
     </main>
   );

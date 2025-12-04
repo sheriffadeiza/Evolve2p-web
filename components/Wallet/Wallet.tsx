@@ -25,22 +25,22 @@ import Footer from "../Footer/Footer";
 import TabsNav from "../TabsNav/TabsNav";
 import { useRouter } from "next/navigation";
 import WalletTransactions from "@/app/walletTransaction/walletTrans";
-import { fetchCoinData, getCoinData } from "@/utils";
 
 interface QRCodeBoxProps {
   value?: string;
 }
 
-interface wallet {
+interface Wallet {
   id: string;
-  currency: string; // "BTC", "ETH", etc
+  currency: string;
   address: string;
+  balance: number;
 }
 
-type Currency = {
+interface Currency {
   name: string;
   symbol: string;
-};
+}
 
 const currencies: Currency[] = [
   { name: "USD", symbol: "$" },
@@ -49,11 +49,40 @@ const currencies: Currency[] = [
   { name: "ETH", symbol: "Ξ" },
 ];
 
-const conversionRates: { [key: string]: number } = {
-  USD: 1,
-  NGN: 1500,
-  BTC: 0.000015,
-  ETH: 0.00022,
+// Crypto Price Service using fetch
+const CryptoPriceService = {
+  async getMultipleCryptoPrices(coinIds: string[], vsCurrencies: string[] = ['usd']) {
+    try {
+      const response = await fetch(
+        `https://api.coingecko.com/api/v3/simple/price?ids=${coinIds.join(',')}&vs_currencies=${vsCurrencies.join(',')}`
+      );
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      return data;
+    } catch (error) {
+      console.error('Error fetching crypto prices from CoinGecko:', error);
+      throw error;
+    }
+  },
+
+  async getUSDToNGNRate() {
+    try {
+      // Using a free forex API for USD to NGN conversion
+      const response = await fetch('https://api.exchangerate-api.com/v4/latest/USD');
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      const data = await response.json();
+      return data.rates.NGN || 1500; // Fallback to 1500 if API fails
+    } catch (error) {
+      console.error('Error fetching USD to NGN rate:', error);
+      return 1500; // Fallback rate
+    }
+  }
 };
 
 const Wallet: React.FC<QRCodeBoxProps> = ({ value }) => {
@@ -62,49 +91,139 @@ const Wallet: React.FC<QRCodeBoxProps> = ({ value }) => {
   const [isReceiveOpen, setIsReceiveOpen] = useState(false);
   const [myDate, setMyDate] = useState("");
   const [clientUser, setClientUser] = useState<any>(null);
-  const [currentWallet, setCurrentWallet] = useState<wallet | null>(null);
+  const [currentWallet, setCurrentWallet] = useState<Wallet | null>(null);
   const [currentCoin, setCurrentCoin] = useState("");
   const [showBalance, setShowBalance] = useState(true);
   const [error, setError] = useState("");
-  const [coinData, setCoinData] = useState<any>(null);
+  const [isTransOpen, setIsTransOpen] = useState(false);
+  const [selectedCurrency, setSelectedCurrency] = useState<Currency>(currencies[0]);
+  const [totalBalanceUSD, setTotalBalanceUSD] = useState<number>(0);
+  const [convertedBalance, setConvertedBalance] = useState<string>("0.00");
+  const [cryptoPrices, setCryptoPrices] = useState<any>({});
+  const [usdToNgnRate, setUsdToNgnRate] = useState<number>(1500);
+  const [loadingPrices, setLoadingPrices] = useState(true);
+  const [activeTab, setActiveTab] = useState("balance");
+
   const router = useRouter();
 
-  const [isTransOpen, setIsTransOpen] = useState(false);
+  // Safe number conversion helper
+  const safeNumber = (value: any): number => {
+    if (value === null || value === undefined) return 0;
+    const num = Number(value);
+    return isNaN(num) ? 0 : num;
+  };
 
-  const balance = 0; // 🔁 This is the static amount in USD
-
+  // Fetch crypto prices and conversion rates
   useEffect(() => {
-    (async () => {
-      const res = await fetchCoinData();
-      setCoinData(res);
-    })();
+    const fetchAllPrices = async () => {
+      setLoadingPrices(true);
+      try {
+        // Fetch crypto prices in USD
+        const [cryptoPricesData, ngnRate] = await Promise.all([
+          CryptoPriceService.getMultipleCryptoPrices(
+            ['bitcoin', 'ethereum', 'tether', 'usd-coin'],
+            ['usd']
+          ),
+          CryptoPriceService.getUSDToNGNRate()
+        ]);
+
+        setCryptoPrices(cryptoPricesData);
+        setUsdToNgnRate(ngnRate);
+      } catch (error) {
+        console.error('Error fetching prices:', error);
+        // Set fallback prices in case of API failure
+        setCryptoPrices({
+          bitcoin: { usd: 50000 },
+          ethereum: { usd: 3000 },
+          tether: { usd: 1 },
+          'usd-coin': { usd: 1 }
+        });
+        setUsdToNgnRate(1500);
+      } finally {
+        setLoadingPrices(false);
+      }
+    };
+
+    fetchAllPrices();
+    const interval = setInterval(fetchAllPrices, 60000); // Refresh every minute
+    return () => clearInterval(interval);
   }, []);
+
+  // Calculate total balance in USD
+  useEffect(() => {
+    if (clientUser?.wallets && Object.keys(cryptoPrices).length > 0) {
+      let totalUSD = 0;
+      
+      clientUser.wallets.forEach((wallet: Wallet) => {
+        const walletBalance = safeNumber(wallet.balance);
+        let usdValue = 0;
+
+        switch (wallet.currency?.toUpperCase()) {
+          case 'BTC':
+            usdValue = walletBalance * safeNumber(cryptoPrices.bitcoin?.usd);
+            break;
+          case 'ETH':
+            usdValue = walletBalance * safeNumber(cryptoPrices.ethereum?.usd);
+            break;
+          case 'USDT':
+            usdValue = walletBalance * safeNumber(cryptoPrices.tether?.usd || 1);
+            break;
+          case 'USDC':
+            usdValue = walletBalance * safeNumber(cryptoPrices['usd-coin']?.usd || 1);
+            break;
+          default:
+            usdValue = walletBalance;
+        }
+
+        totalUSD += usdValue;
+      });
+
+      setTotalBalanceUSD(totalUSD);
+    }
+  }, [clientUser, cryptoPrices]);
+
+  // Convert balance to selected currency
+  useEffect(() => {
+    if (totalBalanceUSD > 0) {
+      let convertedValue = 0;
+      
+      switch (selectedCurrency.name) {
+        case 'USD':
+          convertedValue = totalBalanceUSD;
+          break;
+        case 'NGN':
+          convertedValue = totalBalanceUSD * usdToNgnRate;
+          break;
+        case 'BTC':
+          convertedValue = totalBalanceUSD / safeNumber(cryptoPrices.bitcoin?.usd || 1);
+          break;
+        case 'ETH':
+          convertedValue = totalBalanceUSD / safeNumber(cryptoPrices.ethereum?.usd || 1);
+          break;
+        default:
+          convertedValue = totalBalanceUSD;
+      }
+
+      // Format based on currency type
+      if (selectedCurrency.name === 'BTC' || selectedCurrency.name === 'ETH') {
+        setConvertedBalance(convertedValue.toFixed(8));
+      } else {
+        setConvertedBalance(convertedValue.toFixed(2));
+      }
+    } else {
+      setConvertedBalance("0.00");
+    }
+  }, [totalBalanceUSD, selectedCurrency, cryptoPrices, usdToNgnRate]);
 
   const handleSelect = (currency: Currency) => {
     setSelectedCurrency(currency);
     setIsTransOpen(false);
   };
 
-  const toggleDropdown = () => {
-    setOpen((prev) => !prev);
-  };
-  const toggleReceiveDropdown = () => {
-    setIsReceiveOpen((prev) => !prev);
-  };
-
+  const toggleDropdown = () => setOpen((prev) => !prev);
+  const toggleReceiveDropdown = () => setIsReceiveOpen((prev) => !prev);
   const toggleVissibility = () => setShowBalance(!showBalance);
-
-  const toggleTransDropdown = () => {
-    setIsTransOpen((prev) => !prev);
-  };
-
-  const [selectedCurrency, setSelectedCurrency] = useState<Currency>(
-    currencies[0]
-  );
-
-  const convertedAmount = (
-    balance * conversionRates[selectedCurrency.name]
-  ).toFixed(2);
+  const toggleTransDropdown = () => setIsTransOpen((prev) => !prev);
 
   const handleReceiveClick = (symbol: string) => {
     setCurrentCoin(symbol);
@@ -122,857 +241,466 @@ const Wallet: React.FC<QRCodeBoxProps> = ({ value }) => {
         setTimeout(() => router.push("/Logins/login"), 1500);
         return;
       }
-      if (stored) {
-        setClientUser(JSON.parse(stored)?.userData);
+      try {
+        const userData = JSON.parse(stored);
+        setClientUser(userData?.userData || userData);
+      } catch (e) {
+        console.error("Error parsing user data:", e);
+        setError("Invalid user data");
       }
     }
-  }, []);
+  }, [router]);
 
   useEffect(() => {
-    if (currentCoin !== "") {
-      if (clientUser && clientUser.wallets) {
-        const wallet = clientUser.wallets.find(
-          (w: any) =>
-            String(w.currency).toUpperCase() == currentCoin?.toUpperCase()
-        );
-        setCurrentWallet(wallet || null); // Set to null if not found
-      } else {
-        console.warn("Client user or wallets data is not available yet.");
-        setCurrentWallet(null); //set current wallet to null to avoid future errors
-      }
+    if (currentCoin !== "" && clientUser?.wallets) {
+      const wallet = clientUser.wallets.find(
+        (w: Wallet) => w.currency?.toUpperCase() === currentCoin.toUpperCase()
+      );
+      setCurrentWallet(wallet || null);
     }
   }, [currentCoin, clientUser]);
-
-  
 
   useEffect(() => {
     setMyDate(new Date().toLocaleString());
   }, []);
 
+  // Get wallet balance in USD
+  const getWalletBalanceUSD = (wallet: Wallet): number => {
+    const walletBalance = safeNumber(wallet.balance);
+    
+    switch (wallet.currency?.toUpperCase()) {
+      case 'BTC':
+        return walletBalance * safeNumber(cryptoPrices.bitcoin?.usd);
+      case 'ETH':
+        return walletBalance * safeNumber(cryptoPrices.ethereum?.usd);
+      case 'USDT':
+        return walletBalance * safeNumber(cryptoPrices.tether?.usd || 1);
+      case 'USDC':
+        return walletBalance * safeNumber(cryptoPrices['usd-coin']?.usd || 1);
+      default:
+        return walletBalance;
+    }
+  };
+
+  // Format balance with appropriate decimal places
+  const formatBalance = (balance: number, currency: string): string => {
+    const safeBalance = safeNumber(balance);
+    
+    if (currency === 'BTC' || currency === 'ETH') {
+      if (safeBalance === 0) return "0.00";
+      if (safeBalance < 0.001) return safeBalance.toFixed(8);
+      if (safeBalance < 1) return safeBalance.toFixed(6);
+      return safeBalance.toFixed(4);
+    }
+    
+    // For stablecoins
+    return safeBalance.toFixed(2);
+  };
+
+  // Get current price for display
+  const getCurrentPrice = (symbol: string): string => {
+    switch (symbol.toLowerCase()) {
+      case 'btc':
+        return `1 USD = ${(1 / safeNumber(cryptoPrices.bitcoin?.usd || 1)).toFixed(8)} BTC`;
+      case 'eth':
+        return `1 USD = ${(1 / safeNumber(cryptoPrices.ethereum?.usd || 1)).toFixed(6)} ETH`;
+      case 'usdt':
+        return `1 USD = 1.00 USDT`;
+      case 'usdc':
+        return `1 USD = 1.00 USDC`;
+      default:
+        return "Loading...";
+    }
+  };
+
+  const cryptoAssets = [
+    { symbol: "BTC", name: "Bitcoin", icon: BTC },
+    { symbol: "ETH", name: "Ethereum", icon: ETH },
+    { symbol: "USDC", name: "USDC", icon: USDC },
+    { symbol: "USDT", name: "USDT", icon: USDT },
+  ];
+
+  // Custom Tabs Component
+  const CustomTabs = () => {
+    const tabs = [
+      { id: "balance", label: "Balance" },
+      { id: "transaction", label: "Transaction" },
+      { id: "swap", label: "Swap" },
+    ];
+
+    return (
+      <div className="flex bg-[#2D2D2D] rounded-[56px] w-full max-w-md md:w-[296px] h-12 md:h-[48px] p-1">
+        {tabs.map((tab) => (
+          <button
+            key={tab.id}
+            onClick={() => {
+              if (tab.id === "swap") {
+                router.push("/swap");
+              } else {
+                setActiveTab(tab.id);
+              }
+            }}
+            className={`flex-1 flex items-center justify-center rounded-[56px] text-sm md:text-[16px] font-[500] transition-all ${
+              activeTab === tab.id
+                ? "bg-[#4A4A4A] text-[#FCFCFC]"
+                : "text-[#DBDBDB] hover:text-[#FCFCFC]"
+            }`}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+    );
+  };
+
   return (
-    <main className="min-h-screen bg-[#0F1012] pr-[10px] mt-[30px] pl-[30px] text-white md:p-8">
-      <div className="max-w-7xl mx-auto">
+    <main className="min-h-screen bg-[#0F1012] text-white">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 md:py-8">
         <Nav />
 
-        <div className="flex bg-[#2D2D2D] rounded-[56px] mt-8 w-[296px] h-[48px] p-1 items-center justify-between">
-          <TabsNav />
+        {/* Custom Tabs Navigation */}
+        <div className="flex justify-center md:justify-start mt-6 md:mt-8">
+          <CustomTabs />
         </div>
 
-        <div className="flex md:flex-row justify-between pr-[30px] mt-[5px]">
-          {/*left_side */}
-          <div
-            className="flex flex-col justify-between mt-[30px] w-[706px] h-[188px]  bg-[#222222] rounded-[12px]"
-            style={{ padding: "24px 20px" }}
-          >
-            <div className="flex items-center  mt-[5px] gap-2 mb-6  space-x-[10px]">
-              <p className="text-[16px] font-[400] text-[#DBDBDB]">
+        {/* Balance Cards Section */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6 mt-6 md:mt-8">
+          {/* Available Balance Card */}
+          <div className="bg-[#222222] rounded-[12px] p-4 sm:p-6">
+            <div className="flex items-center justify-between mb-4 sm:mb-6">
+              <p className="text-[14px] sm:text-[16px] font-[400] text-[#DBDBDB]">
                 Available Balance
               </p>
-
-              <p>
-                {" "}
-                <Image
-                  onClick={toggleVissibility}
-                  src={SlashH}
-                  alt="slash"
-                  width={25}
-                  height={25}
-                  className="cursor-pointer"
-                />
-              </p>
+              <Image
+                onClick={toggleVissibility}
+                src={SlashH}
+                alt="slash"
+                width={20}
+                height={20}
+                className="cursor-pointer w-5 h-5 sm:w-6 sm:h-6"
+              />
             </div>
-            <div className="flex  space-x-[10px] mt-[-35px]">
-              <p className="text-[36px] font-[700] text-[#FCFCFC]">
-                <span className="text-[28px]">{selectedCurrency.symbol}</span>
-                {showBalance ? convertedAmount : "****"}
-              </p>
-              <div className="flex items-center  mt-[40px] w-[82px] h-[36px] ml-[5px] bg-[#2D2D2D]  font-[700] text-[16px] rounded-full">
-                <p className="text-[14px] font-[700] ml-[20px]  text-[#DBDBDB]">
-                  {selectedCurrency.name}
-                </p>
-                <Image
-                  src={Parrow}
-                  alt="arrow"
-                  sizes="16px"
-                  className="ml-[10px] text-[#8F8F8F]"
+            
+            {/* Balance and Currency Selector - Responsive Layout */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+              {/* Balance Display */}
+              <div className="flex items-baseline space-x-2">
+                <span className="text-[24px] sm:text-[28px] font-[700] text-[#FCFCFC]">
+                  {selectedCurrency.symbol}
+                </span>
+                <span className="text-[32px] sm:text-[36px] font-[700] text-[#FCFCFC]">
+                  {showBalance ? convertedBalance : "****"}
+                </span>
+              </div>
+              
+              {/* Currency Dropdown */}
+              <div className="relative self-start sm:self-auto">
+                <div 
+                  className="flex items-center bg-[#2D2D2D] px-3 py-2 sm:px-4 sm:py-2 rounded-full cursor-pointer min-w-[90px] sm:min-w-[100px]"
                   onClick={toggleTransDropdown}
-                />
+                >
+                  <p className="text-[12px] sm:text-[14px] font-[700] text-[#DBDBDB] mr-2">
+                    {selectedCurrency.name}
+                  </p>
+                  <Image src={Parrow} alt="arrow" width={14} height={14} className="w-3 h-3 sm:w-4 sm:h-4" />
+                </div>
+
+                {isTransOpen && (
+                  <div className="absolute top-full left-0 mt-2 w-full bg-[#222] rounded-[12px] shadow-lg z-50 border border-[#2D2D2D]">
+                    {currencies.map((currency) => (
+                      <div
+                        key={currency.name}
+                        onClick={() => handleSelect(currency)}
+                        className={`flex justify-between items-center px-3 py-2 sm:px-4 sm:py-3 cursor-pointer hover:bg-[#2D2D2D] ${
+                          currency.name === selectedCurrency.name ? "bg-[#2D2D2D]" : ""
+                        }`}
+                      >
+                        <span className="text-[14px] sm:text-[16px] font-[500] text-[#FCFCFC]">
+                          {currency.name}
+                        </span>
+                        <span
+                          className={`w-3 h-3 sm:w-4 sm:h-4 rounded-full border-2 ${
+                            currency.name === selectedCurrency.name
+                              ? "border-[#4DF2BE] bg-[#4DF2BE]"
+                              : "border-[#5C5C5C]"
+                          }`}
+                        ></span>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
 
-            {/* Dropdown */}
-            {isTransOpen && (
-              <div
-                className="absolute w-[181px] h-[176px] space-y-[25px] top-[52%]  p-[8px] bg-[#222] rounded-[12px] shadow-lg z-50"
-                style={{ border: "1px solid #2D2D2D" }}
-              >
-                {currencies.map((currency) => (
-                  <div
-                    key={currency.name}
-                    onClick={() => handleSelect(currency)}
-                    className={`flex justify-between items-center mt-[10px] px-4 py-3 cursor-pointer hover:bg-[#2D2D2D] ${
-                      currency.name === selectedCurrency.name
-                        ? "bg-[#2D2D2D]"
-                        : ""
-                    }`}
-                  >
-                    <span className="text-[#FCFCFC] text-[16px] font-[500]">
-                      {currency.name}
-                    </span>
-                    <span
-                      className={`w-[16px] h-[16px] rounded-full border-[2px] ${
-                        currency.name === selectedCurrency.name
-                          ? "border-[#4DF2BE] bg-[#4DF2BE]"
-                          : "border-[#5C5C5C]"
-                      }`}
-                    ></span>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            <div className="flex items-center space-x-[10px] ml-[40%]    ">
-              <div
-                className="flex w-[122px] h-[40px]  items-center bg-[#2D2D2D] relative text-[#4DF2BE] space-x-[5px] ml-[5px] mt-4 rounded-full"
-                style={{ padding: "5px 10px" }}
-              >
-                <Image src={Send} alt="send" className="pl-[5px]" />
-                <p className="   rounded-full font-[700] text-[14px] pl-[10px] ">
-                  Send
-                </p>
-                <Image
+            {/* Action Buttons - Responsive Layout */}
+            <div className="flex flex-col xs:flex-row gap-3">
+              <div className="relative">
+                <button 
+                  className="flex items-center justify-center bg-[#2D2D2D] text-[#4DF2BE] px-3 py-2 sm:px-4 sm:py-3 rounded-full font-[700] text-[12px] sm:text-[14px] gap-2 w-full xs:w-auto min-w-[110px] sm:min-w-[120px]"
                   onClick={toggleDropdown}
-                  src={Barrow}
-                  alt="arrow"
-                  sizes="20px"
-                  className="ml-[10px]"
-                />
-              </div>
+                >
+                  <Image src={Send} alt="send" width={14} height={14} className="w-3 h-3 sm:w-4 sm:h-4" />
+                  Send
+                  <Image src={Barrow} alt="arrow" width={14} height={14} className="w-3 h-3 sm:w-4 sm:h-4" />
+                </button>
 
-              {showReceiveModal && (
-                <div className="fixed inset-0  top-[38px]    justify-center  items-center z-50">
-                  <div className="bg-[#0F1012] w-[560px] max-h-[85vh] pb-[20px]  pl-[20px] rounded-[20px] p-6 relative text-white overflow-y-auto scrollbar-thin scrollbar-thumb-[#DBDBDB] scrollbar-track-[#2D2D2D] ">
-                    <Image
-                      src={Times}
-                      alt={"times"}
-                      width={20}
-                      height={20}
-                      className="absolute top-[20px] w-[32px] h-[32px]  ml-[85%] cursor-pointer"
-                      onClick={closeReceiveModal}
-                    />
-
-                    <h2 className="text-[16px]  font-[700] text-[#FCFCFC] mt-[30px] mb-2">
-                      Receive {currentCoin}
-                    </h2>
-
-                    <div className="mt-[50px]">
-                      <p className="text-[#FCFCFC] text-[18px] font-[700]">
-                        Your {currentCoin} Address
-                      </p>
-                      <p className="text-[#DBDBDB] text-[14px] font-[400]">
-                        Use this address to deposit{" "}
-                        <small className="font-[700]  text-[14px]">
-                          {currentCoin}
-                        </small>{" "}
-                        to your Evolve2p wallet.
-                      </p>
-                    </div>
-
-                    {/* QR Code */}
-                    <div className="flex justify-center mt-[30px]">
-                      <QRCodeCanvas
-                        value={currentWallet?.address || ""}
-                        size={206}
-                        bgColor="#3A3A3A"
-                        fgColor="#FFFFFF"
-                        level="H"
-                        includeMargin={true}
-                      />
-                    </div>
-
-                    <div className="mt-[20px]">
-                      <div className="flex items-center p-[12px] justify-between bg-[#2D2D2D] w-[496px] h-[44px] rounded-[8px]">
-                        <p className="text-[14px] text-[#DBDBDB] font-[400] ">
-                          Network
-                        </p>
-                        <strong className="text-[14px] font-[500] text-[#FCFCFC]">
-                          {currentCoin === "USDC"
-                            ? "BSC"
-                            : currentCoin == "USDT"
-                            ? "TRON"
-                            : currentCoin}
-                        </strong>
-                      </div>
-                      <div className="flex items-center mt-[20px] p-[12px] justify-between bg-[#2D2D2D] w-[496px] h-[44px] rounded-[8px]">
-                        <p className="text-[14px] text-[#DBDBDB] font-[400] ">
-                          Created
-                        </p>
-                        <strong className="text-[14px] font-[500] text-[#FCFCFC]">
-                          {myDate}
-                        </strong>
-                      </div>
-                    </div>
-
-                    <div
-                      className="flex  items-start w-[496px] h-[92px] bg-[#2D2D2D] space-x-[10px] mt-[30px]"
-                      style={{
-                        borderRadius: "0px 12px 12px 0px",
-                        borderLeft: "2px solid  #FFC051",
-                        padding: "16px 16px 16px 8px",
-                      }}
-                    >
-                      <Image
-                        src={Yellow_i}
-                        alt="yellow"
-                        className="mt-[15px]"
-                      />
-                      <p className="text-[#DBDBDB] text-[14px] font-[400]">
-                        Make sure to only send {currentCoin} through the
-                        selected network: <br />
-                        {currentCoin === "USDC"
-                          ? "BSC"
-                          : currentCoin == "USDT"
-                          ? "TRON"
-                          : currentCoin}{" "}
-                        . Sending incompatible cryptocurrencies or sending
-                        through a <br />
-                        different network may result in irreversible loss.
-                      </p>
-                    </div>
-                    <div className="ml-[-30%]">
-                      <div className="w-[100%] h-[1px]  bg-[#2D2D2D] mt-[30px]"></div>
-                    </div>
-
-                    <div className="flex space-x-[15px]">
-                      <div className=" flex items-center space-x-[10px] w-[242px] h-[48px] bg-[#2D2D2D] justify-center mt-[10px] rounded-full">
-                        <p className="text-[14px] font-[700] text-[#FCFCFC] ">
-                          {" "}
-                          {currentWallet?.id
-                            ? `${currentWallet.address.substring(
-                                0,
-                                4
-                              )}...${currentWallet.address.substring(
-                                currentWallet.id.length - 4
-                              )}`
-                            : "Generating address..."}{" "}
-                        </p>
-                        <div
-                          onClick={() => {
-                            navigator.clipboard.writeText(
-                              currentWallet?.id ?? ""
-                            );
-                            alert("Address copied");
-                          }}
-                        >
-                          <Image src={Copy} alt="copy " sizes="16.667" />
-                        </div>
-                      </div>
-
-                      <div className=" flex items-center space-x-[10px] w-[242px] h-[48px] bg-[#2D2D2D] justify-center mt-[10px] rounded-full">
-                        <p className="text-[14px] font-[700] text-[#4DF2BE] ">
-                          Share
-                        </p>
-                        <Image src={Share} alt="copy" />
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/*Drop_down */}
-
-              {open && (
-                <div className="absolute mt-[350px] p-[8px] pl-[30px] w-[251px] h-[272px] bg-[#222222] rounded-[12px] shadow-lg z-50 py-4 px-6">
-                  <div className="flex flex-col space-y-[40px] text-white text-[16px] font-medium">
-                    {[
-                      {
-                        icon: BTC,
-                        label: "Send Bitcoin",
-                        width: 27.997,
-                        height: 28,
-                        symbol: BTC,
-                      },
-                      {
-                        icon: ETH,
-                        label: "Send Ethereum",
-                        width: 28,
-                        height: 28,
-                        symbol: ETH,
-                      },
-                      {
-                        icon: USDT,
-                        label: "Send Tether",
-                        width: 27.997,
-                        height: 28,
-                        symbol: USDT,
-                      },
-                      {
-                        icon: USDC,
-                        label: "Send USDC",
-                        width: 28,
-                        height: 28,
-                        symbol: USDC,
-                      },
-                    ].map((item, idx) => (
+                {open && (
+                  <div className="absolute top-full left-0 mt-2 w-48 xs:w-64 bg-[#222222] rounded-[12px] shadow-lg z-50 p-3 sm:p-4">
+                    {cryptoAssets.map((asset) => (
                       <div
-                        key={idx}
-                        className="flex justify-between items-center cursor-pointer hover:opacity-80"
+                        key={asset.symbol}
+                        className="flex justify-between items-center py-2 sm:py-3 cursor-pointer hover:opacity-80 border-b border-[#2D2D2D] last:border-b-0"
                       >
-                        <div className="flex items-center space-x-[20px]">
-                          <Image
-                            src={item.icon}
-                            alt={item.label}
-                            width={item.width}
-                            height={item.height}
-                          />
-                          <span className="font-[400] text-[#FCFCFC] text-[14px]">
-                            {item.label}
+                        <div className="flex items-center space-x-2 sm:space-x-3">
+                          <Image src={asset.icon} alt={asset.name} width={24} height={24} className="w-6 h-6 sm:w-7 sm:h-7" />
+                          <span className="font-[400] text-[#FCFCFC] text-[12px] sm:text-[14px]">
+                            Send {asset.name}
                           </span>
                         </div>
-                        <span>
-                          <Image
-                            src={Larrow}
-                            alt="arrow"
-                            className=" w-[24px] h-[24px] mt-[10px] pr-[20px]"
-                          />
-                        </span>
+                        <Image src={Larrow} alt="arrow" width={20} height={20} className="w-4 h-4 sm:w-6 sm:h-6" />
                       </div>
                     ))}
                   </div>
-                </div>
-              )}
+                )}
+              </div>
 
-              <div
-                className="flex w-[130px] h-[40px] bor items-center bg-[#2D2D2D] text-[#4DF2BE] space-x-[10px] relative  mt-4 rounded-full"
-                style={{ padding: "5px 10px" }}
-              >
-                <Image src={Rarrowd} alt="Rd" className="pl-[5px]" />
-                <p className="    rounded-full font-[700] text-[14px] pl-[5px]">
-                  Receive
-                </p>
-                <Image
+              <div className="relative">
+                <button 
+                  className="flex items-center justify-center bg-[#2D2D2D] text-[#4DF2BE] px-3 py-2 sm:px-4 sm:py-3 rounded-full font-[700] text-[12px] sm:text-[14px] gap-2 w-full xs:w-auto min-w-[120px] sm:min-w-[130px]"
                   onClick={toggleReceiveDropdown}
-                  src={Barrow}
-                  alt="arrow"
-                  sizes="20px"
-                  className=" ml-[5px]"
-                />
-              </div>
+                >
+                  <Image src={Rarrowd} alt="receive" width={14} height={14} className="w-3 h-3 sm:w-4 sm:h-4" />
+                  Receive
+                  <Image src={Barrow} alt="arrow" width={14} height={14} className="w-3 h-3 sm:w-4 sm:h-4" />
+                </button>
 
-              {/*Drop_down */}
-
-              {isReceiveOpen && (
-                <div className="absolute right-[550px]  mt-[350px] p-[8px]  pl-[30px] w-[251px] h-[272px] bg-[#222222] rounded-[12px] shadow-lg z-50 ">
-                  <div className="flex flex-col space-y-[40px]  text-white text-[16px] font-medium">
-                    {[
-                      {
-                        icon: BTC,
-                        label: "Send Bitcoin",
-                        width: 27.997,
-                        height: 28,
-                        symbol: "BTC",
-                      },
-                      {
-                        icon: ETH,
-                        label: "Send Ethereum",
-                        width: 28,
-                        height: 28,
-                        symbol: "ETH",
-                      },
-                      {
-                        icon: USDT,
-                        label: "Send Tether",
-                        width: 27.997,
-                        height: 28,
-                        symbol: "USDT",
-                      },
-                      {
-                        icon: USDC,
-                        label: "Send USDC",
-                        width: 28,
-                        height: 28,
-                        symbol: "USDC",
-                      },
-                    ].map((item, idx) => (
+                {isReceiveOpen && (
+                  <div className="absolute top-full left-0 mt-2 w-48 xs:w-64 bg-[#222222] rounded-[12px] shadow-lg z-50 p-3 sm:p-4">
+                    {cryptoAssets.map((asset) => (
                       <div
-                        key={idx}
-                        className="flex justify-between  items-center cursor-pointer hover:opacity-80"
-                        onClick={() => handleReceiveClick(item.symbol)}
+                        key={asset.symbol}
+                        onClick={() => handleReceiveClick(asset.symbol)}
+                        className="flex justify-between items-center py-2 sm:py-3 cursor-pointer hover:opacity-80 border-b border-[#2D2D2D] last:border-b-0"
                       >
-                        <div className="flex items-center  space-x-[20px]">
-                          <Image
-                            src={item.icon}
-                            alt={item.label}
-                            width={item.width}
-                            height={item.height}
-                          />
-                          <span className="font-[400] text-[#FCFCFC] text-[14px]">
-                            {item.label}
+                        <div className="flex items-center space-x-2 sm:space-x-3">
+                          <Image src={asset.icon} alt={asset.name} width={24} height={24} className="w-6 h-6 sm:w-7 sm:h-7" />
+                          <span className="font-[400] text-[#FCFCFC] text-[12px] sm:text-[14px]">
+                            Receive {asset.name}
                           </span>
                         </div>
-                        <span>
-                          <Image
-                            src={Larrow}
-                            alt="arrow"
-                            className=" w-[24px] h-[24px] mt-[10px] pr-[20px]"
-                          />
-                        </span>
+                        <Image src={Larrow} alt="arrow" width={20} height={20} className="w-4 h-4 sm:w-6 sm:h-6" />
                       </div>
                     ))}
                   </div>
-                </div>
-              )}
+                )}
+              </div>
 
-              <div
-                className="flex w-[122px] h-[40px]  items-center bg-[#2D2D2D] text-[#4DF2BE] space-x-[10px] mt-4 rounded-full"
-                style={{ padding: "5px 10px" }}
+              <button 
+                className="flex items-center justify-center bg-[#2D2D2D] text-[#4DF2BE] px-3 py-2 sm:px-4 sm:py-3 rounded-full font-[700] text-[12px] sm:text-[14px] gap-2 w-full xs:w-auto min-w-[110px] sm:min-w-[120px]"
                 onClick={() => router.push("/swap")}
               >
-                <p className="pl-[10px]">
-                  <Image src={Swap} alt="swap" />
-                </p>
-                <p className="px-4 py-1 ml-[10px]   rounded-full font-[700] text-[14px]">
-                  Swap
-                </p>
-              </div>
+                <Image src={Swap} alt="swap" width={14} height={14} className="w-3 h-3 sm:w-4 sm:h-4" />
+                Swap
+              </button>
             </div>
           </div>
-          {/*right_side */}
-          <div
-            className="flex flex-col justify-between  mt-[30px] w-[498px] h-[188px] ml-[15px] bg-[#222222] rounded-[12px]"
-            style={{ padding: "24px 20px" }}
-          >
-            <div>
-              <p className="text-[16px] font-[400] text-[#DBDBDB]">
-                Daily Limit
-              </p>
-              <p className="text-[18px] font-[500] text-[#FCFCFC]">$14850000</p>
 
-              <div className="w-[458px] h-[8px] bg-[#4A4A4A]  rounded-[4px]">
-                <div className="w-[8px] h-[8px] bg-[#4DF2BE] rounded-full"></div>
-
-                <div className="flex space-x-[43%] text-[14px]  font-[400] text-[#DBDBDB]">
-                  <p>$14850000 remaining</p>
-                  <p>Refreshes in 10minutes</p>
-                </div>
-
-                <div className="w-[122px] h-[36px] ml-[73%] text-[14px] font-[700] bg-[#2D2D2D]  text-[#FCFCFC] px-4 py-2 rounded-full mt-[10px]">
-                  <p className="" style={{ padding: "8px 14px" }}>
-                    Increase Limit
-                  </p>
-                </div>
-              </div>
+          {/* Daily Limit Card */}
+          <div className="bg-[#222222] rounded-[12px] p-4 sm:p-6">
+            <div className="mb-4">
+              <p className="text-[14px] sm:text-[16px] font-[400] text-[#DBDBDB]">Daily Limit</p>
+              <p className="text-[16px] sm:text-[18px] font-[500] text-[#FCFCFC]">$14,850,000</p>
             </div>
+
+            <div className="w-full bg-[#4A4A4A] rounded-[4px] h-2 mb-2">
+              <div className="bg-[#4DF2BE] rounded-[4px] h-2 w-3/4"></div>
+            </div>
+
+            <div className="flex flex-col xs:flex-row xs:justify-between text-[12px] sm:text-[14px] font-[400] text-[#DBDBDB] mb-4 gap-1">
+              <p>$14,850,000 remaining</p>
+              <p>Refreshes in 10 minutes</p>
+            </div>
+
+            <button className="bg-[#2D2D2D] text-[#FCFCFC] px-4 py-2 sm:px-6 sm:py-2 rounded-full font-[700] text-[12px] sm:text-[14px] w-full xs:w-auto ml-auto block">
+              Increase Limit
+            </button>
           </div>
         </div>
 
-        {/* left_side */}
-        <div>
-          <div className="flex items-center justify-between mt-[50px] w-[1224px] h-[64px]  rounded-[12px]">
-            <p className="text-[16px] font-[500] text-[#8F8F8F]">My Assets</p>
-            <div className="flex items-center  space-x-[10px]">
-              <p className="text-[14px] font-[700] ml-[20px] text-[#FCFCFC]">
-                See all
-              </p>{" "}
-              <Image src={R_arrow} alt="rarrow" />
-            </div>
+        {/* My Assets Section */}
+        <div className="mt-8 md:mt-12">
+          <div className="flex justify-between items-center mb-4 md:mb-6">
+            <p className="text-[14px] sm:text-[16px] font-[500] text-[#8F8F8F]">My Assets</p>
+            <button className="flex items-center text-[12px] sm:text-[14px] font-[700] text-[#FCFCFC]">
+              See all
+              <Image src={R_arrow} alt="arrow" width={14} height={14} className="ml-1 sm:ml-2 w-3 h-3 sm:w-4 sm:h-4" />
+            </button>
           </div>
 
-          <div className="flex ml-[90px] space-x-[100px] text-[#8F8F8F] text-[14px] font-[400]">
-            <div>
-              <p>Currency</p>
-            </div>
+          {/* Assets Grid */}
+          <div className="grid grid-cols-1 gap-3 md:gap-4">
+            {cryptoAssets.map((asset) => {
+              const wallet = clientUser?.wallets?.find((w: any) => 
+                w.currency?.toUpperCase() === asset.symbol.toUpperCase()
+              );
+              const walletBalance = safeNumber(wallet?.balance);
+              const usdValue = getWalletBalanceUSD(wallet || { currency: asset.symbol, balance: 0 } as Wallet);
 
-            <div>
-              <p className="ml-[120%]">Balance</p>
-            </div>
+              return (
+                <div key={asset.symbol} className="bg-[#222222] rounded-[12px] p-3 md:p-4">
+                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 md:gap-4">
+                    <div className="flex items-center space-x-3 md:space-x-4 flex-1">
+                      <Image src={asset.icon} alt={asset.name} width={32} height={32} className="w-8 h-8 md:w-10 md:h-10" />
+                      <div className="min-w-0 flex-1">
+                        <p className="text-[14px] md:text-[16px] font-[700] text-[#FCFCFC] truncate">{asset.name}</p>
+                        <p className="text-[12px] md:text-[14px] font-[400] text-[#8F8F8F] truncate">
+                          {getCurrentPrice(asset.symbol)}
+                        </p>
+                      </div>
+                    </div>
 
-            <div>
-              <p className="ml-[520%] whitespace-nowrap">In USD</p>
-            </div>
+                    <div className="flex items-center md:space-x-8 flex-1 justify-start md:justify-center">
+                      <div className="text-right md:text-center">
+                        <p className="text-[12px] md:text-[14px] font-[500] text-[#FCFCFC]">
+                          {formatBalance(walletBalance, asset.symbol)}
+                        </p>
+                        <p className="text-[10px] md:text-[12px] font-[500] text-[#DBDBDB]">
+                          {asset.symbol}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center md:space-x-8 flex-1 justify-start md:justify-end">
+                      <div className="text-right">
+                        <div className="flex items-baseline space-x-1">
+                          <span className="text-[10px] md:text-[12px] font-[500] text-[#DBDBDB]">$</span>
+                          <span className="text-[12px] md:text-[14px] font-[500] text-[#FCFCFC]">
+                            {usdValue.toFixed(2)}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center space-x-2 flex-wrap gap-2">
+                      <button className="bg-[#2D2D2D] text-[#DBDBDB] px-2 py-1 md:px-3 md:py-2 rounded-full text-[10px] md:text-[14px] font-[500] min-w-[70px] md:min-w-[85px] flex items-center justify-center">
+                        <Image src={Send} alt="send" width={10} height={10} className="mr-1 md:mr-2 w-2 h-2 md:w-3 md:h-3" />
+                        Send
+                      </button>
+                      <button 
+                        className="bg-[#2D2D2D] text-[#DBDBDB] px-2 py-1 md:px-3 md:py-2 rounded-full text-[10px] md:text-[14px] font-[500] min-w-[80px] md:min-w-[101px] flex items-center justify-center"
+                        onClick={() => handleReceiveClick(asset.symbol)}
+                      >
+                        <Image src={Rarrowd} alt="receive" width={10} height={10} className="mr-1 md:mr-2 w-2 h-2 md:w-3 md:h-3" />
+                        Receive
+                      </button>
+                      <button 
+                        className="bg-[#2D2D2D] text-[#DBDBDB] px-2 py-1 md:px-3 md:py-2 rounded-full text-[10px] md:text-[14px] font-[500] min-w-[70px] md:min-w-[87px] flex items-center justify-center"
+                        onClick={() => router.push("/swap")}
+                      >
+                        <Image src={Swap} alt="swap" width={10} height={10} className="mr-1 md:mr-2 w-2 h-2 md:w-3 md:h-3" />
+                        Swap
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
           </div>
+        </div>
 
-          <div className="w-[1224px] h-[64px] space-x-[-40px] ">
-            <div
-              className="flex bg-[#222222] rounded-[12px]"
-              style={{ padding: "12px 20px" }}
-            >
-              <Image
-                src={BTC}
-                alt="bitcoin"
-                className="w-[39.995px] h-[40px] mt-[15px] ml-[16px]"
-              />
-              <div className=" ml-[20px] gap-[-10px]">
-                <p className="text-[16px] font-[700] text-[#FCFCFC]">Bitcoin</p>
-                <p className="flex items-center mt-[-15px] text-[14px] font-[400] text-[#8F8F8F] whitespace-nowrap">
-                  1 USD
-                  <span className="ml-[2px]">=</span>
-                  <span className="ml-[2px]">
-                    {" "}
-                    {(() => {
-                      const info = getCoinData("BTC", coinData || {});
-                      return !("error" in info) && info.btc
-                        ? `${Number(info.usd).toFixed(2)} BTC`
-                        : "N/A";
-                    })()}
-                  </span>
-                </p>
-              </div>
-              <div className="flex ml-[65px] mt-[15px] space-x-[100%] ">
-                <p className="flex text-[14px] font-[500] text-[#FCFCFC]">
-                  <span>
-                    {
-                      clientUser?.wallets?.find(
-                        (w: any) => w?.currency == "BTC"
-                      )?.balance
-                    }{" "}
-                  </span>
-                  <span className="text-[12px] ml-[5px] text-[#DBDBDB] font-[500]">
-                    BTC
-                  </span>
-                </p>
-                <p className="text-[12px] font-[500] ml-[23px] text-[#DBDBDB] ">
-                  $
-                  <span className="text-[#FCFCFC] text-[14px] ml-[5px] font-[500]">
-                    0.00
-                  </span>
-                </p>
-              </div>
-
-              <div className="flex ml-[33%] space-x-[10px]">
-                <div
-                  className="flex space-x-[15px] text-center  w-[85px] h-[36px] items-center bg-[#2D2D2D] mt-[10px]  rounded-full"
-                  style={{ padding: "8px 14px" }}
-                >
-                  <Image
-                    src={Send}
-                    alt="send"
-                    className=" w-[16px] pl-[10px] h-[16px]"
-                  />
-                  <p className="text-[#DBDBDB] text-[14px]  font-[500]">Send</p>
-                </div>
-
-                <div
-                  className="flex space-x-[15px] text-center  w-[101px] h-[36px] items-center bg-[#2D2D2D] mt-[10px]  rounded-full"
-                  style={{ padding: "8px 14px" }}
-                >
-                  <Image
-                    src={Rarrowd}
-                    alt="arrow"
-                    className="w-[16px] h-[16px] pl-[10px]"
-                  />
-                  <p className="text-[14px] font-[500] text-[#DBDBDB]">
-                    Receive
-                  </p>
-                </div>
-
-                <div
-                  className="flex space-x-[15px] text-center  w-[87px] h-[36px] items-center bg-[#2D2D2D] mt-[10px]  rounded-full"
-                  style={{ padding: "8px 14px" }}
-                >
-                  <Image
-                    src={Swap}
-                    alt="swap"
-                    className="w-[16px] h-[16px] pl-[10px]"
-                  />
-                  <p className="text-[14px] font-[500] text-[#DBDBDB]">Swap</p>
-                </div>
-                <div className="flex items-center justify-center w-[44px] h-[36px] bg-[#2D2D2D] mt-[20px] ml-[15px] rounded-full">
-                  <Image
-                    src={Points}
-                    alt="point"
-                    className="w-[13px] h-[13px] text-[#FFFFFF]"
-                  />
-                </div>
-              </div>
-            </div>
-            <div
-              className="flex bg-[#222222] mt-[10px] rounded-[12px]"
-              style={{ padding: "12px 20px" }}
-            >
-              <Image
-                src={ETH}
-                alt="eth"
-                className="w-[39.995px] h-[40px] mt-[15px] ml-[16px]"
-              />
-              <div className=" ml-[20px] gap-[-10px]">
-                <p className="text-[16px] font-[700] text-[#FCFCFC]">
-                  Ethereum
-                </p>
-                <p className="flex items-center mt-[-15px] text-[14px] font-[400] text-[#8F8F8F] whitespace-nowrap">
-                  1 USD
-                  <span className="ml-[2px]">=</span>
-                  <span className="ml-[2px]">
-                    {(() => {
-                      const info = getCoinData("ETH", coinData || {});
-                      return !("error" in info) && info.eth
-                        ? `${Number(info.usd).toFixed(2)} ETH`
-                        : "N/A";
-                    })()}
-                  </span>
-                </p>{" "}
-              </div>
-              <div className="flex ml-[65px] mt-[15px] space-x-[100%] ">
-                <p className="flex text-[14px] font-[500] text-[#FCFCFC]">
-                  <span>
-                    {" "}
-                    {
-                      clientUser?.wallets?.find(
-                        (w: any) => w?.currency == "ETH"
-                      )?.balance
-                    }
-                  </span>
-                  <span className="text-[12px] ml-[5px] text-[#DBDBDB] font-[500]">
-                    ETH
-                  </span>
-                </p>
-                <p className="text-[12px] font-[500] ml-[23px] text-[#DBDBDB] ">
-                  $
-                  <span className="text-[#FCFCFC] text-[14px] ml-[5px] font-[500]">
-                    0.00
-                  </span>
-                </p>
-              </div>
-
-              <div className="flex ml-[33%] space-x-[10px]">
-                <div
-                  className="flex space-x-[15px] text-center  w-[85px] h-[36px] items-center bg-[#2D2D2D] mt-[10px]  rounded-full"
-                  style={{ padding: "8px 14px" }}
-                >
-                  <Image
-                    src={Send}
-                    alt="send"
-                    className=" w-[16px] pl-[10px] h-[16px]"
-                  />
-                  <p className="text-[#DBDBDB] text-[14px] font-[500]">Send</p>
-                </div>
-
-                <div
-                  className="flex space-x-[15px] text-center  w-[101px] h-[36px] items-center bg-[#2D2D2D] mt-[10px]  rounded-full"
-                  style={{ padding: "8px 14px" }}
-                >
-                  <Image
-                    src={Rarrowd}
-                    alt="arrow"
-                    className="w-[16px] h-[16px] pl-[10px]"
-                  />
-                  <p className="text-[14px] font-[500] text-[#DBDBDB]">
-                    Receive
-                  </p>
-                </div>
-
-                <div
-                  className="flex space-x-[15px] text-center  w-[87px] h-[36px] items-center bg-[#2D2D2D] mt-[10px]  rounded-full"
-                  style={{ padding: "8px 14px" }}
-                >
-                  <Image
-                    src={Swap}
-                    alt="swap"
-                    className="w-[16px] h-[16px] pl-[10px]"
-                  />
-                  <p className="text-[14px] font-[500] text-[#DBDBDB]">Swap</p>
-                </div>
-                <div className="flex items-center justify-center w-[44px] h-[36px] bg-[#2D2D2D] mt-[20px] ml-[15px] rounded-full">
-                  <Image
-                    src={Points}
-                    alt="point"
-                    className="w-[13px] h-[13px] text-[#FFFFFF]"
-                  />
-                </div>
-              </div>
-            </div>
-            <div
-              className="flex bg-[#222222] mt-[10px] rounded-[12px]"
-              style={{ padding: "12px 20px" }}
-            >
-              <Image
-                src={USDC}
-                alt="usdc"
-                className="w-[39.995px] h-[40px] mt-[15px] ml-[16px]"
-              />
-              <div className=" ml-[20px] gap-[-10px]">
-                <p className="text-[16px] font-[700] text-[#FCFCFC]">USDC</p>
-                <p className="flex items-center mt-[-15px] text-[14px] font-[400] text-[#8F8F8F] whitespace-nowrap">
-                  1 USD
-                  <span className="ml-[2px]">=</span>
-                  <span className="ml-[2px]">
-                    {(() => {
-                      const info = getCoinData("USDC", coinData || {});
-                      return !("error" in info) && info.usd
-                        ? `${Number(info.usd).toFixed(2)} USDC`
-                        : "N/A";
-                    })()}
-                  </span>
-                </p>
-              </div>
-              <div className="flex ml-[60px] mt-[15px] space-x-[100%] ">
-                <p className="flex items-center text-[14px] font-[500] text-[#FCFCFC]">
-                  <span>
-                    {
-                      clientUser?.wallets?.find(
-                        (w: any) => w?.currency == "USDC"
-                      )?.balance
-                    }
-                  </span>
-                  <span className="text-[12px] ml-[5px] text-[#DBDBDB] font-[500]">
-                    USDC
-                  </span>
-                </p>
-                <p className="text-[12px] font-[500] ml-[16px] text-[#DBDBDB] ">
-                  $
-                  <span className="text-[#FCFCFC] text-[14px] ml-[5px] font-[500]">
-                    0.00
-                  </span>
-                </p>
-              </div>
-
-              <div className="flex ml-[33%] space-x-[10px]">
-                <div
-                  className="flex space-x-[15px] text-center  w-[85px] h-[36px] items-center bg-[#2D2D2D] mt-[10px]  rounded-full"
-                  style={{ padding: "8px 14px" }}
-                >
-                  <Image
-                    src={Send}
-                    alt="send"
-                    className=" w-[16px] pl-[10px] h-[16px]"
-                  />
-                  <p className="text-[#DBDBDB] text-[14px] font-[500]">Send</p>
-                </div>
-
-                <div
-                  className="flex space-x-[15px] text-center  w-[101px] h-[36px] items-center bg-[#2D2D2D] mt-[10px]  rounded-full"
-                  style={{ padding: "8px 14px" }}
-                >
-                  <Image
-                    src={Rarrowd}
-                    alt="arrow"
-                    className="w-[16px] h-[16px] pl-[10px]"
-                  />
-                  <p className="text-[14px] font-[500] text-[#DBDBDB]">
-                    Receive
-                  </p>
-                </div>
-
-                <div
-                  className="flex space-x-[15px] text-center  w-[87px] h-[36px] items-center bg-[#2D2D2D] mt-[10px]  rounded-full"
-                  style={{ padding: "8px 14px" }}
-                >
-                  <Image
-                    src={Swap}
-                    alt="swap"
-                    className="w-[16px] h-[16px] pl-[10px]"
-                  />
-                  <p className="text-[14px] font-[500] text-[#DBDBDB]">Swap</p>
-                </div>
-                <div className="flex items-center justify-center w-[44px] h-[36px] bg-[#2D2D2D] mt-[20px] ml-[15px] rounded-full">
-                  <Image
-                    src={Points}
-                    alt="point"
-                    className="w-[13px] h-[13px] text-[#FFFFFF]"
-                  />
-                </div>
-              </div>
-            </div>
-            <div
-              className="flex w-[1224px] mt-[10px] bg-[#222222] rounded-[12px]"
-              style={{ padding: "12px 20px" }}
-            >
-              <Image
-                src={USDT}
-                alt="bitcoin"
-                className="w-[39.995px] h-[40px] mt-[15px] ml-[16px]"
-              />
-              <div className=" ml-[20px] gap-[-10px]">
-                <p className="text-[16px] font-[700] text-[#FCFCFC]">USDT</p>
-                <p className="flex items-center mt-[-15px] text-[14px] font-[400] text-[#8F8F8F] whitespace-nowrap">
-                  1 USD
-                  <span className="ml-[2px]">=</span>
-                  <span className="ml-[2px]">
-                    {(() => {
-                      const info = getCoinData("USDT", coinData || {});
-                      return !("error" in info) && info.usd
-                        ? `${Number(info.usd).toFixed(2)} USDT`
-                        : "N/A";
-                    })()}
-                  </span>
-                </p>
-              </div>
-              <div className="flex ml-[60px] mt-[15px] space-x-[100%] ">
-                <p className="flex items-center text-[14px] font-[500] text-[#FCFCFC]">
-                  <span>
-                    {
-                      clientUser?.wallets?.find(
-                        (w: any) => w?.currency == "USDT"
-                      )?.balance
-                    }{" "}
-                  </span>
-                  <span className="text-[12px] ml-[5px] text-[#DBDBDB] font-[500]">
-                    USDT
-                  </span>
-                </p>
-                <p className="text-[12px] font-[500] ml-[17px] text-[#DBDBDB] ">
-                  $
-                  <span className="text-[#FCFCFC] text-[14px] ml-[5px] font-[500]">
-                    0.00
-                  </span>
-                </p>
-              </div>
-
-              <div className="flex ml-[33%] space-x-[10px]">
-                <div
-                  className="flex space-x-[15px] text-center  w-[85px] h-[36px] items-center bg-[#2D2D2D] mt-[10px]  rounded-full"
-                  style={{ padding: "8px 14px" }}
-                >
-                  <Image
-                    src={Send}
-                    alt="send"
-                    className=" w-[16px] pl-[10px] h-[16px]"
-                  />
-                  <p className="text-[#DBDBDB] text-[14px] font-[500]">Send</p>
-                </div>
-
-                <div
-                  className="flex space-x-[15px] text-center  w-[101px] h-[36px] items-center bg-[#2D2D2D] mt-[10px]  rounded-full"
-                  style={{ padding: "8px 14px" }}
-                >
-                  <Image
-                    src={Rarrowd}
-                    alt="arrow"
-                    className="w-[16px] h-[16px] pl-[10px]"
-                  />
-                  <p className="text-[14px] font-[500] text-[#DBDBDB]">
-                    Receive
-                  </p>
-                </div>
-
-                <div
-                  className="flex space-x-[15px] text-center  w-[87px] h-[36px] items-center bg-[#2D2D2D] mt-[10px]  rounded-full"
-                  style={{ padding: "8px 14px" }}
-                >
-                  <Image
-                    src={Swap}
-                    alt="swap"
-                    className="w-[16px] h-[16px] pl-[10px]"
-                  />
-                  <p className="text-[14px] font-[500] text-[#DBDBDB]">Swap</p>
-                </div>
-                <div className="flex items-center justify-center w-[44px] h-[36px] bg-[#2D2D2D] mt-[20px] ml-[15px] rounded-full">
-                  <Image
-                    src={Points}
-                    alt="point"
-                    className="w-[13px] h-[13px] text-[#FFFFFF]"
-                  />
-                </div>
-              </div>
-            </div>
-          </div>
-          <div className="w-[1224px] h-[338px] mt-[15%]">
+        {/* Transactions Section - Only show if activeTab is transaction */}
+        {activeTab === "transaction" && (
+          <div className="mt-8 md:mt-12">
             <WalletTransactions />
           </div>
-        </div>
-        <div className=" mb-[80px] mt-[68%] ">
-          <Footer />
-        </div>
+        )}
+
+        {/* Receive Modal */}
+        {showReceiveModal && (
+          <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+            <div className="bg-[#0F1012] rounded-[20px] max-w-md w-full max-h-[85vh] overflow-y-auto">
+              <div className="p-4 sm:p-6">
+                <div className="flex justify-between items-center mb-4 sm:mb-6">
+                  <h2 className="text-[14px] sm:text-[16px] font-[700] text-[#FCFCFC]">
+                    Receive {currentCoin}
+                  </h2>
+                  <Image
+                    src={Times}
+                    alt="close"
+                    width={28}
+                    height={28}
+                    className="cursor-pointer w-7 h-7 sm:w-8 sm:h-8"
+                    onClick={closeReceiveModal}
+                  />
+                </div>
+
+                <div className="mb-4 sm:mb-6">
+                  <p className="text-[16px] sm:text-[18px] font-[700] text-[#FCFCFC] mb-2">
+                    Your {currentCoin} Address
+                  </p>
+                  <p className="text-[12px] sm:text-[14px] font-[400] text-[#DBDBDB]">
+                    Use this address to deposit <strong>{currentCoin}</strong> to your Evolve2p wallet.
+                  </p>
+                </div>
+
+                <div className="flex justify-center mb-4 sm:mb-6">
+                  <QRCodeCanvas
+                    value={currentWallet?.address || ""}
+                    size={180}
+                    bgColor="#3A3A3A"
+                    fgColor="#FFFFFF"
+                    level="H"
+                    includeMargin={true}
+                  />
+                </div>
+
+                <div className="space-y-3 sm:space-y-4 mb-4 sm:mb-6">
+                  <div className="flex justify-between items-center bg-[#2D2D2D] p-2 sm:p-3 rounded-[8px]">
+                    <p className="text-[12px] sm:text-[14px] text-[#DBDBDB] font-[400]">Network</p>
+                    <strong className="text-[12px] sm:text-[14px] font-[500] text-[#FCFCFC]">
+                      {currentCoin === "USDC" ? "BSC" : currentCoin === "USDT" ? "TRON" : currentCoin}
+                    </strong>
+                  </div>
+                  <div className="flex justify-between items-center bg-[#2D2D2D] p-2 sm:p-3 rounded-[8px]">
+                    <p className="text-[12px] sm:text-[14px] text-[#DBDBDB] font-[400]">Created</p>
+                    <strong className="text-[12px] sm:text-[14px] font-[500] text-[#FCFCFC]">{myDate}</strong>
+                  </div>
+                </div>
+
+                <div className="bg-[#2D2D2D] border-l-4 border-[#FFC051] p-3 sm:p-4 mb-4 sm:mb-6">
+                  <div className="flex space-x-2 sm:space-x-3">
+                    <Image src={Yellow_i} alt="info" width={14} height={14} className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0 mt-0.5" />
+                    <p className="text-[11px] sm:text-[14px] font-[400] text-[#DBDBDB]">
+                      Make sure to only send {currentCoin} through the selected network:{" "}
+                      {currentCoin === "USDC" ? "BSC" : currentCoin === "USDT" ? "TRON" : currentCoin}.
+                      Sending incompatible cryptocurrencies or sending through a different network may result in irreversible loss.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex flex-col sm:flex-row sm:space-x-4 space-y-3 sm:space-y-0">
+                  <button className="flex-1 bg-[#2D2D2D] text-[#FCFCFC] py-2 sm:py-3 rounded-full font-[700] text-[12px] sm:text-[14px] flex items-center justify-center">
+                    {currentWallet?.address ? 
+                      `${currentWallet.address.substring(0, 6)}...${currentWallet.address.substring(currentWallet.address.length - 4)}` : 
+                      "Generating address..."
+                    }
+                    <Image src={Copy} alt="copy" width={14} height={14} className="ml-1 sm:ml-2 w-3 h-3 sm:w-4 sm:h-4" />
+                  </button>
+                  <button className="flex-1 bg-[#2D2D2D] text-[#4DF2BE] py-2 sm:py-3 rounded-full font-[700] text-[12px] sm:text-[14px] flex items-center justify-center">
+                    Share
+                    <Image src={Share} alt="share" width={14} height={14} className="ml-1 sm:ml-2 w-3 h-3 sm:w-4 sm:h-4" />
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        <div className="w-[100%]  h-[1px] bg-[#fff] mt-[50%] opacity-20 my-8"></div>
+        
+                <div className=" mb-[80px] mt-[10%] ">
+                  <Footer />
+                </div>
       </div>
     </main>
   );

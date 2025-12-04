@@ -1,11 +1,11 @@
 import React from 'react';
-import Buy_btc from '@/components/Buy_btc/Buy_btc'
+import PRC_Sell from '@/components/PRC_Sell/PRC_Sell';
 
 
 const page = () => {
   return (
     <div>
-      <Buy_btc/>
+      <PRC_Sell/>
     </div>
   )
 }

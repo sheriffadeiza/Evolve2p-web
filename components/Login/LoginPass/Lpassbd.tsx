@@ -131,22 +131,22 @@ const Lpassbd = () => {
   };
 
   return (
-    <div className="flex flex-col text-center items-center justify-center max-w-md  mx-auto my-6 px-4 text-white  lg:max-w-lg ">
+    <div className="flex flex-col text-center items-center justify-center w-full max-w-md mx-auto my-6 px-4 sm:px-6 text-white lg:max-w-lg">
       {/* Success Modal */}
       {showSuccessModal && (
-        <div className="fixed inset-0 flex items-center justify-center z-50 ">
-          <div className="bg-[#0F1012] p-8 rounded-[10px] w-[375px] h-[300px] flex flex-col items-center justify-center border-2 border-gray-400">
+        <div className="fixed inset-0 flex items-center justify-center z-50 p-4 bg-black bg-opacity-50">
+          <div className="bg-[#0F1012] p-6 sm:p-8 rounded-[10px] w-full max-w-[375px] h-auto min-h-[300px] flex flex-col items-center justify-center border-2 border-gray-400 mx-4">
             <Image src={ModalC} alt="Success Icon" width={58.001} height={58} />
-            <h2 className="text-[20px] text-[#FCFCFC] font-[700] mb-2">
+            <h2 className="text-[18px] sm:text-[20px] text-[#FCFCFC] font-[700] mb-2 mt-4 text-center">
               Password Changed
             </h2>
-            <p className="text-[16px] font-[400] text-[#8F8F8F]  mb-6 text-center w-full">
+            <p className="text-[14px] sm:text-[16px] font-[400] text-[#8F8F8F] mb-6 text-center w-full px-2">
               Your password has been successfully updated. You can now log in
               with your new password.
             </p>
             <button
               onClick={handleGoToLogin}
-              className=" w-[356px] h-[48px] bg-[#4DF2BE] mt-[30px] text-[14px] text-[#0F1012] border-none font-[700] py-3 rounded-[100px] hover:bg-[#3dd9ab] transition"
+              className="w-full max-w-[356px] h-12 sm:h-[48px] bg-[#4DF2BE] mt-4 sm:mt-[30px] text-[14px] text-[#0F1012] border-none font-[700] py-3 rounded-[100px] hover:bg-[#3dd9ab] transition"
             >
               Go to log in
             </button>
@@ -154,20 +154,20 @@ const Lpassbd = () => {
         </div>
       )}
 
-      <h1 className="text-[24px] text-[#FCFCFC] font-[700] sm:ml-[-40%] ml-[-28%]  ">
+      <h1 className="text-[20px] sm:text-[24px] text-[#FCFCFC] font-[700] w-full text-left">
         Create new password
       </h1>
-      <p className="text-[16px] font-[400] mt-[6px]  text-[#8F8F8F]  sm:ml-[-2%]  whitespace-wrap">
+      <p className="text-[14px] sm:text-[16px] font-[400] mt-2 text-[#8F8F8F] w-full text-left whitespace-normal">
         Create a strong password to protect your trades and funds.
       </p>
 
       {error && (
-        <div className="text-[#FCFCFC] text-[20px] font-[700] mt-4 mb-2">
+        <div className="text-[#FCFCFC] text-[16px] sm:text-[20px] font-[700] mt-4 mb-2 w-full text-center">
           {error}
         </div>
       )}
 
-      <label className="block text-[14px] ml-[-82%] mt-[30px] font-[500] text-[#8F8F8F] mb-[10px]">
+      <label className="block text-[14px] font-[500] text-[#8F8F8F] mb-2 mt-6 sm:mt-[30px] w-full text-left">
         Password
       </label>
       <div className="relative w-full">
@@ -175,7 +175,7 @@ const Lpassbd = () => {
           type={showPassword ? "text" : "password"}
           value={password}
           onChange={handlePasswordChange}
-          className={`w-[100%] h-[56px] bg-[#222222]  text-[#DBDBDB] text-[14px] font-[500] border mb-4 pl-[15px] pr-10 rounded-[10px] ${
+          className={`w-full h-12 sm:h-[56px] bg-[#222222] text-[#DBDBDB] text-[14px] font-[500] border mb-4 pl-4 pr-10 rounded-[10px] ${
             error &&
             (!isMinLength || !hasNumber || !hasSpecialChar || !hasUpperLower)
               ? "border-[#F5918A]"
@@ -187,7 +187,7 @@ const Lpassbd = () => {
         <button
           type="button"
           onClick={() => setShowPassword(!showPassword)}
-          className="absolute border-0 right-2 ml-[-40px] top-[45%] bg-[#222222] -translate-y-1/2 text-[#DBDBDB]"
+          className="absolute border-0 right-3 top-1/2 transform -translate-y-1/2 bg-transparent text-[#DBDBDB]"
           disabled={isLoading}
         >
           <Image
@@ -199,8 +199,8 @@ const Lpassbd = () => {
         </button>
       </div>
 
-      <ul className="text-[14px] font-[400] font-satoshi  text-[#8F8F8F] mb-6 space-y-[10px]  w-full">
-        <li className="flex items-center gap-[5px]">
+      <ul className="text-[14px] font-[400] font-satoshi text-[#8F8F8F] mb-6 space-y-3 w-full">
+        <li className="flex items-center gap-3">
           <Image
             src={isMinLength ? schecklistActive : schecklistInactive}
             alt="check list"
@@ -213,7 +213,7 @@ const Lpassbd = () => {
             Minimum 6 characters
           </span>
         </li>
-        <li className="flex items-center gap-[5px]">
+        <li className="flex items-center gap-3">
           <Image
             src={hasNumber ? schecklistActive : schecklistInactive}
             alt="check list"
@@ -226,7 +226,7 @@ const Lpassbd = () => {
             At least 1 number
           </span>
         </li>
-        <li className="flex items-center gap-[5px]">
+        <li className="flex items-center gap-3">
           <Image
             src={hasSpecialChar ? schecklistActive : schecklistInactive}
             alt="check list"
@@ -241,7 +241,7 @@ const Lpassbd = () => {
             At least 1 special character
           </span>
         </li>
-        <li className="flex items-center gap-[5px]">
+        <li className="flex items-center gap-3">
           <Image
             src={hasUpperLower ? schecklistActive : schecklistInactive}
             alt="check list"
@@ -256,15 +256,15 @@ const Lpassbd = () => {
         </li>
       </ul>
 
-      <label className="block text-[14px] mt-[10px] font-[500] ml-[-66%] text-[#8F8F8F] mb-[10px]">
+      <label className="block text-[14px] font-[500] text-[#8F8F8F] mb-2 mt-4 w-full text-left">
         Confirm password
       </label>
-      <div className="relative w-full inline-block ">
+      <div className="relative w-full">
         <input
           type={showConfirm ? "text" : "password"}
           value={confirmPassword}
           onChange={handleConfirmPasswordChange}
-          className={`w-[100%] h-[56px] bg-[#222222] text-[#DBDBDB]  text-[14px] font-[500] border  mb-4 pl-[15px] pr-10 rounded-[10px] ${
+          className={`w-full h-12 sm:h-[56px] bg-[#222222] text-[#DBDBDB] text-[14px] font-[500] border mb-4 pl-4 pr-10 rounded-[10px] ${
             error && !passwordsMatch ? "border-[#F5918A]" : "border-[#2E2E2E]"
           }`}
           placeholder="Re-enter your password"
@@ -273,7 +273,7 @@ const Lpassbd = () => {
         <button
           type="button"
           onClick={() => setShowConfirm(!showConfirm)}
-          className="absolute top-[45%] border-0 right-2 ml-[-40px] bg-[#222222] -translate-y-1/2 text-[#DBDBDB]"
+          className="absolute border-0 right-3 top-1/2 transform -translate-y-1/2 bg-transparent text-[#DBDBDB]"
           disabled={isLoading}
         >
           <Image
@@ -286,7 +286,7 @@ const Lpassbd = () => {
       </div>
 
       <button
-        className={`w-[100%] h-[56px]  border-none mt-[40px] bg-[#4DF2BE] text-[#0F1012] py-3 rounded-[100px] hover:bg-[#1a5d50] transition ${
+        className={`w-full h-12 sm:h-[56px] border-none mt-6 sm:mt-[40px] bg-[#4DF2BE] text-[#0F1012] py-3 rounded-[100px] hover:bg-[#3dd9ab] transition ${
           !allFieldsValid() || isLoading ? "opacity-50 cursor-not-allowed" : ""
         }`}
         onClick={handleSubmit}

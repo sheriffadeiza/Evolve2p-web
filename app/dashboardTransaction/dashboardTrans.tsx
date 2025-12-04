@@ -148,7 +148,6 @@ const DashboardTransactions = () => {
       )}
 
       {/* Divider */}
-      <div className="w-[108%] sm:w-[104.6%] h-[1px]  ml-[-12px] bg-[#fff] mt-[364%] opacity-20 my-8 sm:mt-[172%]  md:mt-[138%] md:h-[1px] md:w-[110%] md:ml-[-36px]  lg:w-[153.8%] xl:w-[152%] xl:mt-[60%] xl:ml-[-68px] "></div>
     </div>
   );
 };

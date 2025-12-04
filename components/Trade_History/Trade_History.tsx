@@ -293,10 +293,11 @@ const Trade_History: React.FC = () => {
         )}
       </div>
 
-      <div className="w-[106%] ml-[-5%] h-[1px] bg-[#fff] mt-[10%] opacity-20 my-8"></div>
-      <div className="mb-[80px] mt-[30%]">
-        <Footer />
-      </div>
+       <div className="w-[100%]  h-[1px] bg-[#fff] mt-[50%] opacity-20 my-8"></div>
+        
+                <div className=" mb-[80px] mt-[10%] ">
+                  <Footer />
+                </div>
     </main>
   );
 };

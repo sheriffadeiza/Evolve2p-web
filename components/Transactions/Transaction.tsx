@@ -1,5 +1,5 @@
 "use client";
-
+import React, { useState } from "react";
 import Image from "next/image";
 import { Search } from "lucide-react";
 import Filter from "../../public/Assets/Evolve2p_filter/filter-horizontal.svg";
@@ -15,10 +15,52 @@ import escrowIcon from "../../public/Assets/Evolve2p_EscrowT/elements.svg";
 import cancelledIcon from "../../public/Assets/Evolve2p_CanclT/elements.svg";
 import expiredIcon from "../../public/Assets/Evolve2p_ExpT/elements.svg";
 import Nav from "../NAV/Nav";
+import { useRouter } from "next/navigation";
 import { useTransaction } from "@/app/useTransaction/useTransaction";
-import TabsNav from "../TabsNav/TabsNav";
 import Footer from "../Footer/Footer";
 import { formatHashOrAddress } from "@/utils";
+
+// Constants
+const TYPE_ICONS = {
+  Buy: BuyIcon,
+  Swap: SwapIcon,
+  Sell: SellIcon,
+  Sent: SendIcon,
+  "Trade escrowed": EscrowIcon,
+} as const;
+
+const STATUS_CONFIG = {
+  Processing: {
+    color: "bg-[#23303C] text-[#66B9FF]",
+    icon: processingIcon,
+    width: "min-w-[94px]"
+  },
+  Completed: {
+    color: "bg-[#1B362B] text-[#4DF2BE]", 
+    icon: completedIcon,
+    width: "min-w-[94px]"
+  },
+  Failed: {
+    color: "bg-[#342827] text-[#FE857D]",
+    icon: failedIcon,
+    width: "min-w-[65px]"
+  },
+  "In Escrow": {
+    color: "bg-[#392D46] text-[#CCA0FA]",
+    icon: escrowIcon,
+    width: "min-w-[88px]"
+  },
+  Cancelled: {
+    color: "bg-[#3A3A3A] text-[#DBDBDB]",
+    icon: cancelledIcon,
+    width: "min-w-[87px]"
+  },
+  Expired: {
+    color: "bg-[#3A3A3A] text-[#DBDBDB]",
+    icon: expiredIcon,
+    width: "min-w-[74px]"
+  },
+} as const;
 
 const Transaction = () => {
   const {
@@ -29,167 +71,272 @@ const Transaction = () => {
     transactions,
   } = useTransaction();
 
-  console.log(transactions);
+  const router = useRouter();
+  const [activeTab, setActiveTab] = useState("transaction");
 
-  // ✅ Map transaction types to icons
-  const typeIcons: Record<string, any> = {
-    Buy: BuyIcon,
-    Swap: SwapIcon,
-    Sell: SellIcon,
-    Sent: SendIcon,
-    "Trade escrowed": EscrowIcon,
+  // Custom Tabs Component
+  const CustomTabs = () => {
+    const tabs = [
+      { id: "balance", label: "Balance" },
+      { id: "transaction", label: "Transaction" },
+      { id: "swap", label: "Swap" },
+    ];
+
+    return (
+      <div className="flex bg-[#2D2D2D] rounded-[56px] w-full max-w-[400px] h-[48px] p-1">
+        {tabs.map((tab) => (
+          <button
+            key={tab.id}
+            onClick={() => {
+              if (tab.id === "balance") {
+                router.push("/wallet");
+              } else if (tab.id === "transaction") {
+                router.push("/wallet?tab=transaction");
+              } else {
+                router.push("/swap");
+              }
+            }}
+            className={`flex-1 flex items-center justify-center rounded-[56px] text-[14px] font-[500] transition-all ${
+              tab.id === activeTab
+                ? "bg-[#4A4A4A] text-[#FCFCFC]"
+                : "text-[#DBDBDB] hover:text-[#FCFCFC]"
+            }`}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+    );
   };
 
-  // ✅ Status colors
-  const statusColors: Record<string, string> = {
-    Processing:
-      "bg-[#23303C] w-[94px] h-[22px] gap-[5px] text-[12px] font-[500] text-[#66B9FF] p-[2px_8px]",
-    Completed:
-      "bg-[#1B362B] w-[94px] h-[22px] gap-[5px] text-[12px] font-[500] text-[#4DF2BE] p-[2px_8px]",
-    Failed:
-      "bg-[#342827] w-[65px] h-[22px] gap-[5px] text-[#FE857D] text-[12px] font-[500] p-[2px_8px]",
-    "In Escrow":
-      "bg-[#392D46] w-[88px] h-[22px] gap-[5px] text-[12px] font-[500] text-[#CCA0FA] p-[2px_8px]",
-    Cancelled:
-      "bg-[#3A3A3A] w-[87px] h-[22px] gap-[5px] text-[12px] font-[500] text-[#DBDBDB] p-[2px_8px]",
-    Expired:
-      "bg-[#3A3A3A] w-[74px] h-[22px] gap-[5px] text-[12px] font-[500] text-[#DBDBDB] p-[2px_8px]",
-  };
-
-  // ✅ Status icons
-  const statusIcons: Record<string, any> = {
-    Processing: processingIcon,
-    Completed: completedIcon,
-    Failed: failedIcon,
-    "In Escrow": escrowIcon,
-    Cancelled: cancelledIcon,
-    Expired: expiredIcon,
-  };
-
-  if (loading)
-    return <p className="text-[#ffffff]  p-10">Loading transactions...</p>;
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-[#0F1012] flex items-center justify-center">
+        <p className="text-white text-lg">Loading transactions...</p>
+      </div>
+    );
+  }
 
   return (
-    <main className="min-h-screen bg-[#0F1012] pr-[10px] mt-[30px] pl-[30px] text-white md:p-8">
-      <div className="max-w-7xl mx-auto">
+    <main className="min-h-screen bg-[#0F1012] text-white flex flex-col">
+      <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-6 flex-1">
         <Nav />
 
-        <div className="flex bg-[#2D2D2D] rounded-[56px] mt-8 w-[296px] h-[48px] p-1 items-center justify-between">
-          <TabsNav />
+        {/* Tabs Navigation */}
+        <div className="flex justify-center mt-8">
+          <CustomTabs />
         </div>
 
-        {/* Search + Filters */}
-        <div className="flex flex-col w-[1224px] h-[650px] p-[32px] rounded-[12px] bg-[#1A1A1A] mt-[50px]">
-          <div className="flex items-center justify-between font-[700] text-[#FFFFFF]">
-            <p className="text-[24px]">Transactions</p>
-            <p className="text-[14px]">See all</p>
-          </div>
-
-          <div className="flex justify-between items-center mb-4">
-            <div
-              className="flex items-center bg-[#3A3A3A] rounded-md px-3 py-2 w-[375px] h-[40px]"
-              style={{ padding: "4px 8px 4px 16px" }}
-            >
-              <Search className="w-[17.916px] h-[17.916px] text-[#DBDBDB] mr-2" />
-              <input
-                type="text"
-                placeholder="Search"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="border-none w-[323px] h-[18px] bg-transparent text-[#C7C7C7] focus:outline-none w-full"
-              />
-            </div>
-            <button
-              className="flex items-center bg-[#2D2D2D] w-[94px] h-[36px] space-x-[5px] border-none rounded-full"
-              style={{ padding: "8px 14px" }}
-            >
-              <Image src={Filter} alt="filter" />
-              <p className="text-[14px] text-[#DBDBDB] font-[700]">Filters</p>
+        {/* Main Content */}
+        <div className="w-full max-w-7xl mx-auto bg-[#1A1A1A] rounded-[12px] mt-8 p-4 sm:p-6 lg:p-8">
+          {/* Header */}
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6 gap-4">
+            <h1 className="text-[20px] sm:text-[24px] lg:text-[28px] font-bold text-white">
+              Transactions
+            </h1>
+            <button className="text-[14px] font-bold text-white hover:opacity-80 transition-opacity w-fit sm:w-auto text-right">
+              See all
             </button>
           </div>
 
-          {/* Table */}
-          <table className="w-full mt-[30px] [&_th]:pl-[20px] [&_td]:pl-[20px] text-sm">
-            <thead>
-              <tr className="text-[#C7C7C7] text-[14px] font-[500]">
-                <th className="text-left py-2 pl-4">Type</th>
-                <th className="text-left py-2 pl-4">Amount</th>
-                <th className="text-left py-2 pl-4">To Address</th>
-                <th className="text-left py-2 pl-4">From Address</th>
-                <th className="text-left py-2 pl-4">txHash</th>
-                <th className="text-left py-2 pl-4">Status</th>
-                <th className="text-left py-2 pl-4">Date</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredTransactions.length > 0 ? (
-                filteredTransactions.map((t, i) => (
-                  <tr
-                    key={i}
-                    className="border-b w-[1160px] text-[#DBDBDB] font-[500] text-[16px] bg-[#222222]"
-                  >
-                    <td className="flex items-center p-[10px_12px] gap-[20px]">
-                      <div className="flex items-center pl-4 w-[20px] h-[20px] bg-[#0F1012] p-[5.6px] rounded-full">
-                        <Image
-                          src={typeIcons[t.type] || BuyIcon}
-                          alt={t.type}
-                          width={16}
-                          height={16}
-                        />
-                      </div>
-                      {t.type}
-                    </td>
-                    <td className="py-3 pl-4">{t.amount}</td>
-                    <td className="py-3 pl-4">
-                      {formatHashOrAddress(t?.toAddress)}
-                    </td>
-                    <td className="py-3 pl-4">
-                      {formatHashOrAddress(t?.fromAddress) || "-"}
-                    </td>
-                    <td className="py-3 pl-4">
-                      {formatHashOrAddress(t?.txHash) || "-"}
-                    </td>
-                    <td className="py-3 pl-4">
-                      <span
-                        className={`flex items-center gap-5 px-3 py-1 rounded-full text-xs font-medium ${
-                          statusColors[t.status] ||
-                          "bg-gray-800 text-gray-400 px-2"
-                        }`}
-                      >
-                        <Image
-                          src={statusIcons[t.status] || completedIcon}
-                          alt={t.status}
-                          width={14}
-                          height={14}
-                          className="mr-1"
-                        />
-                        {" " + " " + t.status}
-                      </span>
-                    </td>
-                    <td className="py-3 pl-4">
-                      {new Date(t?.createdAt).toDateString()}
+          {/* Search and Filters */}
+          <div className="flex flex-col lg:flex-row gap-4 mb-6">
+            {/* Search Bar */}
+            <div className="flex-1">
+              <div className="flex items-center bg-[#3A3A3A] rounded-lg px-4 py-3 w-full max-w-[500px]">
+                <Search className="w-5 h-5 text-[#DBDBDB] mr-3 flex-shrink-0" />
+                <input
+                  type="text"
+                  placeholder="Search transactions..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="bg-transparent border-none text-[#C7C7C7] placeholder-[#8F8F8F] focus:outline-none w-full text-sm lg:text-base"
+                />
+              </div>
+            </div>
+
+            {/* Filter Button */}
+            <button className="flex items-center justify-center bg-[#2D2D2D] px-4 py-3 space-x-2 border-none rounded-full hover:bg-[#3A3A3A] transition-colors w-fit">
+              <Image src={Filter} alt="filter" width={16} height={16} />
+              <span className="text-sm font-bold text-[#DBDBDB]">Filters</span>
+            </button>
+          </div>
+
+          {/* Transactions Table */}
+          <div className="overflow-x-auto">
+            {/* Desktop Table */}
+            <table className="w-full hidden lg:table">
+              <thead>
+                <tr className="border-b border-[#333]">
+                  <th className="text-left py-4 pl-4 text-[14px] font-[500] text-[#C7C7C7]">Type</th>
+                  <th className="text-left py-4 pl-4 text-[14px] font-[500] text-[#C7C7C7]">Amount</th>
+                  <th className="text-left py-4 pl-4 text-[14px] font-[500] text-[#C7C7C7]">To Address</th>
+                  <th className="text-left py-4 pl-4 text-[14px] font-[500] text-[#C7C7C7]">From Address</th>
+                  <th className="text-left py-4 pl-4 text-[14px] font-[500] text-[#C7C7C7]">txHash</th>
+                  <th className="text-left py-4 pl-4 text-[14px] font-[500] text-[#C7C7C7]">Status</th>
+                  <th className="text-left py-4 pl-4 text-[14px] font-[500] text-[#C7C7C7]">Date</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredTransactions.length > 0 ? (
+                  filteredTransactions.map((transaction, index) => (
+                    <DesktopTableRow 
+                      key={transaction.id || index} 
+                      transaction={transaction} 
+                    />
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan={7} className="text-center py-8 text-[#8F8F8F]">
+                      No transactions found
                     </td>
                   </tr>
+                )}
+              </tbody>
+            </table>
+
+            {/* Mobile Cards */}
+            <div className="lg:hidden space-y-3">
+              {filteredTransactions.length > 0 ? (
+                filteredTransactions.map((transaction, index) => (
+                  <MobileTransactionCard 
+                    key={transaction.id || index} 
+                    transaction={transaction} 
+                  />
                 ))
               ) : (
-                <tr>
-                  <td
-                    colSpan={6}
-                    className="text-center mt-[50%] pt-[50px] py-6 text-[#ffffff]"
-                  >
-                    No transactions found
-                  </td>
-                </tr>
+                <div className="text-center py-8 text-[#8F8F8F]">
+                  No transactions found
+                </div>
               )}
-            </tbody>
-          </table>
+            </div>
+          </div>
         </div>
 
-        <div className="mb-[80px] mt-[30%]">
-          <Footer />
-        </div>
+         <div className="w-[106%] ml-[-40px] h-[1px] bg-[#fff] mt-[30%] opacity-20 my-8"></div>
+      <div className="mb-[80px] whitespace-nowrap mt-[30%]">
+        <Footer />
+      </div>
       </div>
     </main>
+  );
+};
+
+// Desktop Table Row Component
+const DesktopTableRow = ({ transaction }: { transaction: any }) => {
+  const statusConfig = STATUS_CONFIG[transaction.status as keyof typeof STATUS_CONFIG] || 
+    { color: "bg-gray-800 text-gray-400", icon: completedIcon, width: "min-w-auto" };
+  
+  const typeIcon = TYPE_ICONS[transaction.type as keyof typeof TYPE_ICONS] || BuyIcon;
+
+  return (
+    <tr className="border-b border-[#333] last:border-b-0 hover:bg-[#222222] transition-colors">
+      {/* Type */}
+      <td className="py-4 pl-4">
+        <div className="flex items-center gap-3">
+          <div className="flex items-center justify-center w-8 h-8 bg-[#0F1012] rounded-full flex-shrink-0">
+            <Image src={typeIcon} alt={transaction.type} width={16} height={16} />
+          </div>
+          <span className="text-[14px] font-[500] text-[#DBDBDB]">{transaction.type}</span>
+        </div>
+      </td>
+
+      {/* Amount */}
+      <td className="py-4 pl-4 text-[14px] text-[#DBDBDB]">
+        {transaction.amount}
+      </td>
+
+      {/* To Address */}
+      <td className="py-4 pl-4">
+        <span className="font-mono text-[12px] text-[#DBDBDB] break-all">
+          {formatHashOrAddress(transaction?.toAddress)}
+        </span>
+      </td>
+
+      {/* From Address */}
+      <td className="py-4 pl-4">
+        <span className="font-mono text-[12px] text-[#DBDBDB] break-all">
+          {formatHashOrAddress(transaction?.fromAddress) || "-"}
+        </span>
+      </td>
+
+      {/* txHash */}
+      <td className="py-4 pl-4">
+        <span className="font-mono text-[12px] text-[#DBDBDB] break-all">
+          {formatHashOrAddress(transaction?.txHash) || "-"}
+        </span>
+      </td>
+
+      {/* Status */}
+      <td className="py-4 pl-4">
+        <span className={`inline-flex items-center justify-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${statusConfig.color} ${statusConfig.width}`}>
+          <Image src={statusConfig.icon} alt={transaction.status} width={12} height={12} />
+          {transaction.status}
+        </span>
+      </td>
+
+      {/* Date */}
+      <td className="py-4 pl-4 text-[12px] text-[#DBDBDB] whitespace-nowrap">
+        {transaction?.createdAt ? new Date(transaction.createdAt).toLocaleDateString() : "-"}
+      </td>
+    </tr>
+  );
+};
+
+// Mobile Transaction Card Component
+const MobileTransactionCard = ({ transaction }: { transaction: any }) => {
+  const statusConfig = STATUS_CONFIG[transaction.status as keyof typeof STATUS_CONFIG] || 
+    { color: "bg-gray-800 text-gray-400", icon: completedIcon, width: "min-w-auto" };
+  
+  const typeIcon = TYPE_ICONS[transaction.type as keyof typeof TYPE_ICONS] || BuyIcon;
+
+  return (
+    <div className="bg-[#222222] rounded-lg p-3 border border-[#333]">
+      {/* Header */}
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-3">
+          <div className="flex items-center justify-center w-8 h-8 bg-[#0F1012] rounded-full flex-shrink-0">
+            <Image src={typeIcon} alt={transaction.type} width={16} height={16} />
+          </div>
+          <div className="min-w-0">
+            <p className="text-[14px] font-bold text-[#DBDBDB] truncate">{transaction.type}</p>
+            <p className="text-[12px] text-[#DBDBDB] truncate">{transaction.amount}</p>
+          </div>
+        </div>
+        <span className={`inline-flex items-center justify-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${statusConfig.color} ${statusConfig.width} flex-shrink-0`}>
+          <Image src={statusConfig.icon} alt={transaction.status} width={12} height={12} />
+          <span className="truncate">{transaction.status}</span>
+        </span>
+      </div>
+
+      {/* Details */}
+      <div className="grid grid-cols-1 gap-2 text-sm">
+        <div className="flex justify-between items-start gap-2">
+          <span className="text-[#8F8F8F] text-xs flex-shrink-0">To:</span>
+          <span className="font-mono text-[#DBDBDB] text-xs text-right break-all">
+            {formatHashOrAddress(transaction?.toAddress)}
+          </span>
+        </div>
+        <div className="flex justify-between items-start gap-2">
+          <span className="text-[#8F8F8F] text-xs flex-shrink-0">From:</span>
+          <span className="font-mono text-[#DBDBDB] text-xs text-right break-all">
+            {formatHashOrAddress(transaction?.fromAddress) || "-"}
+          </span>
+        </div>
+        <div className="flex justify-between items-start gap-2">
+          <span className="text-[#8F8F8F] text-xs flex-shrink-0">Hash:</span>
+          <span className="font-mono text-[#DBDBDB] text-xs text-right break-all">
+            {formatHashOrAddress(transaction?.txHash) || "-"}
+          </span>
+        </div>
+        <div className="flex justify-between items-start gap-2">
+          <span className="text-[#8F8F8F] text-xs flex-shrink-0">Date:</span>
+          <span className="text-[#DBDBDB] text-xs text-right">
+            {transaction?.createdAt ? new Date(transaction.createdAt).toLocaleDateString() : "-"}
+          </span>
+        </div>
+      </div>
+    </div>
   );
 };
 

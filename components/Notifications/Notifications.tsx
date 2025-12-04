@@ -75,35 +75,35 @@ const Notifications: React.FC = () => {
   }) => (
     <div
       onClick={onToggle}
-      className={`w-[44px] h-[24px] rounded-full p-[2px] flex items-center cursor-pointer transition-colors duration-300 ${
+      className={`w-11 h-6 md:w-[44px] md:h-[24px] rounded-full p-[2px] flex items-center cursor-pointer transition-colors duration-300 ${
         enabled ? "bg-[#4DF2BE]" : "bg-[#3A3A3A]"
       }`}
     >
       <div
-        className={`w-[18px] h-[18px] rounded-full transition-transform duration-300 ${
-          enabled ? "translate-x-[20px] bg-[#000]" : "translate-x-0 bg-[#fff]"
+        className={`w-4 h-4 md:w-[18px] md:h-[18px] rounded-full transition-transform duration-300 ${
+          enabled ? "translate-x-5 md:translate-x-[20px] bg-[#000]" : "translate-x-0 bg-[#fff]"
         }`}
       />
     </div>
   );
 
   return (
-    <main className="min-h-screen bg-[#0F1012] pr-[10px] mt-[30px] pl-[30px] text-white md:p-8">
+    <main className="min-h-screen bg-[#0F1012] text-white p-4 sm:p-6 md:pr-[10px] md:mt-[30px] md:pl-[30px] lg:p-8">
       <div className="max-w-7xl mx-auto">
         <Nav />
 
-        <div className="flex items-center mt-[20px] mr-[40px]">
+        <div className="flex flex-col lg:flex-row items-start gap-4 md:gap-6 mt-4 md:mt-[20px] md:mr-[40px]">
           <Settings />
 
           {/* Right Section */}
-          <div className="w-[809px] h-[865px] bg-[#1A1A1A] gap-[20px] p-[24px_64px]">
-            <p className="text-[24px] font-[700] text-[#FFFFFF]">Notification</p>
+          <div className="w-full lg:w-[809px] min-h-[865px] bg-[#1A1A1A] gap-4 md:gap-[20px] p-4 sm:p-6 md:p-[24px_64px] rounded-lg md:rounded-none">
+            <p className="text-xl sm:text-2xl md:text-[24px] font-[700] text-[#FFFFFF]">Notification</p>
 
-            <div className="h-[279px] p-[20px] mt-[50px]">
+            <div className="p-4 sm:p-5 md:p-[20px] mt-6 md:mt-[50px]">
               {/* LOGIN ALERTS */}
-              <p className="text-[14px] font-[500] text-[#DBDBDB]">Login Alerts</p>
-              <div className="flex items-center justify-between p-[12px] rounded-[8px] w-[414px] h-[48px] bg-[#2D2D2D]">
-                <p className="text-[12px] font-[500] text-[#DBDBDB]">Email</p>
+              <p className="text-sm md:text-[14px] font-[500] text-[#DBDBDB]">Login Alerts</p>
+              <div className="flex items-center justify-between p-3 md:p-[12px] rounded-lg md:rounded-[8px] w-full max-w-[414px] h-12 md:h-[48px] bg-[#2D2D2D] mt-2">
+                <p className="text-xs md:text-[12px] font-[500] text-[#DBDBDB]">Email</p>
                 <Toggle
                   enabled={loginEmail}
                   onToggle={() => {
@@ -114,15 +114,15 @@ const Notifications: React.FC = () => {
                 />
               </div>
 
-              <div className="w-[430px] h-[1px] bg-[#3A3A3A] mt-[50px]" />
+              <div className="w-full max-w-[430px] h-[1px] bg-[#3A3A3A] mt-8 md:mt-[50px]" />
 
               {/* TRANSACTION ALERTS */}
-              <div className="mt-[20px] space-y-[10px]">
-                <p className="text-[14px] font-[500] text-[#DBDBDB]">
+              <div className="mt-5 md:mt-[20px] space-y-3 md:space-y-[10px]">
+                <p className="text-sm md:text-[14px] font-[500] text-[#DBDBDB]">
                   Transaction Alerts
                 </p>
-                <div className="flex items-center justify-between p-[12px] rounded-[8px] w-[414px] h-[48px] bg-[#2D2D2D]">
-                  <p className="text-[12px] font-[500] text-[#DBDBDB]">Email</p>
+                <div className="flex items-center justify-between p-3 md:p-[12px] rounded-lg md:rounded-[8px] w-full max-w-[414px] h-12 md:h-[48px] bg-[#2D2D2D]">
+                  <p className="text-xs md:text-[12px] font-[500] text-[#DBDBDB]">Email</p>
                   <Toggle
                     enabled={transactionEmail}
                     onToggle={() => {
@@ -134,8 +134,8 @@ const Notifications: React.FC = () => {
                 </div>
 
                 {/* PUSH NOTIFICATION */}
-                <div className="flex items-center justify-between p-[12px] rounded-[8px] w-[414px] h-[48px] bg-[#2D2D2D]">
-                  <p className="text-[12px] font-[500] text-[#DBDBDB]">
+                <div className="flex items-center justify-between p-3 md:p-[12px] rounded-lg md:rounded-[8px] w-full max-w-[414px] h-12 md:h-[48px] bg-[#2D2D2D]">
+                  <p className="text-xs md:text-[12px] font-[500] text-[#DBDBDB]">
                     Push notification
                   </p>
                   <Toggle
@@ -148,8 +148,8 @@ const Notifications: React.FC = () => {
           </div>
         </div>
 
-        <div className="w-[106%] ml-[-5%] h-[1px] bg-[#fff] mt-[10%] opacity-20 my-8" />
-        <div className="mb-[80px] mt-[30%]">
+        <div className="w-full h-[1px] bg-[#fff] mt-8 md:mt-[10%] opacity-20 my-6 md:my-8" />
+        <div className="mb-8 md:mb-[80px] mt-8 md:mt-[30%]">
           <Footer />
         </div>
       </div>

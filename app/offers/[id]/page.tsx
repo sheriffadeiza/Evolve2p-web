@@ -1,11 +1,11 @@
 import React from 'react';
-import UpdatePhone from "../../../components/UpdatePhone/UpdatePhone";
+import Offers from '@/components/Offers/Offers'
 
 
 const page = () => {
   return (
     <div>
-      <UpdatePhone/>
+      <Offers/>
     </div>
   )
 }

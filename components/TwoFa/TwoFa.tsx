@@ -7,63 +7,64 @@ import TFa from "../../public/Assets/Evolve2p_2Fa/Profile/elements.svg"
 import Footer from "../../components/Footer/Footer";
 import { useRouter } from "next/navigation"
 
-
 const TwoFa: React.FC = () => {
-
     const router = useRouter()
-  return (
-   <main className="min-h-screen bg-[#0F1012] pr-[10px] mt-[30px] pl-[30px] text-white md:p-8">
-          <div className="max-w-7xl mx-auto">
-            
-            <Nav />
-            
-                   <div className="flex  items-center mt-[20px]  mr-[40px] ">
-                    
-                       <Settings />
 
-
-
-                         {/* Right */}
-                <div className="w-[809px]  h-[865px] bg-[#1A1A1A]   gap-[20px] p-[24px_64px]">
-
-                    <p className="text-[24px] font-[700] text-[#FFFFFF]">Two Factor Authentication</p>
-
-
-                    <div className="flex flex-col items-center justify-center mt-[150px]">
-                      
-                      <div className="flex items-center justify-center w-[137.693px] h-[137.693px] bg-[#222222] rounded-[68.846px] border-[2px] border-[#222]">
-                        <Image src={TFa} alt="2fa"/>
-                        
-                        </div>
-                     
-
-                     <div className="flex flex-col items-center justify-center">
-                     <p className="text-[#FFFFFF] text-[24px] font-[700]">Security beyond passwords </p>
-                      <p className="text-[16px] mt-[-10px] font-[400] text-[#C7C7C7]">Get an extra layer of protection to your account <br/>
-                        when logging in and performing transactions.</p>
-
-                        <button 
-                        onClick={() => {router.push("/tfa/setuptwofa")}}
-                        className="flex item-center justify-center mt-[20px] w-[335px] h-[48px] bg-[#4DF2BE] p-[12px_20px] rounded-full border-[1px] text-[14px] font-[700] text-[#0F1012] border-[#4DF2BE] ">
-
-                          Set up now
-                            </button>
-                     </div>
-                 </div>
-
-                    </div>
-        </div>
-          
-           <div className="w-[106%] ml-[-5%] h-[1px] bg-[#fff] mt-[10%] opacity-20 my-8"></div>
+    return (
+        <main className="min-h-screen bg-[#0F1012] text-white">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 md:py-8">
+                <Nav />
                 
-                        <div className=" mb-[80px] mt-[30%] ">
-                          <Footer />
+                <div className="flex flex-col lg:flex-row gap-6 mt-6">
+                    {/* Settings Sidebar */}
+                    <div className="lg:w-64">
+                        <Settings />
+                    </div>
+
+                    {/* Main Content */}
+                    <div className="flex-1 bg-[#1A1A1A] rounded-xl p-4 lg:p-8">
+                        <p className="text-xl lg:text-2xl font-bold text-white mb-8">
+                            Two Factor Authentication
+                        </p>
+
+                        <div className="flex flex-col items-center justify-center mt-8 lg:mt-24">
+                            {/* Icon Container */}
+                            <div className="flex items-center justify-center w-32 h-32 lg:w-36 lg:h-36 bg-[#222222] rounded-full border-2 border-[#222] mb-8">
+                                <Image 
+                                    src={TFa} 
+                                    alt="2FA security icon" 
+                                    className="w-16 h-16 lg:w-20 lg:h-20"
+                                />
+                            </div>
+                         
+                            {/* Content */}
+                            <div className="flex flex-col items-center justify-center text-center max-w-2xl">
+                                <p className="text-xl lg:text-2xl font-bold text-white mb-4">
+                                    Security beyond passwords
+                                </p>
+                                <p className="text-sm lg:text-base font-normal text-[#C7C7C7] mb-8 leading-relaxed">
+                                    Get an extra layer of protection to your account when logging in and performing transactions.
+                                </p>
+
+                                <button 
+                                    onClick={() => {router.push("/tfa/setuptwofa")}}
+                                    className="w-full max-w-xs lg:max-w-sm h-12 bg-[#4DF2BE] rounded-full border border-[#4DF2BE] text-sm lg:text-base font-bold text-[#0F1012] hover:bg-[#3fe0ad] transition-colors duration-200"
+                                >
+                                    Set up now
+                                </button>
+                            </div>
                         </div>
-
-        </div>
+                    </div>
+                </div>
+                
+                <div className="w-[100%]  h-[1px] bg-[#fff] mt-[50%] opacity-20 my-8"></div>
+        
+                <div className=" mb-[80px] mt-[10%] ">
+                  <Footer />
+                </div>
+            </div>
         </main>              
-
-  )
+    )
 }
 
 export default TwoFa

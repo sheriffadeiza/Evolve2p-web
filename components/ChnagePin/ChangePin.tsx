@@ -33,7 +33,7 @@ const UpdatePin: React.FC = () => {
       return;
     }
 
-    const email = localStorage.getItem("userEmail"); // stored earlier in signup/login
+    const email = localStorage.getItem("userEmail");
     if (!email) {
       alert("Email not found. Please log in again.");
       return;
@@ -71,33 +71,33 @@ const UpdatePin: React.FC = () => {
   };
 
   return (
-    <main className="min-h-screen bg-[#0F1012] pr-[10px] mt-[30px] pl-[30px] text-white md:p-8">
-      <div className="max-w-7xl mx-auto">
+    <main className="min-h-screen bg-[#0F1012] text-white">
+      <div className="px-4 py-6 md:px-8 md:py-8 lg:max-w-7xl lg:mx-auto">
         {/* Navbar */}
         <Nav />
 
-        <div className="flex items-start mt-[20px] mr-[40px]">
+        <div className="flex flex-col lg:flex-row items-start gap-6 mt-6 lg:mt-8">
           {/* Settings Sidebar */}
-          <Settings />
+          <div className="w-full lg:w-auto">
+            <Settings />
+          </div>
 
-          {/* Right Side */}
-          <div className="w-[809px] h-[784px] bg-[#1A1A1A] rounded-r-[8px] p-[64px] flex flex-col">
-            <p className="text-[24px] font-[700] text-[#FFFFFF]">
+          {/* Right Side - Main Content */}
+          <div className="w-full bg-[#1A1A1A] rounded-lg lg:rounded-r-[8px] p-6 md:p-8 lg:p-16 flex flex-col">
+            <p className="text-xl md:text-2xl font-bold text-[#FFFFFF] mb-4 md:mb-6">
               Update Security PIN
             </p>
 
-            <div className="flex flex-col ml-[110px] p-[24px_20px]">
-              <p className="text-[20px] font-[700] text-[#FFFFFF]">
+            <div className="flex flex-col w-full max-w-md mx-auto lg:mx-0 lg:ml-[110px] p-4 md:p-6">
+              <p className="text-lg md:text-xl font-bold text-[#FFFFFF]">
                 Enter Current PIN
               </p>
-              <p className="text-[16px] text-[#C7C7C7] font-[400] mt-[8px]">
-                For security reasons, enter your current PIN before
-                <br />
-                setting a new one.
+              <p className="text-sm md:text-base text-[#C7C7C7] font-normal mt-2 md:mt-3">
+                For security reasons, enter your current PIN before setting a new one.
               </p>
 
               {/* PIN Input Boxes */}
-              <div className="flex items-center ml-[35px] gap-[12px] mt-[20px]">
+              <div className="flex justify-center lg:justify-start items-center gap-3 md:gap-4 mt-6 md:mt-8">
                 {[1, 2, 3, 4].map((_, index) => (
                   <input
                     key={index}
@@ -109,7 +109,7 @@ const UpdatePin: React.FC = () => {
                     maxLength={1}
                     onChange={(e) => handleInput(e, index)}
                     onKeyDown={(e) => handleKeyDown(e, index)}
-                    className="w-[67.75px] h-[56px] p-[8px] text-center text-[18px] font-[700] text-[#FFFFFF] bg-[#222222] border border-[#2E2E2E] rounded-[12px] focus:outline-none focus:border-[#4DF2BE]"
+                    className="w-14 h-12 md:w-16 md:h-14 lg:w-[67.75px] lg:h-[56px] p-2 text-center text-base md:text-lg font-bold text-[#FFFFFF] bg-[#222222] border border-[#2E2E2E] rounded-lg md:rounded-xl lg:rounded-[12px] focus:outline-none focus:border-[#4DF2BE] transition-colors"
                   />
                 ))}
               </div>
@@ -117,7 +117,7 @@ const UpdatePin: React.FC = () => {
               {/* Forget PIN */}
               <div
                 onClick={() => router.push("/change-pin/forgotpin")}
-                className="mt-[20px] text-[#FFFFFF] ml-[200px] text-[14px] font-[700] hover:underline cursor-pointer"
+                className="mt-4 md:mt-6 text-[#FFFFFF] text-center lg:text-left lg:ml-[200px] text-sm font-bold hover:underline cursor-pointer"
               >
                 Forget PIN
               </div>
@@ -126,43 +126,43 @@ const UpdatePin: React.FC = () => {
               <button
                 onClick={handleContinue}
                 disabled={isLoading}
-                className="w-[395px] h-[48px] mt-[40px] border-[1px] bg-[#4DF2BE] border-[#4DF2BE] ml-[38px] p-[12px_20px] text-[#0F1012] font-[700] text-[14px] rounded-full hover:opacity-90 transition-all flex items-center justify-center"
+                className="w-full max-w-sm mx-auto lg:mx-0 lg:w-[395px] h-12 md:h-[48px] mt-8 md:mt-10 border border-[#4DF2BE] bg-[#4DF2BE] text-[#0F1012] font-bold text-sm rounded-full hover:opacity-90 transition-all flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isLoading ? (
                   <div className="flex items-center justify-center gap-2">
                     <div className="loader"></div>
+                    <span>Verifying...</span>
                   </div>
                 ) : (
                   "Continue"
                 )}
-
-                <style jsx>{`
-                  .loader {
-                    width: 20px;
-                    height: 20px;
-                    border: 3px solid rgba(0, 0, 0, 0.2);
-                    border-radius: 50%;
-                    border-top-color: #0f1012;
-                    animation: spin 1s ease-in-out infinite;
-                  }
-                  @keyframes spin {
-                    to {
-                      transform: rotate(360deg);
-                    }
-                  }
-                `}</style>
               </button>
+
+              <style jsx>{`
+                .loader {
+                  width: 20px;
+                  height: 20px;
+                  border: 3px solid rgba(0, 0, 0, 0.2);
+                  border-radius: 50%;
+                  border-top-color: #0f1012;
+                  animation: spin 1s ease-in-out infinite;
+                }
+                @keyframes spin {
+                  to {
+                    transform: rotate(360deg);
+                  }
+                }
+              `}</style>
             </div>
           </div>
         </div>
 
         {/* Footer Divider */}
-        <div className="w-[106%] ml-[-5%] h-[1px] bg-[#fff] mt-[10%] opacity-20 my-8"></div>
-
-        {/* Footer */}
-        <div className="mb-[80px] mt-[30%]">
-          <Footer />
-        </div>
+          <div className="w-[100%]  h-[1px] bg-[#fff] mt-[50%] opacity-20 my-8"></div>
+        
+                <div className=" mb-[80px] mt-[10%] ">
+                  <Footer />
+                </div>
       </div>
     </main>
   );
