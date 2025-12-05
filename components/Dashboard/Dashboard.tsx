@@ -44,7 +44,7 @@ interface Wallet {
   address: string;
   balance: number;
 }
-
+ 
 interface Currency {
   name: string;
   symbol: string;
@@ -767,7 +767,7 @@ const Dashboard: React.FC<QRCodeBoxProps> = ({ value }) => {
       </p>
     </div>
     <Link 
-      href="/notifications/notify2" 
+      href="/notify2" 
       className="text-[12px] sm:text-[14px] font-[700] text-[#4DF2BE] hover:text-[#3DD2A5] flex items-center gap-2"
     >
       View All
