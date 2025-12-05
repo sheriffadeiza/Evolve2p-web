@@ -8,8 +8,6 @@ import { useRouter } from "next/navigation";
 import Image from "next/image";
 import Footer from "../Footer/Footer";
 import Less_than from "../../public/Assets/Evolve2p_lessthan/Makretplace/arrow-left-01.svg";
-import BellIcon from "../../public/Assets/Evolve2p_bell/elements.svg";
-import CheckIcon from "../../public/Assets/Evolve2p_check/check.svg";
 import ArrowRight from "../../public/Assets/Evolve2p_Larrow/arrow-right-01.svg";
 
 const NotificationsPage = () => {
