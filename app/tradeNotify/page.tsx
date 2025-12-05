@@ -1,11 +1,11 @@
 import React from 'react';
-import Notify2 from "../../../components/Notify2/Notify2";
+import Notify from "../../components/tradeNotify/tradeNotify";
 
 
 const page = () => {
   return (
     <div>
-      <Notify2/>
+      <Notify/>
     </div>
   )
 }

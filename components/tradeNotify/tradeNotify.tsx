@@ -9,7 +9,7 @@ import Footer from "../Footer/Footer";
 import Less_than from "../../public/Assets/Evolve2p_lessthan/Makretplace/arrow-left-01.svg";
 import ArrowRight from "../../public/Assets/Evolve2p_Larrow/arrow-right-01.svg";
 
-const Notify2 = () => {
+const tradeNotify = () => {
   const {
     notifications,
     unreadCount,
@@ -326,4 +326,4 @@ const Notify2 = () => {
   );
 };
 
-export default Notify2;
+export default tradeNotify;
