@@ -1,12 +1,27 @@
-import './globals.css';
-import type { ReactNode } from 'react';
+// app/layout.tsx
+import type { Metadata } from "next";
+import { Inter } from "next/font/google";
+import "./globals.css";
+import { NotificationProvider } from "../Context/provider";
 
+const inter = Inter({ subsets: ["latin"] });
 
-export default function RootLayout({ children }: { children: ReactNode }) {
+export const metadata: Metadata = {
+  title: "Your App",
+  description: "Your app description",
+};
+
+export default function RootLayout({
+  children,
+}: Readonly<{
+  children: React.ReactNode;
+}>) {
   return (
     <html lang="en">
-      <body className="bg-[#0F1012]">
-        {children}
+      <body className={inter.className}>
+        <NotificationProvider>
+          {children}
+        </NotificationProvider>
       </body>
     </html>
   );
