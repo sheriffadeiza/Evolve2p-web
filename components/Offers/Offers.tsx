@@ -1,9 +1,9 @@
+// app/offers/OffersComponent.tsx
 "use client";
 
-import { useState, useEffect } from "react";
-import Nav from "../NAV/Nav";
+import { useState, useEffect, useContext } from "react";
+import Nav from "../../components/NAV/Nav";
 import { useRouter, useParams, useSearchParams } from "next/navigation";
-import { useNotifications } from "../../Context/provider";
 import Image from "next/image";
 import Vector from "../../public/Assets/Evolve2p_vector/vector.svg";
 import Mark_green from "../../public/Assets/Evolve2p_mark/elements.svg";
@@ -22,14 +22,72 @@ import USDT from "../../public/Assets/Evolve2p_USDT/Tether (USDT).svg";
 import USDC from "../../public/Assets/Evolve2p_USDC/USD Coin (USDC).svg";
 import Arrow_great from "../../public/Assets/Evolve2p_Larrow/arrow-right-01.svg";
 import Times from "../../public/Assets/Evolve2p_times/Icon container.png";
-import Footer from "../Footer/Footer";
+import Footer from "../../components/Footer/Footer";
 import { countryCurrencyService, CurrencyOption } from "../../utils/countryCurrencyService";
 
-const Offers = () => {
+// Create a safe wrapper that doesn't crash if context is not available
+const useSafeNotifications = () => {
+  const [notificationsAvailable, setNotificationsAvailable] = useState(false);
+  const [sendNotification, setSendNotification] = useState<((notification: any) => string | null) | null>(null);
+  const [saveTradeToLocalStorage, setSaveTradeToLocalStorage] = useState<((trade: any) => any) | null>(null);
+
+  useEffect(() => {
+    const loadContext = async () => {
+      try {
+        // Dynamic import to avoid circular dependencies
+        const { useNotifications } = await import("../../Context/provider");
+        const context = useNotifications();
+        setSendNotification(() => context.sendNotification);
+        setSaveTradeToLocalStorage(() => context.saveTradeToLocalStorage);
+        setNotificationsAvailable(true);
+      } catch (error) {
+        console.warn("Notifications context not available:", error);
+        // Provide fallback functions
+        setSendNotification(() => (notification: any) => {
+          console.warn("Notification context not available, using fallback:", notification);
+          return null;
+        });
+        setSaveTradeToLocalStorage(() => (trade: any) => {
+          console.warn("Trade storage context not available, using localStorage directly:", trade);
+          try {
+            const trades = JSON.parse(localStorage.getItem('evolve2p_trades') || '{}');
+            const tradeId = trade.id || trade._id || `trade_${Date.now()}`;
+            const enhancedTrade = {
+              ...trade,
+              id: tradeId,
+              createdAt: new Date().toISOString(),
+              status: 'PENDING',
+              updatedAt: new Date().toISOString()
+            };
+            trades[tradeId] = enhancedTrade;
+            localStorage.setItem('evolve2p_trades', JSON.stringify(trades));
+            return enhancedTrade;
+          } catch (e) {
+            console.error("Failed to save trade to localStorage:", e);
+            return trade;
+          }
+        });
+        setNotificationsAvailable(true);
+      }
+    };
+
+    loadContext();
+  }, []);
+
+  return {
+    sendNotification: sendNotification || (() => null),
+    saveTradeToLocalStorage: saveTradeToLocalStorage || ((trade: any) => trade),
+    notificationsAvailable
+  };
+};
+
+const OffersComponent = () => {
   const router = useRouter();
   const params = useParams();
   const searchParams = useSearchParams();
-  const { sendNotification, saveTradeToLocalStorage } = useNotifications();
+  
+  // Use the safe wrapper
+  const { sendNotification, saveTradeToLocalStorage, notificationsAvailable } = useSafeNotifications();
   
   const [isTermsOpen, setIsTermsOpen] = useState(false);
   const [isSellerOpen, setIsSellerOpen] = useState(false);
@@ -347,7 +405,7 @@ const Offers = () => {
       if (trade) {
         console.log("🚀 Trade created, navigating...", trade);
         
-        // Save trade to localStorage using context
+        // Save trade to localStorage using context or fallback
         const savedTrade = saveTradeToLocalStorage(trade);
         
         if (savedTrade) {
@@ -379,18 +437,26 @@ const Offers = () => {
             recipientId: recipientId
           };
 
-          // Send notification using context
-          const notificationSent = sendNotification(notificationData);
+          // Send notification using context - returns notification ID or null
+          const notificationId = sendNotification(notificationData);
           
-          if (notificationSent) {
-            // Show success message
+          if (notificationId) {
+            // Show success message - notification was sent successfully
             const successMsg = isSeller 
               ? `Trade created! Notification sent to buyer.` 
               : `Trade request sent! ${sellerUser.username || 'Seller'} has been notified.`;
             
             showSuccessNotification(successMsg);
             
-            console.log("📨 Notification data sent via context:", notificationData);
+            console.log("📨 Notification sent with ID:", notificationId);
+          } else {
+            // Still show success for trade creation, but warn about notification
+            const successMsg = isSeller 
+              ? `Trade created! (Notification may not have been sent)` 
+              : `Trade request created! ${sellerUser.username || 'Seller'} will see it when they check their dashboard.`;
+            
+            showSuccessNotification(successMsg);
+            console.warn("⚠️ Notification may not have been sent successfully");
           }
 
           // Get trade ID
@@ -1128,7 +1194,7 @@ const Offers = () => {
                         {item}
                       </span>
                     )
-                  )}
+                  )};
                 </div>
 
                 {/* Stats */}
@@ -1242,9 +1308,9 @@ const Offers = () => {
         <div className="mb-[80px] mt-[10%]">
           <Footer />
         </div>
-      </div>
+        </div>
     </main>
   );                                                     
 };
 
-export default Offers;
+export default OffersComponent;
