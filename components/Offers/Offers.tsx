@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import Nav from "../NAV/Nav";
 import { useRouter, useParams, useSearchParams } from "next/navigation";
+import { useNotifications } from "../../Context/provider";
 import Image from "next/image";
 import Vector from "../../public/Assets/Evolve2p_vector/vector.svg";
 import Mark_green from "../../public/Assets/Evolve2p_mark/elements.svg";
@@ -28,6 +29,8 @@ const Offers = () => {
   const router = useRouter();
   const params = useParams();
   const searchParams = useSearchParams();
+  const { sendNotification, saveTradeToLocalStorage } = useNotifications();
+  
   const [isTermsOpen, setIsTermsOpen] = useState(false);
   const [isSellerOpen, setIsSellerOpen] = useState(false);
   const [clientUser, setClientUser] = useState<any>(null);
@@ -37,6 +40,8 @@ const Offers = () => {
   const [tradePrice, setTradePrice] = useState<number | null>(null);
   const [currency, setCurrency] = useState<string>("USD");
   const [isCreatingTrade, setIsCreatingTrade] = useState(false);
+  const [showNotificationSuccess, setShowNotificationSuccess] = useState(false);
+  const [notificationMessage, setNotificationMessage] = useState("");
 
   const toggleSeller = () => setIsSellerOpen((prev) => !prev);
   const [payAmount, setPayAmount] = useState<string>("");
@@ -53,6 +58,17 @@ const Offers = () => {
 
   const [activeTab, setActiveTab] = useState("offers");
 
+  // Show success notification
+  const showSuccessNotification = (message: string) => {
+    setNotificationMessage(message);
+    setShowNotificationSuccess(true);
+    
+    setTimeout(() => {
+      setShowNotificationSuccess(false);
+      setNotificationMessage("");
+    }, 5000);
+  };
+
   // Helper function to safely render values
   const renderSafeValue = (value: any): string => {
     if (value === null || value === undefined) return "N/A";
@@ -68,10 +84,8 @@ const Offers = () => {
       return 'Loading...';
     }
     
-    // Get currency symbol from selectedCurrencyData
     const symbol = selectedCurrencyData?.symbol || '$';
     
-    // Format the amount
     if (amount < 0.01 && amount > 0) {
       return `${symbol}${amount.toFixed(8)}`;
     } else if (amount < 1) {
@@ -84,20 +98,18 @@ const Offers = () => {
     }
   };
 
-  // Check if pay amount is valid (not empty, greater than 0, and within limits)
+  // Check if pay amount is valid
   const isPayAmountValid = () => {
     if (!payAmount || payAmount.trim() === "") return false;
     const amount = parseFloat(payAmount);
     
-    // Check if amount is a valid number and greater than 0
     if (isNaN(amount) || amount <= 0) return false;
     
-    // Check if amount is within the offer limits
     if (offer && offer.minLimit && offer.maxLimit) {
       return amount >= offer.minLimit && amount <= offer.maxLimit;
     }
     
-    return true; // If no limits are set, allow any valid amount
+    return true;
   };
 
   // Get validation error message
@@ -128,12 +140,10 @@ const Offers = () => {
     const currentUserId = clientUser.id || clientUser._id;
     const sellerId = sellerUser.id || sellerUser._id;
     
-    // Compare by ID if available
     if (currentUserId && sellerId) {
       return currentUserId === sellerId;
     }
     
-    // Fallback: compare by email or username
     const currentUserEmail = clientUser.email;
     const sellerEmail = sellerUser.email;
     
@@ -157,7 +167,6 @@ const Offers = () => {
       return "Invalid offer ID";
     }
     
-    // Check if offer ID is a valid UUID format
     const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
     if (!uuidRegex.test(offer.id)) {
       return "Invalid offer ID format (must be UUID)";
@@ -174,7 +183,6 @@ const Offers = () => {
       return "Invalid crypto amount";
     }
     
-    // Check against offer limits with tolerance for floating point
     if (offer.minLimit && amountFiat < (offer.minLimit - 0.01)) {
       return `Amount below minimum limit of ${formatCurrency(offer.minLimit)}`;
     }
@@ -183,7 +191,6 @@ const Offers = () => {
       return `Amount above maximum limit of ${formatCurrency(offer.maxLimit)}`;
     }
     
-    // Check if tradePrice is available
     if (!tradePrice) {
       return "Trade price not available";
     }
@@ -191,16 +198,12 @@ const Offers = () => {
     return null;
   };
 
-  // FIXED: Create trade function with tradePrice from offer data
+  // Create trade function
   const createTrade = async () => {
     console.log("🎯 Starting trade creation...");
     
     if (!isPayAmountValid() || !offer || !clientUser) {
-      console.error("❌ Validation failed:", { 
-        isPayAmountValid: isPayAmountValid(), 
-        offer: !!offer, 
-        clientUser: !!clientUser 
-      });
+      console.error("❌ Validation failed");
       return null;
     }
 
@@ -214,8 +217,6 @@ const Offers = () => {
         try {
           const userData = JSON.parse(userDataRaw);
           token = userData?.accessToken || userData?.token;
-          console.log("🔑 Token available:", !!token);
-          console.log("👤 User ID:", userData?.id || userData?._id);
         } catch (e) {
           console.error("❌ Error parsing user data:", e);
         }
@@ -229,62 +230,33 @@ const Offers = () => {
         headers.Authorization = `Bearer ${token}`;
       }
 
-      // Prepare trade data with CORRECT field names
       const amountFiat = parseFloat(payAmount);
       const amountCrypto = parseFloat(receiveAmount);
 
-      console.log("🔍 Detailed amount analysis:", {
-        payAmount,
-        receiveAmount,
-        amountFiat,
-        amountCrypto,
-        tradePriceFromOffer: tradePrice,
-        fixedPrice: fixedPrice,
-        isFiatValid: !isNaN(amountFiat) && amountFiat > 0,
-        isCryptoValid: !isNaN(amountCrypto) && amountCrypto > 0,
-      });
-
-      // Validate the amounts more strictly
       if (isNaN(amountFiat) || isNaN(amountCrypto) || amountFiat <= 0 || amountCrypto <= 0) {
         throw new Error(`Invalid amount values: Fiat=${amountFiat}, Crypto=${amountCrypto}`);
       }
 
-      // Check if tradePrice is available
       if (!tradePrice || tradePrice <= 0) {
         throw new Error("Trade price not available from offer");
       }
 
-      // FIXED: Use the correct field names expected by your API including tradePrice
       const tradeData = {
         offerId: offer.id,
         amountFiat: amountFiat,
         amountCrypto: amountCrypto,
-        tradePrice: tradePrice, // This is the totalPrice from offer API
+        tradePrice: tradePrice,
         currency: currency,
         cryptoType: offer.crypto,
         paymentMethod: offer.paymentMethod,
-        // Additional fields that might be needed
-        pricePerUnit: fixedPrice, // Price per 1 crypto unit
+        pricePerUnit: fixedPrice,
         margin: offer.margin || 0,
         fiatCurrency: currency,
         paymentTimeLimit: offer.paymentTime || "30 minutes"
       };
 
-      console.log("🔄 Creating trade with data structure including tradePrice:", {
-        tradeData,
-        offerDetails: {
-          id: offer.id,
-          type: offer.type,
-          crypto: offer.crypto,
-          minLimit: offer.minLimit,
-          maxLimit: offer.maxLimit,
-          tradePrice: tradePrice,
-          pricePerUnit: fixedPrice
-        }
-      });
+      console.log("🔄 Creating trade with data:", tradeData);
 
-      console.log("📤 Sending request to:", "https://evolve2p-backend.onrender.com/api/create-trade");
-      
       const response = await fetch(
         "https://evolve2p-backend.onrender.com/api/create-trade",
         {
@@ -295,11 +267,9 @@ const Offers = () => {
       );
 
       console.log("📡 Response status:", response.status);
-      console.log("📡 Response ok:", response.ok);
       
       if (!response.ok) {
         let errorMessage = `Trade creation failed with status ${response.status}`;
-        let errorDetails = null;
         
         try {
           const errorData = await response.text();
@@ -307,22 +277,8 @@ const Offers = () => {
           
           try {
             const parsedError = JSON.parse(errorData);
-            errorDetails = parsedError;
             errorMessage = parsedError.message || parsedError.error || errorMessage;
-            console.error("❌ Parsed error details:", parsedError);
-            
-            // Provide more specific error messages
-            if (response.status === 400) {
-              errorMessage = "Bad request - check the data format";
-            } else if (response.status === 401) {
-              errorMessage = "Unauthorized - please login again";
-            } else if (response.status === 404) {
-              errorMessage = "Offer not found";
-            } else if (response.status === 422) {
-              errorMessage = "Validation error - check amount limits";
-            }
           } catch (parseError) {
-            console.error("❌ Error response is not JSON:", errorData);
             errorMessage = errorData || errorMessage;
           }
         } catch (e) {
@@ -336,16 +292,15 @@ const Offers = () => {
       console.log("✅ Trade created successfully:", result);
 
       if (result.success && result.data) {
-        return result.data; // Return the trade data
+        return result.data;
       } else if (result.trade) {
-        return result.trade; // Alternative response format
+        return result.trade;
       } else {
         throw new Error(result.message || "Failed to create trade - no trade data returned");
       }
     } catch (error) {
       if (error instanceof Error) {
         console.error("❌ Error creating trade:", error.message);
-        console.error("❌ Error stack:", error.stack);
       } else {
         console.error("❌ Unknown error creating trade:", error);
       }
@@ -355,7 +310,7 @@ const Offers = () => {
     }
   };
 
-  // Get button text based on opposite logic
+  // Get button text
   const getButtonText = () => {
     if (isCreatingTrade) {
       return "Creating Trade...";
@@ -364,18 +319,14 @@ const Offers = () => {
     const isSeller = isCurrentUserSeller();
     
     if (isSeller) {
-      // Current user is the offer creator - show original offer type
       return `${offer.type} ${offer.crypto}`;
     } else {
-      // Current user is NOT the offer creator - show OPPOSITE type
-      // If offer type is BUY (creator wants to buy), show SELL (user can sell to them)
-      // If offer type is SELL (creator wants to sell), show BUY (user can buy from them)
       const oppositeType = offer.type?.toUpperCase() === 'BUY' ? 'SELL' : 'BUY';
       return `${oppositeType} ${offer.crypto}`;
     }
   };
 
-  // Handle buy/sell button click with trade creation and routing logic
+  // Handle buy/sell button click with notification
   const handleTradeAction = async () => {
     if (!isPayAmountValid()) {
       alert("Please enter a valid amount");
@@ -395,31 +346,80 @@ const Offers = () => {
       
       if (trade) {
         console.log("🚀 Trade created, navigating...", trade);
-        const isSeller = isCurrentUserSeller();
         
-        // FIXED: Use the correct trade ID field
-        const tradeId = trade.id || trade._id;
+        // Save trade to localStorage using context
+        const savedTrade = saveTradeToLocalStorage(trade);
         
-        if (!tradeId) {
-          throw new Error("No trade ID returned from API");
-        }
-        
-        if (isSeller) {
-          router.push(`/prc_sell?tradeId=${tradeId}&offerId=${offer.id}&currency=${currency}&payAmount=${payAmount}`);
-        } else {
-          if (offer.type?.toUpperCase() === 'SELL') {
-            router.push(`/prc_buy?tradeId=${tradeId}&offerId=${offer.id}&currency=${currency}&payAmount=${payAmount}`);
-          } else {
-            router.push(`/prc_sell?tradeId=${tradeId}&offerId=${offer.id}&currency=${currency}&payAmount=${payAmount}`);
+        if (savedTrade) {
+          // Determine who is who
+          const isSeller = isCurrentUserSeller();
+          const sellerUser = offer.user || clientUser;
+          const buyerUser = clientUser;
+          
+          const sellerId = sellerUser.id || sellerUser._id;
+          const buyerId = buyerUser.id || buyerUser._id;
+          const offerCreatorId = sellerId;
+          
+          // Get recipient (the other party)
+          const recipientId = isSeller ? buyerId : offerCreatorId;
+          const initiatorId = isSeller ? sellerId : buyerId;
+          
+          // Create notification for the other party
+          const notificationData = {
+            type: 'NEW_TRADE_REQUEST' as const,
+            tradeId: savedTrade.id,
+            offerId: offer.id,
+            initiatorId: initiatorId,
+            initiatorUsername: clientUser.username || clientUser.email || 'User',
+            amountFiat: parseFloat(payAmount),
+            amountCrypto: parseFloat(receiveAmount),
+            currency: currency,
+            crypto: offer.crypto,
+            message: `${clientUser.username || clientUser.email} wants to ${isSeller ? 'sell' : 'buy'} ${receiveAmount} ${offer.crypto} from your offer`,
+            recipientId: recipientId
+          };
+
+          // Send notification using context
+          const notificationSent = sendNotification(notificationData);
+          
+          if (notificationSent) {
+            // Show success message
+            const successMsg = isSeller 
+              ? `Trade created! Notification sent to buyer.` 
+              : `Trade request sent! ${sellerUser.username || 'Seller'} has been notified.`;
+            
+            showSuccessNotification(successMsg);
+            
+            console.log("📨 Notification data sent via context:", notificationData);
           }
+
+          // Get trade ID
+          const tradeId = trade.id || trade._id || savedTrade.id;
+          
+          if (!tradeId) {
+            throw new Error("No trade ID returned from API");
+          }
+          
+          // Wait a moment for user to see success message, then navigate
+          setTimeout(() => {
+            if (isSeller) {
+              router.push(`/prc_sell?tradeId=${tradeId}&offerId=${offer.id}&currency=${currency}&payAmount=${payAmount}`);
+            } else {
+              if (offer.type?.toUpperCase() === 'SELL') {
+                router.push(`/prc_buy?tradeId=${tradeId}&offerId=${offer.id}&currency=${currency}&payAmount=${payAmount}`);
+              } else {
+                router.push(`/prc_sell?tradeId=${tradeId}&offerId=${offer.id}&currency=${currency}&payAmount=${payAmount}`);
+              }
+            }
+          }, 1500);
         }
       }
     } catch (error) {
       console.error("💥 Failed to create trade:", error);
       if (error instanceof Error) {
-        alert(`Failed to create trade: ${error.message}\n\nPlease check the console for detailed error information.`);
+        alert(`Failed to create trade: ${error.message}`);
       } else {
-        alert(`Failed to create trade: Unknown error occurred.\n\nPlease check the console for detailed error information.`);
+        alert(`Failed to create trade: Unknown error occurred.`);
       }
     }
   };
@@ -442,11 +442,10 @@ const Offers = () => {
     }
   };
 
-  // FIXED: Format payment terms for display
+  // Format payment terms for display
   const formatPaymentTerms = (terms: string): string[] => {
     if (!terms) return [];
     
-    // Split by newlines or commas and filter out empty strings
     return terms
       .split(/[\n,]/)
       .map(term => term.trim())
@@ -454,61 +453,15 @@ const Offers = () => {
       .map(term => term.startsWith('•') ? term : `• ${term}`);
   };
 
-  // Test function to check API requirements (call this in console)
-  const testTradeCreation = async () => {
-    console.log("🧪 Testing trade creation API...");
-    
-    const testData = {
-      offerId: offer?.id,
-      amountFiat: 100,
-      amountCrypto: 0.002,
-      tradePrice: tradePrice || 100, // Use the actual tradePrice from offer
-      currency: currency,
-      cryptoType: offer?.crypto,
-      paymentMethod: offer?.paymentMethod
-    };
-    
-    console.log("Test data with tradePrice:", testData);
-    
-    try {
-      const userDataRaw = localStorage.getItem("UserData");
-      if (!userDataRaw) {
-        console.error("No user data found in localStorage");
-        return;
-      }
-      
-      const userData = JSON.parse(userDataRaw);
-      const token = userData?.accessToken || userData?.token;
-      
-      const response = await fetch("https://evolve2p-backend.onrender.com/api/create-trade", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`
-        },
-        body: JSON.stringify(testData)
-      });
-      
-      console.log("Test response status:", response.status);
-      const result = await response.json();
-      console.log("Test response:", result);
-      
-    } catch (error) {
-      console.error("Test error:", error);
-    }
-  };
-
   // Make it available globally for testing
   useEffect(() => {
     if (typeof window !== "undefined") {
-      (window as any).testTradeCreation = testTradeCreation;
       (window as any).debugOffer = () => {
         console.log("🔍 Debug Offer:", offer);
         console.log("🔍 Debug Client User:", clientUser);
         console.log("🔍 Debug Amounts:", { payAmount, receiveAmount });
         console.log("🔍 Debug Trade Price:", tradePrice);
         console.log("🔍 Debug Fixed Price:", fixedPrice);
-        console.log("🔍 Debug Payment Terms:", offer?.paymentTerms);
       };
     }
   }, [offer, clientUser, payAmount, receiveAmount, tradePrice, fixedPrice]);
@@ -604,7 +557,6 @@ const Offers = () => {
         }
 
         console.log("🔄 Fetching offer with ID:", offerId);
-        console.log("💰 Using currency:", currency);
 
         const res = await fetch(
           `https://evolve2p-backend.onrender.com/api/get-offer/${offerId}`,
@@ -633,38 +585,27 @@ const Offers = () => {
           throw new Error("No offer data found in response");
         }
 
-        // Get ALL prices from API response
         let pricePerUnit: number | null = null;
         let totalTradePrice: number | null = null;
 
-        // Get price per unit (price for 1 crypto)
         if (offerData.price) {
           pricePerUnit = offerData.price;
-          console.log("💰 Using price per unit from API:", pricePerUnit);
         } else if (offerData.basePrice) {
           pricePerUnit = offerData.basePrice;
-          console.log("💰 Using basePrice per unit from API:", pricePerUnit);
         }
 
-        // Get total trade price (totalPrice from marketplace)
         if (offerData.totalPrice) {
           totalTradePrice = offerData.totalPrice;
-          console.log("💰 Using totalPrice from API:", totalTradePrice);
         } else if (offerData.tradePrice) {
           totalTradePrice = offerData.tradePrice;
-          console.log("💰 Using tradePrice from API:", totalTradePrice);
         } else if (offerData.finalPrice) {
           totalTradePrice = offerData.finalPrice;
-          console.log("💰 Using finalPrice from API:", totalTradePrice);
         }
 
-        // If pricePerUnit is not available but totalTradePrice is, we can calculate it
         if (!pricePerUnit && totalTradePrice && offerData.cryptoAmount) {
           pricePerUnit = totalTradePrice / offerData.cryptoAmount;
-          console.log("🧮 Calculated price per unit from total:", pricePerUnit);
         }
 
-        // Set the prices
         setFixedPrice(pricePerUnit);
         setTradePrice(totalTradePrice);
 
@@ -748,6 +689,29 @@ const Offers = () => {
 
   return (
     <main className="min-h-screen bg-[#0F1012] text-white">
+      {/* Success Notification Toast */}
+      {showNotificationSuccess && (
+        <div className="fixed top-4 right-4 z-50 animate-slideIn">
+          <div className="bg-[#222222] border border-[#4DF2BE] rounded-lg p-4 shadow-2xl max-w-sm">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 bg-[#4DF2BE]/20 rounded-full flex items-center justify-center">
+                <span className="text-[#4DF2BE] font-bold">✓</span>
+              </div>
+              <div className="flex-1">
+                <p className="font-semibold text-white">Notification Sent!</p>
+                <p className="text-sm text-[#C7C7C7] mt-1">{notificationMessage}</p>
+              </div>
+              <button
+                onClick={() => setShowNotificationSuccess(false)}
+                className="text-[#8F8F8F] hover:text-white"
+              >
+                ×
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 md:py-8">
         <Nav />
 
@@ -1053,6 +1017,15 @@ const Offers = () => {
               >
                 {getButtonText()}
               </button>
+            </div>
+
+            {/* Notification Info */}
+            <div className="text-center mt-4 text-xs text-[#8F8F8F]">
+              {isCurrentUserSeller() ? (
+                <span>Buyers will be notified when you create a trade</span>
+              ) : (
+                <span>The seller will be notified of your trade request</span>
+              )}
             </div>
 
             {/* Validation message */}

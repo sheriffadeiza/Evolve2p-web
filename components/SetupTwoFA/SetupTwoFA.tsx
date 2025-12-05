@@ -222,7 +222,7 @@ const SetupTwoFA: React.FC = () => {
 
         <div className="flex flex-col lg:flex-row gap-6 mt-6">
           {/* Settings Sidebar */}
-          <div className="lg:w-64">
+          <div className="lg:w-[300px]">
             <Settings />
           </div>
 
@@ -277,7 +277,7 @@ const SetupTwoFA: React.FC = () => {
 
          <div className="w-[100%]  h-[1px] bg-[#fff] mt-[50%] opacity-20 my-8"></div>
         
-                <div className=" mb-[80px] mt-[10%] ">
+                <div className=" mb-[80px] whitespace-nowrap mt-[10%] ">
                   <Footer />
                 </div>
       </div>

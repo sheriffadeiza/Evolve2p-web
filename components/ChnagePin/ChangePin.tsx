@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useRef, useState } from "react";
+import React, { useRef, useState, useEffect } from "react";
 import Nav from "../../components/NAV/Nav";
 import Settings from "../../components/Settings/Settings";
 import Footer from "../../components/Footer/Footer";
@@ -10,6 +10,35 @@ const UpdatePin: React.FC = () => {
   const router = useRouter();
   const inputRefs = useRef<HTMLInputElement[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [userEmail, setUserEmail] = useState<string>("");
+
+  useEffect(() => {
+    // Get email from localStorage on component mount
+    const getUserEmail = () => {
+      try {
+        const stored = localStorage.getItem("UserData");
+        if (stored) {
+          const userData = JSON.parse(stored);
+          // Try to get email from different possible locations
+          const email = 
+            userData?.email || 
+            userData?.userData?.email || 
+            userData?.user?.email || 
+            userData?.userEmail;
+          
+          if (email) {
+            setUserEmail(email);
+          } else {
+            console.warn("Email not found in user data:", userData);
+          }
+        }
+      } catch (e) {
+        console.error("Error parsing user data:", e);
+      }
+    };
+
+    getUserEmail();
+  }, []);
 
   const handleInput = (e: React.ChangeEvent<HTMLInputElement>, index: number) => {
     const value = e.target.value;
@@ -33,9 +62,9 @@ const UpdatePin: React.FC = () => {
       return;
     }
 
-    const email = localStorage.getItem("userEmail");
-    if (!email) {
+    if (!userEmail) {
       alert("Email not found. Please log in again.");
+      router.push("/Logins/login");
       return;
     }
 
@@ -47,11 +76,11 @@ const UpdatePin: React.FC = () => {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ pin, email }),
+        body: JSON.stringify({ pin, email: userEmail }),
       });
 
       if (!res.ok) {
-        throw new Error("Server error");
+        throw new Error(`Server error: ${res.status}`);
       }
 
       const data = await res.json();
@@ -63,11 +92,19 @@ const UpdatePin: React.FC = () => {
         alert(data.message || "❌ Invalid PIN. Please try again.");
       }
     } catch (err) {
-      console.error(err);
+      console.error("API Error:", err);
       alert("Unexpected server response. Please try again later.");
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleForgetPin = () => {
+    // Store email for the forgot pin flow
+    if (userEmail) {
+      sessionStorage.setItem("forgotPinEmail", userEmail);
+    }
+    router.push("/change-pin/forgotpin");
   };
 
   return (
@@ -96,6 +133,8 @@ const UpdatePin: React.FC = () => {
                 For security reasons, enter your current PIN before setting a new one.
               </p>
 
+            
+
               {/* PIN Input Boxes */}
               <div className="flex justify-center lg:justify-start items-center gap-3 md:gap-4 mt-6 md:mt-8">
                 {[1, 2, 3, 4].map((_, index) => (
@@ -116,7 +155,7 @@ const UpdatePin: React.FC = () => {
 
               {/* Forget PIN */}
               <div
-                onClick={() => router.push("/change-pin/forgotpin")}
+                onClick={handleForgetPin}
                 className="mt-4 md:mt-6 text-[#FFFFFF] text-center lg:text-left lg:ml-[200px] text-sm font-bold hover:underline cursor-pointer"
               >
                 Forget PIN
@@ -125,7 +164,7 @@ const UpdatePin: React.FC = () => {
               {/* Continue Button with Loader */}
               <button
                 onClick={handleContinue}
-                disabled={isLoading}
+                disabled={isLoading || !userEmail}
                 className="w-full max-w-sm mx-auto lg:mx-0 lg:w-[395px] h-12 md:h-[48px] mt-8 md:mt-10 border border-[#4DF2BE] bg-[#4DF2BE] text-[#0F1012] font-bold text-sm rounded-full hover:opacity-90 transition-all flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isLoading ? (
@@ -133,6 +172,8 @@ const UpdatePin: React.FC = () => {
                     <div className="loader"></div>
                     <span>Verifying...</span>
                   </div>
+                ) : !userEmail ? (
+                  "Email not found"
                 ) : (
                   "Continue"
                 )}
@@ -158,11 +199,11 @@ const UpdatePin: React.FC = () => {
         </div>
 
         {/* Footer Divider */}
-          <div className="w-[100%]  h-[1px] bg-[#fff] mt-[50%] opacity-20 my-8"></div>
+        <div className="w-[100%] h-[1px] bg-[#fff] mt-[50%] opacity-20 my-8"></div>
         
-                <div className=" mb-[80px] mt-[10%] ">
-                  <Footer />
-                </div>
+        <div className="mb-[80px] whitespace-nowrap mt-[10%]">
+          <Footer />
+        </div>
       </div>
     </main>
   );

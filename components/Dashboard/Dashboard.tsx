@@ -27,6 +27,7 @@ import Refer from "../../public/Assets/Evolve2p_Refer/elements.svg";
 import Times from "../../public/Assets/Evolve2p_times/Icon container.png";
 import checklistInactive from "../../public/Assets/Evolve2p_checklist2/checklist-inactive.svg";
 import { QRCodeCanvas } from "qrcode.react";
+import Link from "next/link";
 import Yellow_i from "../../public/Assets/Evolve2p_yellowi/elements.svg";
 import Copy from "../../public/Assets/Evolve2p_code/elements.svg";
 import Share from "../../public/Assets/Evolve2p_share/elements.svg";
@@ -112,6 +113,8 @@ const Dashboard: React.FC<QRCodeBoxProps> = ({ value }) => {
   const [cryptoPrices, setCryptoPrices] = useState<any>({});
   const [usdToNgnRate, setUsdToNgnRate] = useState<number>(1500);
   const [loadingPrices, setLoadingPrices] = useState(true);
+  const [recentNotifications, setRecentNotifications] = useState([]);
+
 
   // Safe number conversion helper
   const safeNumber = (value: any): number => {
@@ -286,6 +289,43 @@ const Dashboard: React.FC<QRCodeBoxProps> = ({ value }) => {
     setMyDate(new Date().toLocaleString());
   }, []);
 
+
+  useEffect(() => {
+  const loadNotifications = () => {
+    try {
+      const userData = JSON.parse(localStorage.getItem("UserData") || "{}");
+      const userId = userData?.id || userData?._id || userData?.userData?.id;
+      
+      if (userId) {
+        const allNotifications = JSON.parse(
+          localStorage.getItem("evolve2p_notifications") || "{}"
+        );
+        
+        const userNotifications = allNotifications[userId] || [];
+        // Get 3 most recent notifications
+        const recent = userNotifications
+          .sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+          .slice(0, 3);
+        
+        setRecentNotifications(recent);
+      }
+    } catch (error) {
+      console.error("Error loading notifications:", error);
+    }
+  };
+  
+  loadNotifications();
+  
+  // Listen for storage changes (new notifications)
+  const handleStorageChange = () => {
+    loadNotifications();
+  };
+  
+  window.addEventListener('storage', handleStorageChange);
+  return () => window.removeEventListener('storage', handleStorageChange);
+}, []);
+
+
   // Get wallet balance in USD for individual assets
   const getWalletBalanceUSD = (wallet: Wallet): number => {
     const walletBalance = safeNumber(wallet.balance);
@@ -339,6 +379,15 @@ const Dashboard: React.FC<QRCodeBoxProps> = ({ value }) => {
     { symbol: "ETH", name: "Ethereum", icon: ETH },
     { symbol: "USDC", name: "USDC", icon: USDC },
     { symbol: "USDT", name: "USDT", icon: USDT },
+  ];
+
+  const todoItems = [
+    { icon: Buy, title: "Buy Crypto", description: "Start a new buy order" },
+    { icon: Sell, title: "Sell Crypto", description: "Start a new sell order" },
+    { icon: Offer, title: "Post an Offer", description: "Create your P2P offer" },
+    { icon: Limit, title: "Increase Buy/Sell Limits", description: "Unlock higher trading limits by upgrading verification." },
+    { icon: Set, title: "Set Up 2FA", description: "Secure your account with two-factor authentication." },
+    { icon: Refer, title: "Refer & Earn", description: "Invite friends and earn rewards on every trade." },
   ];
 
   if (loading) {
@@ -564,141 +613,281 @@ const Dashboard: React.FC<QRCodeBoxProps> = ({ value }) => {
           </div>
         </div>
 
-        {/* Main Content Grid */}
+        {/* Main Content Grid - Assets with Todo List on the side */}
         <div className="flex flex-col xl:flex-row gap-6 sm:gap-8 mt-8 md:mt-12">
-          {/* Left Column - Assets & Transactions */}
+          {/* Left Column - Assets Section */}
           <div className="flex-1">
-            {/* My Assets Section */}
-            <div className="mb-6 sm:mb-8">
-              <div className="flex justify-between items-center mb-4 md:mb-6">
+            {/* My Assets Header with Todo List title */}
+            <div className="flex flex-col xl:flex-row xl:items-center justify-between mb-4 md:mb-6 gap-4">
+              <div className="flex justify-between items-center">
                 <p className="text-[14px] sm:text-[16px] font-[500] text-[#8F8F8F]">My Assets</p>
-                <button className="flex items-center text-[12px] sm:text-[14px] font-[700] text-[#FCFCFC]">
+                <button className="flex xl:hidden items-center text-[12px] sm:text-[14px] font-[700] text-[#FCFCFC]">
                   See all
                   <Image src={R_arrow} alt="arrow" width={14} height={14} className="ml-1 sm:ml-2 w-3 h-3 sm:w-4 sm:h-4" />
                 </button>
               </div>
+              
+              {/* Todo List title for desktop view */}
+              <p className="text-[14px] sm:text-[16px] font-[500] text-[#8F8F8F] hidden xl:block">
+                Todo list
+              </p>
+              
+              <button className="hidden xl:flex items-center text-[12px] sm:text-[14px] font-[700] text-[#FCFCFC]">
+                See all
+                <Image src={R_arrow} alt="arrow" width={14} height={14} className="ml-1 sm:ml-2 w-3 h-3 sm:w-4 sm:h-4" />
+              </button>
+            </div>
 
-              {/* Assets Grid */}
-              <div className="grid grid-cols-1 gap-3 md:gap-4">
-                {cryptoAssets.map((asset) => {
-                  const wallet = clientUser?.wallets?.find((w: any) => 
-                    w.currency?.toUpperCase() === asset.symbol.toUpperCase()
-                  );
-                  const walletBalance = safeNumber(wallet?.balance);
-                  const usdValue = getWalletBalanceUSD(wallet || { currency: asset.symbol, balance: 0 } as Wallet);
+            {/* Assets and Todo List side by side */}
+            <div className="flex flex-col xl:flex-row gap-6 sm:gap-8">
+              {/* Assets Grid - Takes 2/3 width on large screens */}
+              <div className="xl:flex-1">
+                <div className="grid grid-cols-1 gap-3 md:gap-4">
+                  {cryptoAssets.map((asset) => {
+                    const wallet = clientUser?.wallets?.find((w: any) => 
+                      w.currency?.toUpperCase() === asset.symbol.toUpperCase()
+                    );
+                    const walletBalance = safeNumber(wallet?.balance);
+                    const usdValue = getWalletBalanceUSD(wallet || { currency: asset.symbol, balance: 0 } as Wallet);
 
-                  return (
-                    <div key={asset.symbol} className="bg-[#222222] rounded-[12px] p-3 md:p-4">
-                      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 md:gap-4">
-                        <div className="flex items-center space-x-3 md:space-x-4 flex-1">
-                          <Image src={asset.icon} alt={asset.name} width={32} height={32} className="w-8 h-8 md:w-10 md:h-10" />
-                          <div className="min-w-0 flex-1">
-                            <p className="text-[14px] md:text-[16px] font-[700] text-[#FCFCFC] truncate">{asset.name}</p>
-                            <p className="text-[12px] md:text-[14px] font-[400] text-[#8F8F8F] truncate">
-                              {getCurrentPrice(asset.symbol)}
-                            </p>
-                          </div>
-                        </div>
-
-                        <div className="flex items-center md:space-x-8 flex-1 justify-start md:justify-center">
-                          <div className="text-right md:text-center">
-                            <p className="text-[12px] md:text-[14px] font-[500] text-[#FCFCFC]">
-                              {formatBalance(walletBalance, asset.symbol)}
-                            </p>
-                            <p className="text-[10px] md:text-[12px] font-[500] text-[#DBDBDB]">
-                              {asset.symbol}
-                            </p>
-                          </div>
-                        </div>
-
-                        <div className="flex items-center md:space-x-8 flex-1 justify-start md:justify-end">
-                          <div className="text-right">
-                            <div className="flex items-baseline space-x-1">
-                              <span className="text-[10px] md:text-[12px] font-[500] text-[#DBDBDB]">$</span>
-                              <span className="text-[12px] md:text-[14px] font-[500] text-[#FCFCFC]">
-                                {usdValue.toFixed(2)}
-                              </span>
+                    return (
+                      <div key={asset.symbol} className="bg-[#222222] rounded-[12px] p-3 md:p-4">
+                        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 md:gap-4">
+                          <div className="flex items-center space-x-3 md:space-x-4 flex-1">
+                            <Image src={asset.icon} alt={asset.name} width={32} height={32} className="w-8 h-8 md:w-10 md:h-10" />
+                            <div className="min-w-0 flex-1">
+                              <p className="text-[14px] md:text-[16px] font-[700] text-[#FCFCFC] truncate">{asset.name}</p>
+                              <p className="text-[12px] md:text-[14px] font-[400] text-[#8F8F8F] truncate">
+                                {getCurrentPrice(asset.symbol)}
+                              </p>
                             </div>
                           </div>
-                        </div>
 
-                        <div className="flex items-center space-x-2 flex-wrap gap-2">
-                          <button 
-                            className="bg-[#2D2D2D] text-[#DBDBDB] px-2 py-1 md:px-3 md:py-2 rounded-full text-[10px] md:text-[14px] font-[500] min-w-[70px] md:min-w-[85px] flex items-center justify-center"
-                            onClick={() => handleSendClick(asset.symbol)}
-                          >
-                            <Image src={Send} alt="send" width={10} height={10} className="mr-1 md:mr-2 w-2 h-2 md:w-3 md:h-3" />
-                            Send
-                          </button>
-                          <button 
-                            className="bg-[#2D2D2D] text-[#DBDBDB] px-2 py-1 md:px-3 md:py-2 rounded-full text-[10px] md:text-[14px] font-[500] min-w-[80px] md:min-w-[101px] flex items-center justify-center"
-                            onClick={() => handleReceiveClick(asset.symbol)}
-                          >
-                            <Image src={Rarrowd} alt="receive" width={10} height={10} className="mr-1 md:mr-2 w-2 h-2 md:w-3 md:h-3" />
-                            Receive
-                          </button>
-                          <button 
-                            className="bg-[#2D2D2D] text-[#DBDBDB] px-2 py-1 md:px-3 md:py-2 rounded-full text-[10px] md:text-[14px] font-[500] min-w-[70px] md:min-w-[87px] flex items-center justify-center"
-                            onClick={() => handleSwapClick(asset.symbol)}
-                          >
-                            <Image src={Swap} alt="swap" width={10} height={10} className="mr-1 md:mr-2 w-2 h-2 md:w-3 md:h-3" />
-                            Swap
-                          </button>
+                          <div className="flex items-center md:space-x-8 flex-1 justify-start md:justify-center">
+                            <div className="text-right md:text-center">
+                              <p className="text-[12px] md:text-[14px] font-[500] text-[#FCFCFC]">
+                                {formatBalance(walletBalance, asset.symbol)}
+                              </p>
+                              <p className="text-[10px] md:text-[12px] font-[500] text-[#DBDBDB]">
+                                {asset.symbol}
+                              </p>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center md:space-x-8 flex-1 justify-start md:justify-end">
+                            <div className="text-right">
+                              <div className="flex items-baseline space-x-1">
+                                <span className="text-[10px] md:text-[12px] font-[500] text-[#DBDBDB]">$</span>
+                                <span className="text-[12px] md:text-[14px] font-[500] text-[#FCFCFC]">
+                                  {usdValue.toFixed(2)}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center space-x-2 flex-wrap gap-2">
+                            <button 
+                              className="bg-[#2D2D2D] text-[#DBDBDB] px-2 py-1 md:px-3 md:py-2 rounded-full text-[10px] md:text-[14px] font-[500] min-w-[70px] md:min-w-[85px] flex items-center justify-center"
+                              onClick={() => handleSendClick(asset.symbol)}
+                            >
+                              <Image src={Send} alt="send" width={10} height={10} className="mr-1 md:mr-2 w-2 h-2 md:w-3 md:h-3" />
+                              Send
+                            </button>
+                            <button 
+                              className="bg-[#2D2D2D] text-[#DBDBDB] px-2 py-1 md:px-3 md:py-2 rounded-full text-[10px] md:text-[14px] font-[500] min-w-[80px] md:min-w-[101px] flex items-center justify-center"
+                              onClick={() => handleReceiveClick(asset.symbol)}
+                            >
+                              <Image src={Rarrowd} alt="receive" width={10} height={10} className="mr-1 md:mr-2 w-2 h-2 md:w-3 md:h-3" />
+                              Receive
+                            </button>
+                            <button 
+                              className="bg-[#2D2D2D] text-[#DBDBDB] px-2 py-1 md:px-3 md:py-2 rounded-full text-[10px] md:text-[14px] font-[500] min-w-[70px] md:min-w-[87px] flex items-center justify-center"
+                              onClick={() => handleSwapClick(asset.symbol)}
+                            >
+                              <Image src={Swap} alt="swap" width={10} height={10} className="mr-1 md:mr-2 w-2 h-2 md:w-3 md:h-3" />
+                              Swap
+                            </button>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Transactions Section */}
-            <div className="mt-6 sm:mt-8">
-              <DashboardTransactions />
-            </div>
-          </div>
-
-          {/* Right Column - Todo List */}
-          <div className="xl:w-80">
-            <p className="text-[14px] sm:text-[16px] font-[500] text-[#8F8F8F] mb-3 sm:mb-4">Todo list</p>
-            
-            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-1 gap-2 sm:gap-3">
-              {[
-                { icon: Buy, title: "Buy Crypto", description: "Start a new buy order" },
-                { icon: Sell, title: "Sell Crypto", description: "Start a new sell order" },
-                { icon: Offer, title: "Post an Offer", description: "Create your P2P offer" },
-                { icon: Limit, title: "Increase Buy/Sell Limits", description: "Unlock higher trading limits by upgrading verification." },
-                { icon: Set, title: "Set Up 2FA", description: "Secure your account with two-factor authentication." },
-                { icon: Refer, title: "Refer & Earn", description: "Invite friends and earn rewards on every trade." },
-              ].map((item, index) => (
-                <div key={index} className="bg-[#222222] rounded-lg p-2 sm:p-3 flex items-center gap-2 sm:gap-3 cursor-pointer hover:bg-[#2A2A2A] transition-colors">
-                  <div className="relative w-8 h-8 sm:w-10 sm:h-10 flex items-center justify-center flex-shrink-0">
-                    <Image src={Eclipse} alt="background" width={32} height={32} className="w-8 h-8 sm:w-10 sm:h-10" />
-                    <Image 
-                      src={item.icon} 
-                      alt={item.title} 
-                      width={16}
-                      height={16}
-                      className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-4 h-4 sm:w-5 sm:h-5"
-                    />
-                  </div>
-                  
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs sm:text-[14px] font-medium text-[#FCFCFC] truncate">{item.title}</p>
-                    <p className="text-[10px] sm:text-[12px] text-[#DBDBDB] line-clamp-2">{item.description}</p>
-                  </div>
-                  
-                  <Image src={Larrow} alt="arrow" width={12} height={12} className="w-3 h-3 sm:w-3.5 sm:h-3.5 flex-shrink-0" />
+                    );
+                  })}
                 </div>
-              ))}
+              </div>
+
+              {/* Todo List - Takes 1/3 width on large screens */}
+              <div className="xl:w-96">
+                {/* Todo List title for mobile/tablet view */}
+                <p className="text-[14px] sm:text-[16px] font-[500] text-[#8F8F8F] mb-3 sm:mb-4 xl:hidden">
+                  Todo list
+                </p>
+                
+                <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-1 gap-2 sm:gap-3">
+                  {todoItems.map((item, index) => (
+                    <div key={index} className="bg-[#222222] rounded-lg p-2 sm:p-3 flex items-center gap-2 sm:gap-3 cursor-pointer hover:bg-[#2A2A2A] transition-colors">
+                      <div className="relative w-8 h-8 sm:w-10 sm:h-10 flex items-center justify-center flex-shrink-0">
+                        <Image src={Eclipse} alt="background" width={32} height={32} className="w-8 h-8 sm:w-10 sm:h-10" />
+                        <Image 
+                          src={item.icon} 
+                          alt={item.title} 
+                          width={16}
+                          height={16}
+                          className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-4 h-4 sm:w-5 sm:h-5"
+                        />
+                      </div>
+                      
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs sm:text-[14px] font-medium text-[#FCFCFC] truncate">{item.title}</p>
+                        <p className="text-[10px] sm:text-[12px] text-[#DBDBDB] line-clamp-2">{item.description}</p>
+                      </div>
+                      
+                      <Image src={Larrow} alt="arrow" width={12} height={12} className="w-3 h-3 sm:w-3.5 sm:h-3.5 flex-shrink-0" />
+                    </div>
+                  ))}
+                </div>
+              </div>
             </div>
           </div>
         </div>
 
+
+  
+        {/* Transactions Section */}
+        <div className="mt-6 sm:mt-8">
+          <DashboardTransactions />
+        </div>
+
+
+        <div className="mt-8 sm:mt-12">
+  <div className="flex items-center justify-between mb-4 sm:mb-6">
+    <div>
+      <p className="text-[14px] sm:text-[16px] font-[500] text-[#8F8F8F]">Recent Notifications</p>
+      <p className="text-[12px] sm:text-[14px] text-[#C7C7C7]">
+        Latest trade requests and activity
+      </p>
+    </div>
+    <Link 
+      href="/notifications" 
+      className="text-[12px] sm:text-[14px] font-[700] text-[#4DF2BE] hover:text-[#3DD2A5] flex items-center gap-2"
+    >
+      View All
+      <Image src={Larrow} alt="arrow" width={14} height={14} className="w-3 h-3 sm:w-4 sm:h-4" />
+    </Link>
+  </div>
+
+  <div className="bg-[#222222] rounded-xl overflow-hidden">
+    {recentNotifications.length > 0 ? (
+      <div className="divide-y divide-[#2D2D2D]">
+        {recentNotifications.map((notification: any, index: number) => (
+          <div 
+            key={index}
+            onClick={() => {
+              if (notification.tradeId) {
+                const userData = JSON.parse(localStorage.getItem("UserData") || "{}");
+                const userId = userData?.id || userData?._id;
+                
+                if (userId === notification.initiatorId) {
+                  router.push(`/prc_sell?tradeId=${notification.tradeId}`);
+                } else {
+                  router.push(`/prc_buy?tradeId=${notification.tradeId}`);
+                }
+              }
+            }}
+            className={`p-4 cursor-pointer hover:bg-[#2A2A2A] transition-colors border-l-4 ${
+              notification.type === 'NEW_TRADE_REQUEST' 
+                ? 'border-[#1ECB84]' 
+                : notification.type === 'PAYMENT_SENT'
+                ? 'border-[#FFC051]'
+                : 'border-[#4DF2BE]'
+            }`}
+          >
+            <div className="flex items-start gap-3">
+              <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${
+                notification.read ? 'bg-[#3A3A3A]' : 'bg-[#4DF2BE]/20'
+              }`}>
+                {notification.type === 'NEW_TRADE_REQUEST' ? (
+                  <span className="text-lg">💰</span>
+                ) : notification.type === 'PAYMENT_SENT' ? (
+                  <span className="text-lg">💸</span>
+                ) : (
+                  <span className="text-lg">🔔</span>
+                )}
+              </div>
+              
+              <div className="flex-1 min-w-0">
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <p className={`font-medium mb-1 ${
+                      notification.read ? 'text-[#C7C7C7]' : 'text-white'
+                    }`}>
+                      {notification.type === 'NEW_TRADE_REQUEST'
+                        ? `New Trade Request from ${notification.initiatorUsername}`
+                        : notification.message || "Notification"}
+                    </p>
+                    <p className="text-xs text-[#8F8F8F]">
+                      {new Date(notification.createdAt).toLocaleTimeString([], { 
+                        hour: '2-digit', 
+                        minute: '2-digit' 
+                      })}
+                    </p>
+                  </div>
+                  
+                  {!notification.read && (
+                    <div className="w-2 h-2 bg-[#4DF2BE] rounded-full flex-shrink-0 mt-1"></div>
+                  )}
+                </div>
+                
+                {/* Trade Details for NEW_TRADE_REQUEST */}
+                {notification.type === 'NEW_TRADE_REQUEST' && (
+                  <div className="mt-3 p-3 bg-[#2D2D2D] rounded-lg">
+                    <div className="grid grid-cols-2 gap-2 text-sm">
+                      <div>
+                        <span className="text-[#C7C7C7]">Amount:</span>
+                        <p className="text-white font-medium">
+                          {notification.amountFiat} {notification.currency}
+                        </p>
+                      </div>
+                      <div>
+                        <span className="text-[#C7C7C7]">Crypto:</span>
+                        <p className="text-[#4DF2BE] font-medium">
+                          {notification.amountCrypto} {notification.crypto}
+                        </p>
+                      </div>
+                    </div>
+                    <button className="mt-3 text-xs text-[#4DF2BE] hover:text-[#3DD2A5] font-medium">
+                      View Trade Details →
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    ) : (
+      <div className="p-8 text-center">
+        <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-[#2D2D2D] flex items-center justify-center">
+          <span className="text-2xl">🔔</span>
+        </div>
+        <h4 className="text-white font-medium mb-2">No recent notifications</h4>
+        <p className="text-sm text-[#8F8F8F]">
+          You'll see notifications here when someone wants to trade with you
+        </p>
+        <button
+          onClick={() => router.push("/market_place")}
+          className="mt-4 px-6 py-2 bg-[#4DF2BE] text-[#0F1012] font-bold rounded-full hover:bg-[#3DD2A5] transition-colors text-sm"
+        >
+          Browse Marketplace
+        </button>
+      </div>
+    )}
+  </div>
+</div>
+
         {/* Footer */}
         <div className="w-[100%]  h-[1px] bg-[#fff] mt-[50%] opacity-20 my-8"></div>
         
-                <div className=" mb-[80px] mt-[10%] ">
+                <div className=" mb-[80px] whitespace-nowrap mt-[10%] ">
                   <Footer />
                 </div>
       </div>

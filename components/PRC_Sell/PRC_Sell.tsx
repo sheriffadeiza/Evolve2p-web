@@ -7,7 +7,19 @@ import Nav from "../../components/NAV/Nav";
 import Timer from "../../public/Assets/Evolve2p_time/P2P Marketplace/elements.svg";
 import Ochat from "../../public/Assets/Evolve2p_Ochat/P2P Marketplace/elements.svg";
 import GreatT from "../../public/Assets/Evolve2p_Larrow/arrow-right-01.svg";
+
+// Crypto icons - import all available
 import BTC from "../../public/Assets/Evolve2p_BTC/Bitcoin (BTC).svg";
+import ETH from "../../public/Assets/Evolve2p_ETH/Ethereum (ETH).svg";
+import USDT from "../../public/Assets/Evolve2p_USDT/Tether (USDT).svg";
+import USDC from "../../public/Assets/Evolve2p_USDC/USD Coin (USDC).svg";
+// Import more crypto icons as needed:
+// import BNB from "../../public/Assets/Evolve2p_BNB/Binance Coin (BNB).svg";
+// import SOL from "../../public/Assets/Evolve2p_SOL/Solana (SOL).svg";
+// import XRP from "../../public/Assets/Evolve2p_XRP/Ripple (XRP).svg";
+// import ADA from "../../public/Assets/Evolve2p_ADA/Cardano (ADA).svg";
+// import DOGE from "../../public/Assets/Evolve2p_DOGE/Dogecoin (DOGE).svg";
+
 import Yellow_i from "../../public/Assets/Evolve2p_yellowi/elements.svg";
 import UPa from "../../public/Assets/Evolve2p_upA/Makretplace/elements.svg";
 import Book from "../../public/Assets/Evolve2p_book/P2P Marketplace/book-open-02.svg";
@@ -222,6 +234,47 @@ const PRC_Sell = () => {
     if (fileType.includes('pdf')) return '📄';
     if (fileType.includes('word') || fileType.includes('document')) return '📝';
     return '📎';
+  }, []);
+
+  // Helper function to get crypto icon based on crypto type
+  const getCryptoIcon = useCallback((crypto: string) => {
+    const cryptoUpper = crypto.toUpperCase();
+    
+    switch(cryptoUpper) {
+      case 'BTC':
+      case 'BITCOIN':
+        return BTC;
+      case 'ETH':
+      case 'ETHEREUM':
+        return ETH;
+      case 'USDT':
+      case 'TETHER':
+        return USDT;
+      case 'USDC':
+      case 'USD COIN':
+        return USDC;
+      // Add more cases as needed when you import more icons
+      /*
+      case 'BNB':
+      case 'BINANCE COIN':
+        return BNB;
+      case 'SOL':
+      case 'SOLANA':
+        return SOL;
+      case 'XRP':
+      case 'RIPPLE':
+        return XRP;
+      case 'ADA':
+      case 'CARDANO':
+        return ADA;
+      case 'DOGE':
+      case 'DOGECOIN':
+        return DOGE;
+      */
+      default:
+        // Fallback for unknown cryptocurrencies
+        return BTC;
+    }
   }, []);
 
   // Get current user data
@@ -1336,7 +1389,11 @@ const PRC_Sell = () => {
                         <p className="text-sm font-medium text-[#DBDBDB]">{item.label}</p>
                         {item.isCrypto ? (
                           <div className="flex items-center gap-2 px-2 py-1 rounded-2xl bg-[#3A3A3A]">
-                            <Image src={BTC} alt="crypto" className="w-4 h-4" />
+                            <Image 
+                              src={getCryptoIcon(item.value)} 
+                              alt={cryptoType} 
+                              className="w-4 h-4" 
+                            />
                             <p className="text-xs font-medium text-[#DBDBDB]">
                               {item.value}
                             </p>

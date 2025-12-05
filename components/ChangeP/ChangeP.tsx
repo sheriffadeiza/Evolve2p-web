@@ -123,12 +123,12 @@ const ChangeP = () => {
         
         <div className="flex flex-col lg:flex-row gap-6 mt-6">
           {/* Settings Sidebar */}
-          <div className="lg:w-64">
+          <div className="lg:w-[300px]">
             <Settings />
           </div>
 
           {/* Main Content */}
-          <div className="flex-1 bg-[#1A1A1A] rounded-xl p-4 lg:p-8">
+          <div className="flex-1 bg-[#1A1A1A]  rounded-xl p-4 lg:p-8">
             <p className="text-xl lg:text-2xl font-bold text-white mb-6 lg:mb-8">
               Change Password
             </p>
@@ -327,7 +327,7 @@ const ChangeP = () => {
 
          <div className="w-[100%]  h-[1px] bg-[#fff] mt-[50%] opacity-20 my-8"></div>
         
-                <div className=" mb-[80px] mt-[10%] ">
+                <div className=" mb-[80px] whitespace-nowrap mt-[10%] ">
                   <Footer />
                 </div>
       </div>

@@ -10,7 +10,7 @@ import { useRouter } from "next/navigation";
 import Modalc from "../../public/Assets/Evolve2p_modalC/elements.png";
 
 const CHECK_PIN_ENDPOINT =
-  "https://evolve2p-backend.onrender.com/api/check-pin"; // ✅ make sure this is the correct endpoint
+  "https://evolve2p-backend.onrender.com/api/check-pin";
 
 const ConfirmPin: React.FC = () => {
   const router = useRouter();
@@ -120,39 +120,44 @@ const ConfirmPin: React.FC = () => {
   };
 
   return (
-    <main className="min-h-screen bg-[#0F1012] pr-[10px] mt-[30px] pl-[30px] text-white md:p-8 relative">
-      <div className="max-w-7xl mx-auto">
+    <main className="min-h-screen bg-[#0F1012] text-white">
+      <div className="px-4 py-6 sm:px-6 md:px-8 lg:max-w-7xl lg:mx-auto">
         <Nav />
 
-        <div className="flex items-start mt-[20px] mr-[40px]">
-          <Settings />
+        <div className="flex flex-col lg:flex-row items-start gap-6 mt-6 lg:mt-8">
+          {/* Settings Sidebar - Full width on mobile, auto width on desktop */}
+          <div className="w-full lg:w-auto">
+            <Settings />
+          </div>
 
-          <div className="w-[809px] h-[784px] bg-[#1A1A1A] rounded-r-[8px] p-[64px] flex flex-col">
+          {/* Main Content Area */}
+          <div className="w-full bg-[#1A1A1A] rounded-lg lg:rounded-r-[8px] p-6 md:p-8 lg:p-16 flex flex-col">
             {/* Back Button */}
             <div
               onClick={() => router.push("/change-pin/newpin")}
-              className="flex items-center gap-[10px] w-[85px] h-[36px] px-[14px] cursor-pointer rounded-full bg-[#2D2D2D] hover:opacity-80 transition-all"
+              className="flex items-center justify-center lg:justify-start gap-2 w-full lg:w-[85px] h-10 lg:h-[36px] px-4 lg:px-[14px] cursor-pointer rounded-full bg-[#2D2D2D] hover:opacity-80 transition-all mb-6 lg:mb-0"
             >
               <Image
                 src={Lessthan}
                 alt="lessthan"
                 width={16}
                 height={16}
-                className="ml-[6px]"
+                className="lg:ml-[6px]"
               />
-              <p className="text-[14px] font-[700] text-[#FFFFFF]">Back</p>
+              <p className="text-sm font-bold text-[#FFFFFF]">Back</p>
             </div>
 
-            <div className="flex flex-col ml-[110px] p-[24px_20px]">
-              <p className="text-[24px] font-[700] text-[#FFFFFF]">
+            {/* Main Content */}
+            <div className="flex flex-col w-full max-w-lg mx-auto lg:mx-0 lg:ml-[110px] p-4 md:p-6 mt-4 lg:mt-0">
+              <h1 className="text-xl md:text-2xl font-bold text-[#FFFFFF] mb-2">
                 Confirm your PIN
-              </p>
-              <p className="text-[16px] text-[#C7C7C7] font-[400] mt-[8px]">
-                Re-enter your PIN to make sure it’s correct.
+              </h1>
+              <p className="text-sm md:text-base text-[#C7C7C7] font-normal mb-6 md:mb-8">
+                Re-enter your PIN to make sure it&apos;s correct.
               </p>
 
               {/* PIN Input Boxes */}
-              <div className="flex items-center ml-[35px] gap-[12px] mt-[20px]">
+              <div className="flex justify-center lg:justify-start items-center gap-3 md:gap-4 mb-6 md:mb-8">
                 {[0, 1, 2, 3].map((_, index) => (
                   <input
                     key={index}
@@ -167,7 +172,7 @@ const ConfirmPin: React.FC = () => {
                     onChange={handleChange(index)}
                     onKeyDown={handleKeyDown(index)}
                     onPaste={handlePaste}
-                    className="w-[67.75px] h-[56px] text-center text-[14px] font-[500] text-[#FFFFFF] bg-[#222222] border border-[#2E2E2E] rounded-[12px] focus:outline-none focus:border-[#4DF2BE] caret-transparent"
+                    className="w-16 h-14 md:w-20 md:h-16 lg:w-[67.75px] lg:h-[56px] text-center text-lg md:text-xl font-medium text-[#FFFFFF] bg-[#222222] border border-[#2E2E2E] rounded-lg md:rounded-xl lg:rounded-[12px] focus:outline-none focus:border-[#4DF2BE] caret-transparent"
                   />
                 ))}
               </div>
@@ -176,15 +181,16 @@ const ConfirmPin: React.FC = () => {
               <button
                 onClick={handleContinue}
                 disabled={!allFilled || isLoading}
-                className={`w-[395px] h-[48px] mt-[40px] border-[1px] bg-[#4DF2BE] border-[#4DF2BE]  text-[#0F1012] font-[700] text-[14px] rounded-full transition-all ${
+                className={`w-full max-w-sm mx-auto lg:mx-0 lg:w-[395px] h-12 md:h-[48px] border border-[#4DF2BE] bg-[#4DF2BE] text-[#0F1012] font-bold text-sm rounded-full transition-all ${
                   !allFilled || isLoading
                     ? "opacity-50 cursor-not-allowed"
-                    : ""
+                    : "hover:opacity-90"
                 }`}
               >
                 {isLoading ? (
                   <div className="flex items-center justify-center gap-2">
                     <div className="loader"></div>
+                    <span>Verifying...</span>
                   </div>
                 ) : (
                   "Continue"
@@ -196,7 +202,7 @@ const ConfirmPin: React.FC = () => {
                     height: 20px;
                     border: 3px solid rgba(255, 255, 255, 0.3);
                     border-radius: 50%;
-                    border-top-color: #0F1012;
+                    border-top-color: #0f1012;
                     animation: spin 1s ease-in-out infinite;
                   }
                   @keyframes spin {
@@ -210,34 +216,34 @@ const ConfirmPin: React.FC = () => {
           </div>
         </div>
 
-        {/* Divider */}
-          <div className="w-[100%]  h-[1px] bg-[#fff] mt-[50%] opacity-20 my-8"></div>
+        {/* Footer Divider */}
+         <div className="w-[100%]  h-[1px] bg-[#fff] mt-[50%] opacity-20 my-8"></div>
         
-                <div className=" mb-[80px] mt-[10%] ">
+                <div className=" mb-[80px] whitespace-nowrap mt-[10%] ">
                   <Footer />
                 </div>
       </div>
 
-      {/* 🟢 Success Modal */}
+      {/* 🟢 Success Modal - Responsive */}
       {showModal && (
-        <div className="fixed top-[200px] ml-[40%] inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50">
-          <div className="w-[420px] h-[336px] bg-[#0F1012] rounded-[12px] flex flex-col items-center justify-center border border-[#2D2D2D] text-center px-6">
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+          <div className="w-full max-w-md bg-[#0F1012] rounded-xl md:rounded-[12px] flex flex-col items-center justify-center border border-[#2D2D2D] text-center p-6 md:p-8">
             <Image
               src={Modalc}
               alt="Success"
               width={64}
               height={64}
-              className="mb-6"
+              className="mb-4 md:mb-6 w-12 h-12 md:w-16 md:h-16"
             />
-            <h2 className="text-[20px] font-[700] text-[#FFFFFF]">
-             Transaction PIN Updated!
+            <h2 className="text-lg md:text-xl font-bold text-white mb-2">
+              Transaction PIN Updated!
             </h2>
-            <p className="text-[16px] font-[400] text-[#C7C7C7] mt-[8px]">
-            Your Transaction PIN has been set successfully!
+            <p className="text-sm md:text-base text-[#C7C7C7] mb-6 md:mb-8">
+              Your Transaction PIN has been set successfully!
             </p>
             <button
               onClick={() => router.push("/profile")}
-              className="mt-[30px] w-[260px] h-[48px] border-none bg-[#2D2D2D] text-[#FFFFFF] rounded-full font-[700] text-[14px] hover:bg-[#333333] transition-all"
+              className="w-full max-w-xs h-12 md:h-[48px] border-none bg-[#2D2D2D] text-white rounded-full font-bold text-sm md:text-base hover:bg-[#333333] transition-all"
             >
               Back to Profile
             </button>
