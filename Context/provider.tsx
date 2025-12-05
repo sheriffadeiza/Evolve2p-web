@@ -44,34 +44,59 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
   // Get current user from localStorage with better validation
-  const getCurrentUserFromStorage = useCallback((): string | null => {
-    try {
-      if (typeof window === "undefined") return null;
-      
-      const userData = localStorage.getItem('UserData');
-      if (!userData) {
-        console.warn("⚠️ No UserData found in localStorage");
-        return null;
-      }
-      
-      const parsed = JSON.parse(userData);
-      
-      // Try multiple possible ID fields
-      const userId = parsed.id || parsed._id || parsed.userId || parsed.userID || parsed.user_id;
-      
-      if (!userId || typeof userId !== 'string' || userId.trim() === '') {
-        console.warn("⚠️ Invalid user ID in UserData:", parsed);
-        return null;
-      }
-      
-      console.log("👤 Current user ID loaded:", userId);
-      return userId;
-    } catch (error) {
-      console.error('❌ Error getting user from storage:', error);
+  // Replace the getCurrentUserFromStorage function with this:
+const getCurrentUserFromStorage = useCallback((): string | null => {
+  try {
+    if (typeof window === "undefined") return null;
+    
+    const userData = localStorage.getItem('UserData');
+    if (!userData) {
+      console.warn("⚠️ No UserData found in localStorage");
       return null;
     }
-  }, []);
-
+    
+    const parsed = JSON.parse(userData);
+    console.log("📊 Parsed UserData from localStorage:", parsed);
+    
+    // YOUR SPECIFIC STRUCTURE: ID is inside userData object
+    if (parsed.userData && parsed.userData.id) {
+      const userId = parsed.userData.id;
+      console.log("✅ Found user ID in userData.id:", userId);
+      return userId;
+    }
+    
+    // Also check for other possible structures
+    if (parsed.id) {
+      console.log("✅ Found user ID in root id:", parsed.id);
+      return parsed.id;
+    }
+    
+    if (parsed.userId) {
+      console.log("✅ Found user ID in root userId:", parsed.userId);
+      return parsed.userId;
+    }
+    
+    if (parsed._id) {
+      console.log("✅ Found user ID in root _id:", parsed._id);
+      return parsed._id;
+    }
+    
+    // Check nested in data if exists
+    if (parsed.data && parsed.data.id) {
+      console.log("✅ Found user ID in data.id:", parsed.data.id);
+      return parsed.data.id;
+    }
+    
+    console.warn("⚠️ No user ID found in any expected location");
+    console.log("🔍 Available keys in UserData:", Object.keys(parsed));
+    
+    return null;
+    
+  } catch (error) {
+    console.error('❌ Error getting user from storage:', error);
+    return null;
+  }
+}, []);
   // Initialize storage
   const initializeStorage = useCallback(() => {
     if (typeof window === "undefined") return;

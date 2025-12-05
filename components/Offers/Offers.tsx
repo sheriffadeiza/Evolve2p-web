@@ -491,12 +491,11 @@ const OffersComponent = () => {
         if (savedTrade) {
           // Get user IDs properly
           const currentUser = clientUser;
-          const sellerUser = offer.user || {};
-          
+          const sellerUser = offer.user || {};          
           // Extract IDs with fallbacks
-          const currentUserId = currentUser?.id || currentUser?._id || currentUser?.userId || '';
-          const sellerId = sellerUser?.id || sellerUser?._id || sellerUser?.userId || '';
-          const offerCreatorId = sellerId; // The seller created the offer
+          const currentUserId = clientUser?.id;
+
+           const sellerId = sellerUser?.id || offer.userId;          const offerCreatorId = sellerId; // The seller created the offer
           
           console.log("👥 User IDs:", {
             currentUserId,
@@ -646,25 +645,54 @@ const OffersComponent = () => {
   }, [offer, clientUser, payAmount, receiveAmount, tradePrice, fixedPrice]);
 
   // Fixed: Proper null handling for localStorage
-  useEffect(() => {
-    if (typeof window === "undefined") return;
+  // In OffersComponent.tsx, update the useEffect that loads clientUser:
+useEffect(() => {
+  if (typeof window === "undefined") return;
+  
+  const raw = localStorage.getItem("UserData");
+  if (!raw) {
+    console.log("❌ No UserData found in localStorage");
+    return;
+  }
+  
+  try {
+    const parsed = JSON.parse(raw);
+    console.log("📊 Parsed UserData:", parsed);
     
-    const raw = localStorage.getItem("UserData");
-    if (!raw) {
-      console.log("❌ No UserData found in localStorage");
-      return;
+    // EXTRACT USER FROM YOUR SPECIFIC STRUCTURE
+    let userData = null;
+    
+    if (parsed.userData) {
+      // Your structure: { accessToken, userData: {...} }
+      userData = parsed.userData;
+      console.log("✅ Using userData from parsed.userData");
+    } else if (parsed.data) {
+      // Alternative structure: { data: {...} }
+      userData = parsed.data;
+      console.log("✅ Using userData from parsed.data");
+    } else if (parsed.user) {
+      // Alternative structure: { user: {...} }
+      userData = parsed.user;
+      console.log("✅ Using userData from parsed.user");
+    } else {
+      // Direct user object
+      userData = parsed;
+      console.log("✅ Using userData directly from parsed");
     }
     
-    try {
-      const parsed = JSON.parse(raw);
-      const resolved = parsed.userData ?? parsed;
-      setClientUser(resolved);
-      console.log("👤 Client user set:", resolved);
-    } catch (e) {
-      console.error("❌ Error setting client user:", e);
-      setClientUser(null);
+    // Also include the accessToken if available
+    if (parsed.accessToken && !userData.accessToken) {
+      userData.accessToken = parsed.accessToken;
     }
-  }, []);
+    
+    setClientUser(userData);
+    console.log("👤 Client user set:", userData);
+    
+  } catch (e) {
+    console.error("❌ Error setting client user:", e);
+    setClientUser(null);
+  }
+}, []);
 
   // Load currency data from country currency service
   useEffect(() => {
