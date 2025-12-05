@@ -3,10 +3,10 @@
 
 import React, { useState, useEffect } from "react";
 import { useNotifications } from "../../Context/provider";
-import Nav from "../../components/NAV/Nav";
+import Nav from "../NAV/Nav";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
-import Footer from "../../components/Footer/Footer";
+import Footer from "../Footer/Footer";
 import Less_than from "../../public/Assets/Evolve2p_lessthan/Makretplace/arrow-left-01.svg";
 import BellIcon from "../../public/Assets/Evolve2p_bell/elements.svg";
 import CheckIcon from "../../public/Assets/Evolve2p_check/check.svg";

@@ -1,5 +1,5 @@
 import React from 'react';
-import Notify from '@/components/notify2/notify2'
+import Notify from '@/components/Notify2/notify2';
 
 
 const page = () => {
