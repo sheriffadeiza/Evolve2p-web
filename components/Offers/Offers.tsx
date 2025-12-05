@@ -1,4 +1,3 @@
-// app/offers/OffersComponent.tsx
 "use client";
 
 import { useState, useEffect, useContext } from "react";
@@ -45,7 +44,37 @@ const useSafeNotifications = () => {
         // Provide fallback functions
         setSendNotification(() => (notification: any) => {
           console.warn("Notification context not available, using fallback:", notification);
-          return null;
+          
+          // Try to save to localStorage anyway
+          try {
+            const allNotifications = JSON.parse(
+              localStorage.getItem('evolve2p_notifications') || '{}'
+            );
+            
+            const userId = notification.recipientId;
+            if (!userId) {
+              console.error("No recipient ID in notification");
+              return null;
+            }
+            
+            const userNotifications = allNotifications[userId] || [];
+            const newNotification = {
+              ...notification,
+              id: `notif_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+              createdAt: new Date(),
+              read: false
+            };
+            
+            userNotifications.unshift(newNotification);
+            allNotifications[userId] = userNotifications;
+            localStorage.setItem('evolve2p_notifications', JSON.stringify(allNotifications));
+            
+            console.log("📨 Fallback notification saved:", newNotification.id);
+            return newNotification.id;
+          } catch (e) {
+            console.error("Failed to save fallback notification:", e);
+            return null;
+          }
         });
         setSaveTradeToLocalStorage(() => (trade: any) => {
           console.warn("Trade storage context not available, using localStorage directly:", trade);
@@ -195,8 +224,8 @@ const OffersComponent = () => {
     if (!clientUser || !offer || !offer.user) return false;
     
     const sellerUser = offer.user;
-    const currentUserId = clientUser.id || clientUser._id;
-    const sellerId = sellerUser.id || sellerUser._id;
+    const currentUserId = clientUser.id || clientUser._id || clientUser.userId;
+    const sellerId = sellerUser.id || sellerUser._id || sellerUser.userId;
     
     if (currentUserId && sellerId) {
       return currentUserId === sellerId;
@@ -299,6 +328,10 @@ const OffersComponent = () => {
         throw new Error("Trade price not available from offer");
       }
 
+      // Get user IDs for trade creation
+      const currentUserId = clientUser.id || clientUser._id || clientUser.userId;
+      const sellerId = offer.user?.id || offer.user?._id || offer.user?.userId || currentUserId;
+
       const tradeData = {
         offerId: offer.id,
         amountFiat: amountFiat,
@@ -310,7 +343,10 @@ const OffersComponent = () => {
         pricePerUnit: fixedPrice,
         margin: offer.margin || 0,
         fiatCurrency: currency,
-        paymentTimeLimit: offer.paymentTime || "30 minutes"
+        paymentTimeLimit: offer.paymentTime || "30 minutes",
+        buyerId: currentUserId, // Add buyer ID
+        sellerId: sellerId, // Add seller ID
+        initiatorId: currentUserId // Who initiated the trade
       };
 
       console.log("🔄 Creating trade with data:", tradeData);
@@ -384,6 +420,50 @@ const OffersComponent = () => {
     }
   };
 
+  // Test notification function
+  const testNotification = () => {
+    const userData = localStorage.getItem("UserData");
+    let userId = "";
+    
+    if (userData) {
+      try {
+        const parsed = JSON.parse(userData);
+        userId = parsed.id || parsed._id || parsed.userId;
+      } catch (e) {
+        console.error("Error parsing user data:", e);
+      }
+    }
+    
+    if (!userId) {
+      alert("No user ID found in localStorage");
+      return;
+    }
+    
+    const testNotif = {
+      type: 'NEW_TRADE_REQUEST' as const,
+      tradeId: `test_${Date.now()}`,
+      offerId: offer?.id || 'test_offer',
+      initiatorId: userId,
+      initiatorUsername: 'Test User',
+      amountFiat: 100,
+      amountCrypto: 0.002,
+      currency: 'USD',
+      crypto: 'BTC',
+      message: 'This is a test notification',
+      recipientId: userId // Send to yourself for testing
+    };
+    
+    console.log("🧪 Sending test notification:", testNotif);
+    const notifId = sendNotification(testNotif);
+    
+    if (notifId) {
+      alert(`Test notification sent successfully! ID: ${notifId}`);
+      showSuccessNotification("Test notification sent successfully!");
+    } else {
+      alert("Failed to send test notification");
+    }
+  };
+
   // Handle buy/sell button click with notification
   const handleTradeAction = async () => {
     if (!isPayAmountValid()) {
@@ -409,54 +489,76 @@ const OffersComponent = () => {
         const savedTrade = saveTradeToLocalStorage(trade);
         
         if (savedTrade) {
-          // Determine who is who
-          const isSeller = isCurrentUserSeller();
-          const sellerUser = offer.user || clientUser;
-          const buyerUser = clientUser;
+          // Get user IDs properly
+          const currentUser = clientUser;
+          const sellerUser = offer.user || {};
           
-          const sellerId = sellerUser.id || sellerUser._id;
-          const buyerId = buyerUser.id || buyerUser._id;
-          const offerCreatorId = sellerId;
+          // Extract IDs with fallbacks
+          const currentUserId = currentUser?.id || currentUser?._id || currentUser?.userId || '';
+          const sellerId = sellerUser?.id || sellerUser?._id || sellerUser?.userId || '';
+          const offerCreatorId = sellerId; // The seller created the offer
           
-          // Get recipient (the other party)
-          const recipientId = isSeller ? buyerId : offerCreatorId;
-          const initiatorId = isSeller ? sellerId : buyerId;
+          console.log("👥 User IDs:", {
+            currentUserId,
+            sellerId,
+            offerCreatorId,
+            currentUser,
+            sellerUser
+          });
           
-          // Create notification for the other party
-          const notificationData = {
-            type: 'NEW_TRADE_REQUEST' as const,
-            tradeId: savedTrade.id,
-            offerId: offer.id,
-            initiatorId: initiatorId,
-            initiatorUsername: clientUser.username || clientUser.email || 'User',
-            amountFiat: parseFloat(payAmount),
-            amountCrypto: parseFloat(receiveAmount),
-            currency: currency,
-            crypto: offer.crypto,
-            message: `${clientUser.username || clientUser.email} wants to ${isSeller ? 'sell' : 'buy'} ${receiveAmount} ${offer.crypto} from your offer`,
-            recipientId: recipientId
-          };
-
-          // Send notification using context - returns notification ID or null
-          const notificationId = sendNotification(notificationData);
+          // Check if current user is the seller (offer creator)
+          const isSeller = currentUserId === offerCreatorId;
+          console.log("🤔 Is current user seller?", isSeller);
           
-          if (notificationId) {
-            // Show success message - notification was sent successfully
-            const successMsg = isSeller 
-              ? `Trade created! Notification sent to buyer.` 
-              : `Trade request sent! ${sellerUser.username || 'Seller'} has been notified.`;
-            
-            showSuccessNotification(successMsg);
-            
-            console.log("📨 Notification sent with ID:", notificationId);
+          // Determine recipient (the OTHER party)
+          let recipientId = '';
+          
+          if (isSeller) {
+            // If current user is seller, recipient is buyer (who initiated this trade)
+            recipientId = trade.buyerId || trade.initiatorId || currentUserId;
           } else {
-            // Still show success for trade creation, but warn about notification
-            const successMsg = isSeller 
-              ? `Trade created! (Notification may not have been sent)` 
-              : `Trade request created! ${sellerUser.username || 'Seller'} will see it when they check their dashboard.`;
+            // If current user is buyer, recipient is seller (offer creator)
+            recipientId = offerCreatorId;
+          }
+          
+          console.log("📨 Notification recipient ID:", recipientId);
+          
+          // Only send notification if we have a valid recipient ID
+          if (recipientId && recipientId.trim() !== '') {
+            // Create notification for the other party
+            const notificationData = {
+              type: 'NEW_TRADE_REQUEST' as const,
+              tradeId: savedTrade.id,
+              offerId: offer.id,
+              initiatorId: currentUserId,
+              initiatorUsername: currentUser?.username || currentUser?.email || 'User',
+              amountFiat: parseFloat(payAmount),
+              amountCrypto: parseFloat(receiveAmount),
+              currency: currency,
+              crypto: offer.crypto,
+              message: `${currentUser?.username || currentUser?.email} wants to ${isSeller ? 'sell' : 'buy'} ${receiveAmount} ${offer.crypto}`,
+              recipientId: recipientId
+            };
+
+            // Send notification using context
+            console.log("📤 Sending notification:", notificationData);
+            const notificationId = sendNotification(notificationData);
             
-            showSuccessNotification(successMsg);
-            console.warn("⚠️ Notification may not have been sent successfully");
+            if (notificationId) {
+              const successMsg = isSeller 
+                ? `Trade created! Notification sent to buyer.` 
+                : `Trade request sent! Seller has been notified.`;
+              
+              showSuccessNotification(successMsg);
+              console.log("✅ Notification sent with ID:", notificationId);
+            } else {
+              const warningMsg = `Trade created! (Notification may not have been sent)`;
+              showSuccessNotification(warningMsg);
+              console.warn("⚠️ Notification may not have been sent successfully");
+            }
+          } else {
+            console.warn("⚠️ No valid recipient ID found for notification");
+            showSuccessNotification(`Trade created! (Could not identify recipient)`);
           }
 
           // Get trade ID
@@ -468,6 +570,7 @@ const OffersComponent = () => {
           
           // Wait a moment for user to see success message, then navigate
           setTimeout(() => {
+            const isSeller = currentUserId === offerCreatorId;
             if (isSeller) {
               router.push(`/prc_sell?tradeId=${tradeId}&offerId=${offer.id}&currency=${currency}&payAmount=${payAmount}`);
             } else {
@@ -528,6 +631,16 @@ const OffersComponent = () => {
         console.log("🔍 Debug Amounts:", { payAmount, receiveAmount });
         console.log("🔍 Debug Trade Price:", tradePrice);
         console.log("🔍 Debug Fixed Price:", fixedPrice);
+      };
+      
+      (window as any).debugUsers = () => {
+        console.log("🔍 Debug Users:", {
+          clientUser,
+          offerUser: offer?.user,
+          currentUserId: clientUser?.id || clientUser?._id,
+          sellerId: offer?.user?.id || offer?.user?._id,
+          isCurrentUserSeller: isCurrentUserSeller()
+        });
       };
     }
   }, [offer, clientUser, payAmount, receiveAmount, tradePrice, fixedPrice]);
@@ -787,6 +900,14 @@ const OffersComponent = () => {
           <Image src={Less_than} alt="lessthan" className="w-4 h-4" />
           <p>Back to Marketplace</p>
         </div>
+
+        {/* Debug Button (Temporary) */}
+        <button 
+          onClick={testNotification}
+          className="mt-2 mb-4 px-4 py-2 bg-yellow-500 text-black rounded text-sm font-medium"
+        >
+          Test Notification
+        </button>
 
         {/* Currency Display */}
         <div className="p-3 bg-[#222222] rounded-lg mb-6">

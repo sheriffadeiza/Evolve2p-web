@@ -1,11 +1,10 @@
-// Context/provider.tsx
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 
 interface Notification {
   id: string;
-  type: 'NEW_TRADE_REQUEST' | 'TRADE_ACCEPTED' | 'PAYMENT_SENT' | 'SYSTEM';
+  type: 'NEW_TRADE_REQUEST' | 'TRADE_ACCEPTED' | 'TRADE_REJECTED' | 'PAYMENT_SENT' | 'PAYMENT_RECEIVED' | 'TRADE_COMPLETED' | 'TRADE_CANCELLED' | 'SYSTEM';
   tradeId: string;
   offerId: string;
   initiatorId: string;
@@ -23,13 +22,15 @@ interface Notification {
 interface NotificationContextType {
   notifications: Notification[];
   unreadCount: number;
-  sendNotification: (notification: Omit<Notification, 'id' | 'createdAt' | 'read'>) => void;
+  sendNotification: (notification: Omit<Notification, 'id' | 'createdAt' | 'read'>) => string | null;
   markAsRead: (notificationId: string) => void;
   markAllAsRead: () => void;
   clearNotifications: () => void;
   checkForNewNotifications: () => void;
+  refreshNotifications: () => void;
   saveTradeToLocalStorage: (trade: any) => any;
   getTradesFromLocalStorage: () => Record<string, any>;
+  getUnreadTradeRequests: () => Notification[];
 }
 
 const NotificationContext = createContext<NotificationContextType | undefined>(undefined);
@@ -42,56 +43,105 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
   const [unreadCount, setUnreadCount] = useState(0);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
-  // Get current user from localStorage
-  const getCurrentUserFromStorage = useCallback(() => {
+  // Get current user from localStorage with better validation
+  const getCurrentUserFromStorage = useCallback((): string | null => {
     try {
+      if (typeof window === "undefined") return null;
+      
       const userData = localStorage.getItem('UserData');
-      if (userData) {
-        const parsed = JSON.parse(userData);
-        const userId = parsed.id || parsed._id || parsed.userId;
-        setCurrentUserId(userId);
-        return userId;
+      if (!userData) {
+        console.warn("⚠️ No UserData found in localStorage");
+        return null;
       }
+      
+      const parsed = JSON.parse(userData);
+      
+      // Try multiple possible ID fields
+      const userId = parsed.id || parsed._id || parsed.userId || parsed.userID || parsed.user_id;
+      
+      if (!userId || typeof userId !== 'string' || userId.trim() === '') {
+        console.warn("⚠️ Invalid user ID in UserData:", parsed);
+        return null;
+      }
+      
+      console.log("👤 Current user ID loaded:", userId);
+      return userId;
     } catch (error) {
-      console.error('Error getting user from storage:', error);
+      console.error('❌ Error getting user from storage:', error);
+      return null;
     }
-    return null;
   }, []);
 
   // Initialize storage
   const initializeStorage = useCallback(() => {
     if (typeof window === "undefined") return;
     
-    if (!localStorage.getItem(NOTIFICATION_STORAGE_KEY)) {
-      localStorage.setItem(NOTIFICATION_STORAGE_KEY, JSON.stringify({}));
-    }
-    if (!localStorage.getItem(TRADES_STORAGE_KEY)) {
-      localStorage.setItem(TRADES_STORAGE_KEY, JSON.stringify({}));
+    try {
+      if (!localStorage.getItem(NOTIFICATION_STORAGE_KEY)) {
+        localStorage.setItem(NOTIFICATION_STORAGE_KEY, JSON.stringify({}));
+        console.log("📁 Initialized notifications storage");
+      }
+      if (!localStorage.getItem(TRADES_STORAGE_KEY)) {
+        localStorage.setItem(TRADES_STORAGE_KEY, JSON.stringify({}));
+        console.log("📁 Initialized trades storage");
+      }
+    } catch (error) {
+      console.error("❌ Error initializing storage:", error);
     }
   }, []);
 
   // Load notifications for current user
   const loadNotifications = useCallback(() => {
-    const userId = getCurrentUserFromStorage();
-    if (!userId) return;
-
     try {
+      const userId = getCurrentUserFromStorage();
+      
+      if (!userId) {
+        console.log("⚠️ No user ID, skipping notification load");
+        setNotifications([]);
+        setUnreadCount(0);
+        return;
+      }
+
       const allNotifications = JSON.parse(
         localStorage.getItem(NOTIFICATION_STORAGE_KEY) || '{}'
       );
 
-      const userNotifications: Notification[] = allNotifications[userId] || [];
+      const userNotifications: any[] = allNotifications[userId] || [];
       
-      const parsedNotifications = userNotifications.map(notif => ({
-        ...notif,
-        createdAt: new Date(notif.createdAt),
-        id: notif.id || Date.now().toString() + Math.random().toString(36).substr(2, 9)
-      }));
+      // Parse notifications with validation
+      const parsedNotifications = userNotifications
+        .filter(notif => notif && typeof notif === 'object')
+        .map(notif => {
+          // Ensure required fields exist
+          const notification: Notification = {
+            id: notif.id || `notif_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+            type: notif.type || 'SYSTEM',
+            tradeId: notif.tradeId || '',
+            offerId: notif.offerId || '',
+            initiatorId: notif.initiatorId || '',
+            initiatorUsername: notif.initiatorUsername || 'Unknown User',
+            amountFiat: typeof notif.amountFiat === 'number' ? notif.amountFiat : 0,
+            amountCrypto: typeof notif.amountCrypto === 'number' ? notif.amountCrypto : 0,
+            currency: notif.currency || 'USD',
+            crypto: notif.crypto || 'BTC',
+            message: notif.message || 'Notification',
+            read: Boolean(notif.read),
+            createdAt: notif.createdAt ? new Date(notif.createdAt) : new Date(),
+            recipientId: notif.recipientId || userId
+          };
+          return notification;
+        })
+        .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime()); // Sort by newest first
 
       setNotifications(parsedNotifications);
-      setUnreadCount(parsedNotifications.filter(n => !n.read).length);
+      
+      const unread = parsedNotifications.filter(n => !n.read).length;
+      setUnreadCount(unread);
+      
+      console.log(`📊 Loaded ${parsedNotifications.length} notifications, ${unread} unread`);
+      
     } catch (error) {
-      console.error('Error loading notifications:', error);
+      console.error('❌ Error loading notifications:', error);
       setNotifications([]);
       setUnreadCount(0);
     }
@@ -100,36 +150,68 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
   // Initialize
   useEffect(() => {
     initializeStorage();
+    
+    // Set current user ID
+    const userId = getCurrentUserFromStorage();
+    setCurrentUserId(userId);
+    
+    // Load initial notifications
     loadNotifications();
     
-    // Check for new notifications every 30 seconds
-    const interval = setInterval(loadNotifications, 30000);
-    return () => clearInterval(interval);
-  }, [initializeStorage, loadNotifications]);
-
-  // Listen for storage changes
-  useEffect(() => {
-    const handleStorageChange = () => {
+    // Check for new notifications every 15 seconds
+    const interval = setInterval(() => {
       loadNotifications();
+    }, 15000);
+    
+    return () => clearInterval(interval);
+  }, [initializeStorage, getCurrentUserFromStorage, loadNotifications]);
+
+  // Listen for storage changes from other tabs
+  useEffect(() => {
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === NOTIFICATION_STORAGE_KEY) {
+        console.log("🔄 Storage changed, reloading notifications");
+        loadNotifications();
+      }
     };
 
     window.addEventListener('storage', handleStorageChange);
     return () => window.removeEventListener('storage', handleStorageChange);
   }, [loadNotifications]);
 
-  // Request notification permission
+  // Request notification permission on mount
   useEffect(() => {
-    if ('Notification' in window && Notification.permission === 'default') {
-      Notification.requestPermission();
+    if (typeof window !== "undefined" && 'Notification' in window) {
+      if (Notification.permission === 'default') {
+        Notification.requestPermission().then(permission => {
+          console.log(`🔔 Notification permission: ${permission}`);
+        });
+      }
     }
   }, []);
 
-  // Send notification to another user
-  const sendNotification = useCallback((notification: Omit<Notification, 'id' | 'createdAt' | 'read'>) => {
+  // Send notification to another user - returns notification ID or null
+  const sendNotification = useCallback((notification: Omit<Notification, 'id' | 'createdAt' | 'read'>): string | null => {
     try {
+      // Validate recipient ID
+      if (!notification.recipientId || 
+          typeof notification.recipientId !== 'string' || 
+          notification.recipientId.trim() === '') {
+        console.error("❌ Cannot send notification: Invalid recipient ID", notification.recipientId);
+        return null;
+      }
+
+      // Validate initiator
+      if (!notification.initiatorId || notification.initiatorId.trim() === '') {
+        console.error("❌ Cannot send notification: Invalid initiator ID");
+        return null;
+      }
+
+      console.log("📤 Sending notification to:", notification.recipientId);
+
       const newNotification: Notification = {
         ...notification,
-        id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
+        id: `notif_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
         createdAt: new Date(),
         read: false
       };
@@ -139,45 +221,91 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
         localStorage.getItem(NOTIFICATION_STORAGE_KEY) || '{}'
       );
 
-      const recipientNotifications = allNotifications[notification.recipientId] || [];
+      // Initialize if doesn't exist
+      if (!allNotifications[notification.recipientId]) {
+        allNotifications[notification.recipientId] = [];
+      }
+
+      const recipientNotifications = allNotifications[notification.recipientId];
+      
+      // Remove duplicate notifications for the same trade
+      const existingIndex = recipientNotifications.findIndex(
+        (n: any) => n.tradeId === notification.tradeId && n.type === notification.type
+      );
+      
+      if (existingIndex !== -1) {
+        recipientNotifications.splice(existingIndex, 1);
+      }
+      
       recipientNotifications.unshift(newNotification);
       
       // Keep only last 100 notifications
       if (recipientNotifications.length > 100) {
-        recipientNotifications.pop();
+        recipientNotifications.splice(100); // Remove excess from end
       }
 
       allNotifications[notification.recipientId] = recipientNotifications;
-      localStorage.setItem(NOTIFICATION_STORAGE_KEY, JSON.stringify(allNotifications));
-
-      // Trigger browser notification if recipient is current user
-      if (currentUserId === notification.recipientId) {
-        if ('Notification' in window && Notification.permission === 'granted') {
-          new Notification('New Trade Request', {
-            body: notification.message,
-            icon: '/favicon.ico',
-            tag: 'trade-notification'
-          });
+      
+      try {
+        localStorage.setItem(NOTIFICATION_STORAGE_KEY, JSON.stringify(allNotifications));
+        console.log("✅ Notification saved for user:", notification.recipientId);
+        console.log("📊 Total notifications for this user:", recipientNotifications.length);
+      } catch (storageError) {
+        console.error("❌ Storage error:", storageError);
+        // Try to clear some space
+        if (recipientNotifications.length > 50) {
+          recipientNotifications.splice(50); // Keep only 50
+          localStorage.setItem(NOTIFICATION_STORAGE_KEY, JSON.stringify(allNotifications));
+          console.log("🔄 Cleared old notifications to save space");
         }
       }
 
-      // Also update current user's notifications if recipient is current user
+      // Trigger browser notification if recipient is current user
+      if (currentUserId === notification.recipientId && 'Notification' in window) {
+        if (Notification.permission === 'granted') {
+          try {
+            new Notification('New Trade Request', {
+              body: notification.message,
+              icon: '/favicon.ico',
+              tag: notification.tradeId || 'trade-notification',
+              requireInteraction: true
+            });
+          } catch (notifError) {
+            console.warn("⚠️ Could not show browser notification:", notifError);
+          }
+        } else if (Notification.permission === 'default') {
+          // Request permission if not yet asked
+          Notification.requestPermission();
+        }
+      }
+
+      // Update current user's notifications if recipient is current user
       if (currentUserId === notification.recipientId) {
-        setNotifications(prev => [newNotification, ...prev]);
+        setNotifications(prev => {
+          const filtered = prev.filter(n => !(n.tradeId === notification.tradeId && n.type === notification.type));
+          return [newNotification, ...filtered.slice(0, 99)];
+        });
         setUnreadCount(prev => prev + 1);
       }
 
-      console.log("✅ Notification sent successfully:", newNotification);
-      return true;
+      // Dispatch storage event for other tabs
+      window.dispatchEvent(new StorageEvent('storage', {
+        key: NOTIFICATION_STORAGE_KEY,
+        newValue: JSON.stringify(allNotifications)
+      }));
+
+      return newNotification.id;
     } catch (error) {
       console.error("❌ Error sending notification:", error);
-      return false;
+      return null;
     }
   }, [currentUserId]);
 
   // Save trade to localStorage
   const saveTradeToLocalStorage = useCallback((trade: any) => {
     try {
+      if (typeof window === "undefined") return null;
+      
       const trades = JSON.parse(localStorage.getItem(TRADES_STORAGE_KEY) || '{}');
       const tradeId = trade.id || trade._id || `trade_${Date.now()}`;
       
@@ -185,7 +313,7 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
         ...trade,
         id: tradeId,
         createdAt: new Date().toISOString(),
-        status: 'PENDING',
+        status: trade.status || 'PENDING',
         updatedAt: new Date().toISOString()
       };
 
@@ -203,12 +331,22 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
   // Get trades from localStorage
   const getTradesFromLocalStorage = useCallback(() => {
     try {
+      if (typeof window === "undefined") return {};
+      
       return JSON.parse(localStorage.getItem(TRADES_STORAGE_KEY) || '{}');
     } catch (error) {
       console.error("❌ Error getting trades from localStorage:", error);
       return {};
     }
   }, []);
+
+  // Get unread trade requests
+  const getUnreadTradeRequests = useCallback(() => {
+    return notifications.filter(notif => 
+      !notif.read && 
+      notif.type === 'NEW_TRADE_REQUEST'
+    );
+  }, [notifications]);
 
   // Mark notification as read
   const markAsRead = useCallback((notificationId: string) => {
@@ -226,11 +364,15 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
     );
 
     if (currentUserId) {
-      const allNotifications = JSON.parse(
-        localStorage.getItem(NOTIFICATION_STORAGE_KEY) || '{}'
-      );
-      allNotifications[currentUserId] = updatedNotifications;
-      localStorage.setItem(NOTIFICATION_STORAGE_KEY, JSON.stringify(allNotifications));
+      try {
+        const allNotifications = JSON.parse(
+          localStorage.getItem(NOTIFICATION_STORAGE_KEY) || '{}'
+        );
+        allNotifications[currentUserId] = updatedNotifications;
+        localStorage.setItem(NOTIFICATION_STORAGE_KEY, JSON.stringify(allNotifications));
+      } catch (error) {
+        console.error("❌ Error updating notification in storage:", error);
+      }
     }
   }, [notifications, currentUserId]);
 
@@ -240,11 +382,15 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
     setUnreadCount(0);
 
     if (currentUserId) {
-      const allNotifications = JSON.parse(
-        localStorage.getItem(NOTIFICATION_STORAGE_KEY) || '{}'
-      );
-      allNotifications[currentUserId] = updatedNotifications;
-      localStorage.setItem(NOTIFICATION_STORAGE_KEY, JSON.stringify(allNotifications));
+      try {
+        const allNotifications = JSON.parse(
+          localStorage.getItem(NOTIFICATION_STORAGE_KEY) || '{}'
+        );
+        allNotifications[currentUserId] = updatedNotifications;
+        localStorage.setItem(NOTIFICATION_STORAGE_KEY, JSON.stringify(allNotifications));
+      } catch (error) {
+        console.error("❌ Error marking all as read in storage:", error);
+      }
     }
   }, [notifications, currentUserId]);
 
@@ -253,11 +399,15 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
     setUnreadCount(0);
 
     if (currentUserId) {
-      const allNotifications = JSON.parse(
-        localStorage.getItem(NOTIFICATION_STORAGE_KEY) || '{}'
-      );
-      allNotifications[currentUserId] = [];
-      localStorage.setItem(NOTIFICATION_STORAGE_KEY, JSON.stringify(allNotifications));
+      try {
+        const allNotifications = JSON.parse(
+          localStorage.getItem(NOTIFICATION_STORAGE_KEY) || '{}'
+        );
+        allNotifications[currentUserId] = [];
+        localStorage.setItem(NOTIFICATION_STORAGE_KEY, JSON.stringify(allNotifications));
+      } catch (error) {
+        console.error("❌ Error clearing notifications from storage:", error);
+      }
     }
   }, [currentUserId]);
 
@@ -265,20 +415,26 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
     loadNotifications();
   }, [loadNotifications]);
 
+  const refreshNotifications = useCallback(() => {
+    loadNotifications();
+  }, [loadNotifications]);
+
+  const value = {
+    notifications,
+    unreadCount,
+    sendNotification,
+    markAsRead,
+    markAllAsRead,
+    clearNotifications,
+    checkForNewNotifications,
+    refreshNotifications,
+    saveTradeToLocalStorage,
+    getTradesFromLocalStorage,
+    getUnreadTradeRequests
+  };
+
   return (
-    <NotificationContext.Provider
-      value={{
-        notifications,
-        unreadCount,
-        sendNotification,
-        markAsRead,
-        markAllAsRead,
-        clearNotifications,
-        checkForNewNotifications,
-        saveTradeToLocalStorage,
-        getTradesFromLocalStorage,
-      }}
-    >
+    <NotificationContext.Provider value={value}>
       {children}
     </NotificationContext.Provider>
   );
