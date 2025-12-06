@@ -7,6 +7,8 @@ import Nav from "../../components/NAV/Nav";
 import Timer from "../../public/Assets/Evolve2p_time/P2P Marketplace/elements.svg";
 import Ochat from "../../public/Assets/Evolve2p_Ochat/P2P Marketplace/elements.svg";
 import GreatT from "../../public/Assets/Evolve2p_Larrow/arrow-right-01.svg";
+import notificationService from "../../utils/notificationService";
+import { NotificationData } from "../../utils/notificationService";
 
 // Crypto icons - import all available
 import BTC from "../../public/Assets/Evolve2p_BTC/Bitcoin (BTC).svg";
@@ -775,11 +777,11 @@ const PRC_Sell = () => {
   }, [messageInput, selectedFile, getAuthToken, displayData, sellerUsername, tradeData, socket]);
 
   // Release trade (seller confirms payment received)
-  const handleReleaseTrade = useCallback(async () => {
+  const handleReleaseTrade = async () => {
     try {
       setIsReleasing(true);
       const authToken = getAuthToken();
-      
+
       if (!authToken) {
         throw new Error('Authentication required');
       }
@@ -803,8 +805,24 @@ const PRC_Sell = () => {
       const result: ReleaseTradeResponse = await response.json();
       
       if (result.success) {
-        // Update trade data with the returned trade object
         setTradeData(result.trade);
+        
+        // Create notification for buyer about trade completion
+        try {
+          await notificationService.createTradeNotification(
+            displayData.counterparty.id,
+            buyerUsername,
+            'TRADE_COMPLETED',
+            tradeId,
+            fiatAmount,
+            quantity,
+            fiatCurrency,
+            cryptoType,
+            `${sellerUsername} released ${quantity} ${cryptoType} to you`
+          );
+        } catch (notifError) {
+          console.error('Error creating notification:', notifError);
+        }
         
         alert('Trade released successfully! The crypto has been sent to the buyer and the trade is complete.');
         setShowReleaseModal(false);
@@ -825,7 +843,7 @@ const PRC_Sell = () => {
     } finally {
       setIsReleasing(false);
     }
-  }, [tradeId, getAuthToken, socket]);
+  };
 
   // Reset dispute form
   const resetDisputeForm = useCallback(() => {
@@ -836,8 +854,7 @@ const PRC_Sell = () => {
   }, []);
 
   // Submit dispute
-  const handleSubmitDispute = useCallback(async () => {
-    // Validation
+  const handleSubmitDispute = async () => {
     if (!disputeReason) {
       alert("Please select a reason for the dispute.");
       return;
@@ -855,7 +872,6 @@ const PRC_Sell = () => {
         throw new Error('Authentication required');
       }
 
-      // Prepare FormData with correct field names
       const formData = new FormData();
       formData.append('tradeId', tradeId);
       formData.append('reason', disputeReason === "other" ? otherReason : disputeReason);
@@ -868,7 +884,6 @@ const PRC_Sell = () => {
         formData.append('evidence', disputeFile);
       }
 
-      // API call
       const response = await fetch('https://evolve2p-backend.onrender.com/api/open-dispute', {
         method: 'POST',
         headers: {
@@ -883,12 +898,9 @@ const PRC_Sell = () => {
         throw new Error(result.message || `Failed to submit dispute: ${response.status}`);
       }
 
-      // Success handling
       if (result.success) {
-        // Show success modal instead of alert
         setShowDisputeSuccessModal(true);
         
-        // Update trade status
         if (tradeData) {
           setTradeData({
             ...tradeData,
@@ -902,12 +914,27 @@ const PRC_Sell = () => {
           });
         }
         
-        // Reset and close dispute form modal
+        // Create notification for buyer about dispute
+        try {
+          await notificationService.createTradeNotification(
+            displayData.counterparty.id,
+            buyerUsername,
+            'DISPUTE_OPENED',
+            tradeId,
+            fiatAmount,
+            quantity,
+            fiatCurrency,
+            cryptoType,
+            `${sellerUsername} opened a dispute: ${disputeReason === "other" ? otherReason : disputeReason}`
+          );
+        } catch (notifError) {
+          console.error('Error creating notification:', notifError);
+        }
+        
         setShowDisputeModal(false);
         resetDisputeForm();
         setShowDispute(false);
         
-        // Socket notification
         if (socket?.connected) {
           socket.emit('trade-dispute-opened', { tradeId, status: "DISPUTED" });
         }
@@ -919,7 +946,7 @@ const PRC_Sell = () => {
     } finally {
       setSubmittingDispute(false);
     }
-  }, [disputeReason, otherReason, disputeDescription, disputeFile, tradeId, getAuthToken, tradeData, socket, resetDisputeForm]);
+  };
 
   // Handle back to trade chat button
   const handleBackToTradeChat = useCallback(() => {
@@ -2004,11 +2031,11 @@ const PRC_Sell = () => {
           </div>
 
           {/* Footer */}
-         <div className="w-[100%] h-[1px] bg-[#fff]  mt-[50%] opacity-20 my-8"></div>
+          <div className="w-[100%] h-[1px] bg-[#fff]  mt-[50%] opacity-20 my-8"></div>
         
-                        <div className="mb-[80px] whitespace-nowrap mt-[20%]">
-                            <Footer />
-                        </div>
+          <div className="mb-[80px] whitespace-nowrap mt-[20%]">
+            <Footer />
+          </div>
 
           {/* Release Modal - SIMPLIFIED */}
           {showReleaseModal && (
@@ -2321,4 +2348,3 @@ const PRC_Sell = () => {
 };
 
 export default PRC_Sell;
-

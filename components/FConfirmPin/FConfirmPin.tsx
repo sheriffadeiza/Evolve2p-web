@@ -130,11 +130,11 @@ const FConfirmPin: React.FC = () => {
           </div>
         </div>
 
-        <div className="w-full h-px bg-white/20 my-8"></div>
+         <div className="w-[100%]  h-[1px] bg-[#fff] mt-[50%] opacity-20 my-8"></div>
         
-        <div className="mb-16 mt-8">
-          <Footer />
-        </div>
+                <div className=" mb-[80px] mt-[10%] ">
+                  <Footer />
+                </div>
       </div>
 
       {/* Success Modal */}

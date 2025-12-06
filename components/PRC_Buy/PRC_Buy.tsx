@@ -8,10 +8,9 @@ import Timer from "../../public/Assets/Evolve2p_time/P2P Marketplace/elements.sv
 import Ochat from "../../public/Assets/Evolve2p_Ochat/P2P Marketplace/elements.svg";
 import GreatT from "../../public/Assets/Evolve2p_Larrow/arrow-right-01.svg";
 import notificationService from "../../utils/notificationService";
-import { NotificationData } from "../../utils/notificationService";
 // Crypto icons - import all available
 import BTC from "../../public/Assets/Evolve2p_BTC/Bitcoin (BTC).svg";
-import ETH from "../../public/Assets/Evolve2p_ETH/Ethereum (ETH).svg";
+import ETH from "../../public/Assets/Evolve2p_ETH/Ethereum (ETH).svg"; 
 import USDT from "../../public/Assets/Evolve2p_USDT/Tether (USDT).svg";
 import USDC from "../../public/Assets/Evolve2p_USDC/USD Coin (USDC).svg";
 // Import more crypto icons as needed:

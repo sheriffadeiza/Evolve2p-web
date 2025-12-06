@@ -1,4 +1,6 @@
+// components/NAV/Nav.tsx
 "use client";
+
 import React, { useState, useEffect } from "react";
 import { FaBars, FaTimes } from "react-icons/fa";
 import Image from "next/image";
@@ -15,6 +17,7 @@ import LimitIcon from "../../public/Assets/Evolve2p_limicon/elements.svg";
 import HistoryIcon from "../../public/Assets/Evolve2p_trahisicon/elements.svg";
 import Switch from "../../public/Assets/Evolve2p_switch/Profile/elements.svg";
 import Logout from "../../public/Assets/Evolve2p_logouticon/elements.svg";
+import notificationService from "../../utils/notificationService";
 
 const Nav: React.FC = () => {
   const pathname = usePathname();
@@ -25,32 +28,59 @@ const Nav: React.FC = () => {
   const [isMounted, setIsMounted] = useState(false);
   const [clientUser, setClientUser] = useState<{ kycVerified?: boolean } | null>(null);
   const [notificationCount, setNotificationCount] = useState(0);
+  const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
 
+  // Load user data and notification count
+  useEffect(() => {
+    setIsMounted(true);
 
- useEffect(() => {
-  setIsMounted(true);
+    const loadData = () => {
+      if (typeof window !== "undefined") {
+        const stored = localStorage.getItem("UserData");
+        if (stored) {
+          try {
+            const parsed = JSON.parse(stored);
+            const userData = parsed?.userData || parsed;
+            setClientUser(userData);
 
-  if (typeof window !== "undefined") {
-    const stored = localStorage.getItem("UserData");
-    if (stored) {
-      try {
-        const parsed = JSON.parse(stored);
-        const userData = parsed?.userData || parsed;
-
-        setClientUser(userData);
-
-        // Load notifications count
-      if (Array.isArray(parsed?.userData?.notifications)) {
-  setNotificationCount(parsed.userData.notifications.length);
-} else {
-  setNotificationCount(0);
-}
-      } catch (error) {
-        console.error("Error parsing user data:", error);
+            // Load notification count from notification service
+            const allNotifications = notificationService.getNotifications();
+            const unreadCount = notificationService.getUnreadCount();
+            
+            setNotificationCount(allNotifications.length);
+            setUnreadNotificationCount(unreadCount);
+            
+          } catch (error) {
+            console.error("Error parsing user data:", error);
+          }
+        }
       }
-    }
-  }
-}, []);
+    };
+
+    loadData();
+
+    // Listen for notification updates
+    const handleNotificationUpdate = () => {
+      const allNotifications = notificationService.getNotifications();
+      const unreadCount = notificationService.getUnreadCount();
+      
+      setNotificationCount(allNotifications.length);
+      setUnreadNotificationCount(unreadCount);
+    };
+
+    // Listen for custom events from notification service
+    window.addEventListener('notification-updated', handleNotificationUpdate);
+    window.addEventListener('bell-notification-update', handleNotificationUpdate);
+    
+    // Also listen for storage events (updates from other tabs)
+    window.addEventListener('storage', handleNotificationUpdate);
+
+    return () => {
+      window.removeEventListener('notification-updated', handleNotificationUpdate);
+      window.removeEventListener('bell-notification-update', handleNotificationUpdate);
+      window.removeEventListener('storage', handleNotificationUpdate);
+    };
+  }, []);
 
   const toggleProfiledown = () => {
     setIsProfileOpen((prev) => !prev);
@@ -61,9 +91,13 @@ const Nav: React.FC = () => {
   };
 
   const handleLogout = () => {
+    // Clear all local storage
     localStorage.removeItem("accessToken");
     localStorage.removeItem("userData");
     localStorage.removeItem("UserData");
+    localStorage.removeItem("userCache");
+    
+    // Redirect to login
     router.push("/Logins/login");
   };
 
@@ -76,11 +110,26 @@ const Nav: React.FC = () => {
   ];
 
   const profileOptions = [
-    { name: "My Profile", icon: ProfileIcon, action: () => router.push("/profile") },
-    { name: "Notifications", icon: SettingsIcon, action: () => router.push("/notifications") },
-    { name: "My Transactions", icon: TransactionsIcon, action: () => router.push("/transactions") },
-    { name: "Transaction Limit", icon: LimitIcon, action: () => router.push("/translim") },
-    { name: "Trade History", icon: HistoryIcon, action: () => router.push("/tradehistory") },
+    { name: "My Profile", icon: ProfileIcon, action: () => {
+      setIsProfileOpen(false);
+      router.push("/profile");
+    }},
+    { name: "Notifications", icon: SettingsIcon, action: () => {
+      setIsProfileOpen(false);
+      router.push("/bell_notify");
+    }},
+    { name: "My Transactions", icon: TransactionsIcon, action: () => {
+      setIsProfileOpen(false);
+      router.push("/transactions");
+    }},
+    { name: "Transaction Limit", icon: LimitIcon, action: () => {
+      setIsProfileOpen(false);
+      router.push("/translim");
+    }},
+    { name: "Trade History", icon: HistoryIcon, action: () => {
+      setIsProfileOpen(false);
+      router.push("/tradehistory");
+    }},
   ];
 
   // Add Verify Me option conditionally
@@ -88,7 +137,10 @@ const Nav: React.FC = () => {
     profileOptions.unshift({
       name: "Verify me",
       icon: VerifyIcon,
-      action: () => {} // Add your verification route here if needed
+      action: () => {
+        setIsProfileOpen(false);
+        router.push("/verification");
+      }
     });
   }
 
@@ -126,6 +178,10 @@ const Nav: React.FC = () => {
       <nav className="w-full bg-[#0F1012] border-b border-[#2D2D2D] py-4 px-4 sm:px-6 lg:px-8">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
           <div className="w-32 h-8 bg-[#2D2D2D] rounded animate-pulse"></div>
+          <div className="flex items-center space-x-4">
+            <div className="w-10 h-10 bg-[#2D2D2D] rounded-full animate-pulse"></div>
+            <div className="w-10 h-10 bg-[#2D2D2D] rounded-full animate-pulse"></div>
+          </div>
         </div>
       </nav>
     );
@@ -169,24 +225,33 @@ const Nav: React.FC = () => {
 
           {/* Right Section - Icons & Profile */}
           <div className="flex items-center space-x-4">
-            {/* Notification Bell */}
+            {/* Notification Bell - Updated with real-time count */}
             <div className="relative">
-  <div
-    onClick={() => router.push("/bell_notify")}
-    className="relative w-10 h-10 flex items-center justify-center bg-transparent border border-[#2D2D2D] rounded-full cursor-pointer hover:bg-[#2D2D2D] transition-colors"
-  >
-    <Image src={Bell} alt="bell" width={20} height={20} />
+              <div
+                onClick={() => router.push("/bell_notify")}
+                className="relative w-10 h-10 flex items-center justify-center bg-transparent border border-[#2D2D2D] rounded-full cursor-pointer hover:bg-[#2D2D2D] transition-colors"
+              >
+                <Image src={Bell} alt="bell" width={20} height={20} />
 
-    {notificationCount > 0 && (
-      <span className="absolute -top-1 -right-1 min-w-[16px] h-4 px-1 
-  bg-red-500 text-white-600 rounded-full 
-  flex items-center justify-center text-[10px] font-bold shadow-md">
-  {notificationCount}
-</span>
-    )}
-  </div>
-</div>
+                {/* Show unread count badge */}
+                {unreadNotificationCount > 0 && (
+                  <span className="absolute -top-1 -right-1 min-w-[18px] h-5 px-1 
+                    bg-red-500 text-white rounded-full 
+                    flex items-center justify-center text-[10px] font-bold shadow-md animate-pulse">
+                    {unreadNotificationCount > 9 ? '9+' : unreadNotificationCount}
+                  </span>
+                )}
 
+                {/* Optional: Show total count badge in a different position */}
+                {notificationCount > 0 && unreadNotificationCount === 0 && (
+                  <span className="absolute -top-1 -right-1 min-w-[18px] h-5 px-1 
+                    bg-[#4A4A4A] text-[#DBDBDB] rounded-full 
+                    flex items-center justify-center text-[10px] font-bold shadow-md">
+                    {notificationCount > 9 ? '9+' : notificationCount}
+                  </span>
+                )}
+              </div>
+            </div>
 
             {/* Profile Dropdown */}
             <div className="relative profile-trigger">
@@ -206,6 +271,34 @@ const Nav: React.FC = () => {
 
               {isProfileOpen && (
                 <div className="profile-dropdown absolute top-full right-0 mt-2 w-64 bg-[#222222] rounded-xl shadow-lg border border-[#333] p-4 z-50 space-y-3">
+                  {/* Notification summary in profile dropdown */}
+                  {unreadNotificationCount > 0 && (
+                    <div 
+                      onClick={() => {
+                        setIsProfileOpen(false);
+                        router.push("/bell_notify");
+                      }}
+                      className="flex items-center justify-between cursor-pointer hover:bg-[#2D2D2D] transition-colors p-2 rounded-lg"
+                    >
+                      <div className="flex items-center space-x-3">
+                        <div className="w-8 h-8 bg-[#4DF2BE]/20 rounded-full flex items-center justify-center">
+                          <span className="text-[#4DF2BE] text-sm">🔔</span>
+                        </div>
+                        <div>
+                          <span className="text-sm font-medium text-[#FCFCFC]">
+                            Notifications
+                          </span>
+                          <p className="text-xs text-[#8F8F8F]">
+                            {unreadNotificationCount} unread
+                          </p>
+                        </div>
+                      </div>
+                      <span className="text-xs bg-[#4DF2BE] text-[#0F1012] px-2 py-1 rounded-full font-bold">
+                        {unreadNotificationCount}
+                      </span>
+                    </div>
+                  )}
+
                   {profileOptions.map((item, index) => (
                     <div
                       key={index}
@@ -236,7 +329,10 @@ const Nav: React.FC = () => {
                   
                   <div 
                     className="flex items-center space-x-3 cursor-pointer p-2 rounded-lg hover:bg-[#2D2D2D] transition-colors"
-                    onClick={() => setShowLogoutModal(true)}
+                    onClick={() => {
+                      setIsProfileOpen(false);
+                      setShowLogoutModal(true);
+                    }}
                   >
                     <Image src={Logout} alt="logout" width={20} height={20} />
                     <span className="text-sm font-medium text-[#FE857D]">
@@ -299,7 +395,44 @@ const Nav: React.FC = () => {
             })}
           </div>
 
-          {/* REMOVED the profile section at the bottom */}
+          {/* Mobile Notifications Summary */}
+          <div className="absolute bottom-0 left-0 right-0 p-6 border-t border-[#2D2D2D] bg-[#1A1A1A]">
+            <div 
+              onClick={() => {
+                setIsMobileMenuOpen(false);
+                router.push("/bell_notify");
+              }}
+              className="flex items-center justify-between cursor-pointer p-4 bg-[#222222] rounded-xl hover:bg-[#2D2D2D] transition-colors"
+            >
+              <div className="flex items-center space-x-3">
+                <div className="relative">
+                  <div className="w-10 h-10 flex items-center justify-center bg-[#2D2D2D] rounded-full">
+                    <Image src={Bell} alt="bell" width={20} height={20} />
+                  </div>
+                  {unreadNotificationCount > 0 && (
+                    <span className="absolute -top-1 -right-1 min-w-[18px] h-5 px-1 
+                      bg-red-500 text-white rounded-full 
+                      flex items-center justify-center text-[10px] font-bold shadow-md">
+                      {unreadNotificationCount > 9 ? '9+' : unreadNotificationCount}
+                    </span>
+                  )}
+                </div>
+                <div>
+                  <span className="text-sm font-medium text-[#FCFCFC]">
+                    Notifications
+                  </span>
+                  <p className="text-xs text-[#8F8F8F]">
+                    {unreadNotificationCount > 0 
+                      ? `${unreadNotificationCount} unread` 
+                      : `${notificationCount} total`}
+                  </p>
+                </div>
+              </div>
+              <div className="text-[#4DF2BE] font-medium text-sm">
+                View
+              </div>
+            </div>
+          </div>
         </div>
 
         {/* Overlay when mobile menu is open */}
