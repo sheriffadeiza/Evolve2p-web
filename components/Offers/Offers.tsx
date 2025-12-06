@@ -359,7 +359,7 @@ const Offers = () => {
           if (recipientId) {
             const notificationData = {
               type: 'NEW_TRADE_REQUEST' as const,
-              tradeId: trade.id,
+              tradeId: trade.id || trade._id,
               offerId: offer?.id || '',
               initiatorId: currentUserId,
               initiatorUsername: getUsername(clientUser),
@@ -371,8 +371,16 @@ const Offers = () => {
               recipientId: recipientId
             };
             
-            sendNotification(notificationData);
-            setSuccessMessage(`Trade created! Notification sent to ${isSeller ? 'buyer' : 'seller'}.`);
+            // Await and check notification result
+            const notifId = await sendNotification(notificationData);
+            
+            if (notifId) {
+              setSuccessMessage(`Trade created! Notification sent to ${isSeller ? 'buyer' : 'seller'}.`);
+              console.log('Notification sent with ID:', notifId);
+            } else {
+              setSuccessMessage("Trade created! (Notification may not have been delivered)");
+              console.warn("Notification send returned null");
+            }
           }
         } else {
           setSuccessMessage("Trade created!");
