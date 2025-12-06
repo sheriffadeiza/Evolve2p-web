@@ -7,7 +7,8 @@ import Nav from "../../components/NAV/Nav";
 import Timer from "../../public/Assets/Evolve2p_time/P2P Marketplace/elements.svg";
 import Ochat from "../../public/Assets/Evolve2p_Ochat/P2P Marketplace/elements.svg";
 import GreatT from "../../public/Assets/Evolve2p_Larrow/arrow-right-01.svg";
-
+import notificationService from "../../utils/notificationService";
+import { NotificationData } from "../../utils/notificationService";
 // Crypto icons - import all available
 import BTC from "../../public/Assets/Evolve2p_BTC/Bitcoin (BTC).svg";
 import ETH from "../../public/Assets/Evolve2p_ETH/Ethereum (ETH).svg";
@@ -292,7 +293,7 @@ const PRC_Buy = () => {
     cryptoType: tradeData?.cryptoType || tradeData?.offer?.crypto || "BTC"
   }), [tradeData, currentUser]);
 
-  // Initialize Socket.IO connection
+ 
   useEffect(() => {
     if (!tradeData?.chat?.id || socket) return;
 
@@ -917,138 +918,164 @@ const PRC_Buy = () => {
 
   // Mark trade as paid
   const handleMarkAsPaid = async () => {
-    try {
-      setIsMarkingAsPaid(true);
-      const authToken = getAuthToken();
-      
-      if (!authToken) {
-        throw new Error('Authentication required');
-      }
-
-      const response = await fetch(
-        `https://evolve2p-backend.onrender.com/api/mark-trade-as-paid/${tradeId}`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${authToken}`
-          }
-        }
-      );
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`Failed to mark as paid: ${response.status} - ${errorText}`);
-      }
-
-      const result = await response.json();
-      
-      if (tradeData) {
-        setTradeData({
-          ...tradeData,
-          status: "IN_REVIEW"
-        });
-      }
-      
-      setPaidConfirmed(true);
-      setPaidTime(new Date());
-      alert('Trade marked as paid! The seller has been notified and payment is now in review.');
-      setShowPaidModal(false);
-      
-      if (socket && socket.connected) {
-        socket.emit('trade-status-changed', {
-          tradeId: tradeId,
-          status: "IN_REVIEW"
-        });
-      }
-      
-    } catch (error) {
-      console.error('❌ Error marking as paid:', error);
-      alert(error instanceof Error ? error.message : 'Error marking as paid. Please try again.');
-    } finally {
-      setIsMarkingAsPaid(false);
+  try {
+    setIsMarkingAsPaid(true);
+    const authToken = getAuthToken();
+    
+    if (!authToken) {
+      throw new Error('Authentication required');
     }
-  };
+
+    const response = await fetch(
+      `https://evolve2p-backend.onrender.com/api/mark-trade-as-paid/${tradeId}`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${authToken}`
+        }
+      }
+    );
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Failed to mark as paid: ${response.status} - ${errorText}`);
+    }
+
+    const result = await response.json();
+    
+    if (tradeData) {
+      setTradeData({
+        ...tradeData,
+        status: "IN_REVIEW"
+      });
+    }
+    
+    setPaidConfirmed(true);
+    setPaidTime(new Date());
+    
+    // Create notification for seller about payment
+    try {
+      await notificationService.createTradeNotification(
+        tradeId,
+        tradeData?.seller.id || '',
+        sellerUsername,
+        'PAYMENT_SENT',
+        fiatAmount,
+        quantity,
+        fiatCurrency,
+        cryptoType,
+        `${currentUserUsername} marked trade as paid`
+      );
+    } catch (notifError) {
+      console.error('Error creating notification:', notifError);
+      // Continue even if notification fails
+    }
+    
+    alert('Trade marked as paid! The seller has been notified and payment is now in review.');
+    setShowPaidModal(false);
+    
+    if (socket && socket.connected) {
+      socket.emit('trade-status-changed', {
+        tradeId: tradeId,
+        status: "IN_REVIEW"
+      });
+    }
+    
+  } catch (error) {
+    console.error('❌ Error marking as paid:', error);
+    alert(error instanceof Error ? error.message : 'Error marking as paid. Please try again.');
+  } finally {
+    setIsMarkingAsPaid(false);
+  }
+};
 
   // Cancel trade with updated API response handling
-  const handleCancelTrade = async () => {
-    try {
-      if (isTradePaid) {
-        alert('Cannot cancel trade after marking as paid. Please contact support if you have an issue.');
-        setShowCancelModal(false);
-        return;
-      }
-
-      setIsCancelling(true);
-      const authToken = getAuthToken();
-      
-      if (!authToken) {
-        throw new Error('Authentication required');
-      }
-
-      const response = await fetch(
-        `https://evolve2p-backend.onrender.com/api/cancle-trade/${tradeId}`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${authToken}`
-          }
-        }
-      );
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`Failed to cancel trade: ${response.status} - ${errorText}`);
-      }
-
-      const result: CancelTradeResponse = await response.json();
-      
-      // Check for the new API response structure
-      if (result.success) {
-        // Update trade data with the returned trade object
-        if (result.trade) {
-          setTradeData(prev => ({
-            ...prev!,
-            ...result.trade,
-            status: "CANCELLED",
-            amountCrypto: parseFloat(result.trade.amountCrypto) || prev?.amountCrypto || 0,
-            buyer: result.trade.buyer || prev?.buyer!,
-            seller: result.trade.seller || prev?.seller!
-          }));
-        } else {
-          // Fallback for backward compatibility
-          if (tradeData) {
-            setTradeData({
-              ...tradeData,
-              status: "CANCELLED"
-            });
-          }
-        }
-        
-        // Show success message with the new format
-        const successMessage = result.message || `Trade cancelled successfully! Funds have been returned to @${sellerUsername}. Your trade has been cancelled and you won't be able to continue this transaction.`;
-        alert(successMessage);
-        
-      } else {
-        // Handle API error
-        throw new Error(result.message || 'Failed to cancel trade');
-      }
-      
+ const handleCancelTrade = async () => {
+  try {
+    if (isTradePaid) {
+      alert('Cannot cancel trade after marking as paid. Please contact support if you have an issue.');
       setShowCancelModal(false);
-      
-      // Redirect after delay
-      setTimeout(() => {
-        router.push('/market_place');
-      }, 3000);
-      
-    } catch (error) {
-      console.error('❌ Error cancelling trade:', error);
-      alert(error instanceof Error ? error.message : 'Error cancelling trade. Please try again.');
-    } finally {
-      setIsCancelling(false);
+      return;
     }
-  };
+
+    setIsCancelling(true);
+    const authToken = getAuthToken();
+    
+    if (!authToken) {
+      throw new Error('Authentication required');
+    }
+
+    const response = await fetch(
+      `https://evolve2p-backend.onrender.com/api/cancle-trade/${tradeId}`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${authToken}`
+        }
+      }
+    );
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Failed to cancel trade: ${response.status} - ${errorText}`);
+    }
+
+    const result: CancelTradeResponse = await response.json();
+    
+    if (result.success) {
+      if (result.trade) {
+        setTradeData(prev => ({
+          ...prev!,
+          ...result.trade,
+          status: "CANCELLED",
+          amountCrypto: parseFloat(result.trade.amountCrypto) || prev?.amountCrypto || 0,
+          buyer: result.trade.buyer || prev?.buyer!,
+          seller: result.trade.seller || prev?.seller!
+        }));
+      } else {
+        if (tradeData) {
+          setTradeData({
+            ...tradeData,
+            status: "CANCELLED"
+          });
+        }
+      }
+      
+      // Create notification for seller about cancellation
+      await notificationService.createTradeNotification(
+        tradeId,
+        tradeData?.seller.id || '',
+        sellerUsername,
+        'TRADE_CANCELLED',
+        fiatAmount,
+        quantity,
+        fiatCurrency,
+        cryptoType,
+        `${currentUserUsername} cancelled the trade`
+      );
+      
+      const successMessage = result.message || `Trade cancelled successfully!`;
+      alert(successMessage);
+      
+    } else {
+      throw new Error(result.message || 'Failed to cancel trade');
+    }
+    
+    setShowCancelModal(false);
+    
+    setTimeout(() => {
+      router.push('/market_place');
+    }, 3000);
+    
+  } catch (error) {
+    console.error('❌ Error cancelling trade:', error);
+    alert(error instanceof Error ? error.message : 'Error cancelling trade. Please try again.');
+  } finally {
+    setIsCancelling(false);
+  }
+};
 
   // Reset dispute form
   const resetDisputeForm = () => {
@@ -1060,89 +1087,95 @@ const PRC_Buy = () => {
 
   // Submit dispute
   const handleSubmitDispute = async () => {
-    // Validation
-    if (!disputeReason) {
-      alert("Please select a reason for the dispute.");
-      return;
+  if (!disputeReason) {
+    alert("Please select a reason for the dispute.");
+    return;
+  }
+  if (disputeReason === "other" && !otherReason.trim()) {
+    alert("Please specify the reason for your dispute.");
+    return;
+  }
+
+  try {
+    setSubmittingDispute(true);
+    const authToken = getAuthToken();
+
+    if (!authToken) {
+      throw new Error('Authentication required');
     }
-    if (disputeReason === "other" && !otherReason.trim()) {
-      alert("Please specify the reason for your dispute.");
-      return;
+
+    const formData = new FormData();
+    formData.append('tradeId', tradeId);
+    formData.append('reason', disputeReason === "other" ? otherReason : disputeReason);
+    
+    if (disputeDescription.trim()) {
+      formData.append('description', disputeDescription);
+    }
+    
+    if (disputeFile) {
+      formData.append('evidence', disputeFile);
     }
 
-    try {
-      setSubmittingDispute(true);
-      const authToken = getAuthToken();
+    const response = await fetch('https://evolve2p-backend.onrender.com/api/open-dispute', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${authToken}`
+      },
+      body: formData
+    });
 
-      if (!authToken) {
-        throw new Error('Authentication required');
-      }
+    const result: DisputeData = await response.json();
 
-      // Prepare FormData with correct field names
-      const formData = new FormData();
-      formData.append('tradeId', tradeId);
-      formData.append('reason', disputeReason === "other" ? otherReason : disputeReason);
+    if (!response.ok) {
+      throw new Error(result.message || `Failed to submit dispute: ${response.status}`);
+    }
+
+    if (result.success) {
+      setShowDisputeSuccessModal(true);
       
-      if (disputeDescription.trim()) {
-        formData.append('description', disputeDescription);
+      if (tradeData) {
+        setTradeData({
+          ...tradeData,
+          status: "DISPUTED",
+          dispute: {
+            id: `disp_${Date.now()}`,
+            status: "OPEN",
+            reason: disputeReason === "other" ? otherReason : disputeReason,
+            openedAt: new Date().toISOString()
+          }
+        });
       }
       
-      if (disputeFile) {
-        formData.append('evidence', disputeFile);
+      // Create notification for seller about dispute
+      await notificationService.createTradeNotification(
+        tradeId,
+        tradeData?.seller.id || '',
+        sellerUsername,
+        'DISPUTE_OPENED',
+        fiatAmount,
+        quantity,
+        fiatCurrency,
+        cryptoType,
+        `${currentUserUsername} opened a dispute: ${disputeReason === "other" ? otherReason : disputeReason}`
+      );
+      
+      setShowDisputeModal(false);
+      resetDisputeForm();
+      setShowDispute(false);
+      
+      if (socket?.connected) {
+        socket.emit('trade-dispute-opened', { tradeId, status: "DISPUTED" });
       }
-
-      // API call
-      const response = await fetch('https://evolve2p-backend.onrender.com/api/open-dispute', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${authToken}`
-        },
-        body: formData
-      });
-
-      const result: DisputeData = await response.json();
-
-      if (!response.ok) {
-        throw new Error(result.message || `Failed to submit dispute: ${response.status}`);
-      }
-
-      // Success handling
-      if (result.success) {
-        // Show success modal instead of alert
-        setShowDisputeSuccessModal(true);
-        
-        // Update trade status
-        if (tradeData) {
-          setTradeData({
-            ...tradeData,
-            status: "DISPUTED",
-            dispute: {
-              id: `disp_${Date.now()}`,
-              status: "OPEN",
-              reason: disputeReason === "other" ? otherReason : disputeReason,
-              openedAt: new Date().toISOString()
-            }
-          });
-        }
-        
-        // Reset and close dispute form modal
-        setShowDisputeModal(false);
-        resetDisputeForm();
-        setShowDispute(false);
-        
-        // Socket notification
-        if (socket?.connected) {
-          socket.emit('trade-dispute-opened', { tradeId, status: "DISPUTED" });
-        }
-      }
-
-    } catch (error) {
-      console.error('❌ Error submitting dispute:', error);
-      alert(error instanceof Error ? error.message : 'Error submitting dispute');
-    } finally {
-      setSubmittingDispute(false);
     }
-  };
+
+  } catch (error) {
+    console.error('❌ Error submitting dispute:', error);
+    alert(error instanceof Error ? error.message : 'Error submitting dispute');
+  } finally {
+    setSubmittingDispute(false);
+  }
+};
+4. 
 
   // Handle back to trade chat button
   const handleBackToTradeChat = () => {
@@ -1496,7 +1529,7 @@ const PRC_Buy = () => {
                     <div className="w-full max-w-2xl h-12 bg-[#342827] border border-[#FE857D] text-[#FE857D] font-bold rounded-full flex items-center justify-center gap-2">
                       <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
                         <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd"></path>
-                      </svg>
+                    </svg>
                       <span>Trade in Dispute - Under Review</span>
                     </div>
                     <p className="text-center text-sm text-[#8F8F8F] mt-2">
@@ -1958,9 +1991,13 @@ const PRC_Buy = () => {
                     <div className="mt-3 p-3 bg-[#2D2D2D] rounded-lg flex items-center justify-between">
                       <div className="flex items-center gap-3">
                         <div className="w-10 h-10 bg-[#3A3A3A] rounded-lg flex items-center justify-center">
-                          <span className="text-xs text-white">
-                            {getFileIcon(selectedFile.type)}
-                          </span>
+                          {selectedFile.type.startsWith('image/') ? (
+                            <span className="text-lg">🖼️</span>
+                          ) : selectedFile.type.includes('pdf') ? (
+                            <span className="text-lg">📄</span>
+                          ) : (
+                            <span className="text-lg">📎</span>
+                          )}
                         </div>
                         <div>
                           <p className="text-sm text-white truncate max-w-[200px]">
@@ -2180,12 +2217,7 @@ const PRC_Buy = () => {
                     className={`border-2 border-dashed border-[#444] rounded p-4 text-center transition-colors ${
                       submittingDispute ? 'cursor-not-allowed opacity-50' : 'cursor-pointer hover:border-[#4DF2BE]'
                     }`}
-                    onClick={() => !submittingDispute && document.getElementById('dispute-file')?.click()}
-                  >
-                    <input
-                      type="file"
-                      id="dispute-file"
-                      className="hidden"
+                    onClick={() => !submittingDispute && document.getElementById('dispute-file')
                       accept="image/*,.pdf,.doc,.docx"
                       onChange={handleDisputeFileUpload}
                       disabled={submittingDispute}
