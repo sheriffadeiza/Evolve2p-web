@@ -21,7 +21,6 @@ import USDC from "../../public/Assets/Evolve2p_USDC/USD Coin (USDC).svg";
 import Arrow_great from "../../public/Assets/Evolve2p_Larrow/arrow-right-01.svg";
 import Footer from "../../components/Footer/Footer";
 import { countryCurrencyService, CurrencyOption } from "../../utils/countryCurrencyService";
-import { useNotifications } from "../../Context/provider";
 
 interface User {
   id?: string;
@@ -30,7 +29,6 @@ interface User {
   username?: string;
   email?: string;
   name?: string;
-  [key: string]: any;
 }
 
 interface Offer {
@@ -69,43 +67,10 @@ const DEFAULT_CURRENCY: CurrencyOption = {
   flag: 'https://flagcdn.com/w320/us.png'
 };
 
-// Helper function to safely extract string from any value
-const getSafeString = (value: any): string => {
-  if (typeof value === 'string') return value;
-  if (typeof value === 'number') return String(value);
-  if (typeof value === 'boolean') return String(value);
-  if (value === null || value === undefined) return '';
-  
-  if (typeof value === 'object') {
-    // If it's an object with a name property
-    if (value.name && typeof value.name === 'string') {
-      return value.name;
-    }
-    // If it's an object with a username property
-    if (value.username && typeof value.username === 'string') {
-      return value.username;
-    }
-    // If it's an object with an email property
-    if (value.email && typeof value.email === 'string') {
-      return value.email;
-    }
-    // Try to stringify if it's a simple object
-    try {
-      return JSON.stringify(value);
-    } catch {
-      return '';
-    }
-  }
-  
-  return '';
-};
-
 const Offers = () => {
   const router = useRouter();
   const params = useParams();
   const searchParams = useSearchParams();
-  
-  const { sendNotification, saveTradeToLocalStorage } = useNotifications();
   
   const [isTermsOpen, setIsTermsOpen] = useState(false);
   const [clientUser, setClientUser] = useState<User | null>(null);
@@ -126,28 +91,22 @@ const Offers = () => {
   // Helper: Get username from user object
   const getUsername = (user: User | null): string => {
     if (!user) return "Unknown User";
-    
-    // Use getSafeString for each property
-    const username = getSafeString(user.username);
-    const email = getSafeString(user.email);
-    const name = getSafeString(user.name);
-    
-    return username || email || name || "Unknown User";
+    return user.username || user.email || user.name || "Unknown User";
   };
 
   // Helper: Extract seller ID from offer
   const getSellerIdFromOffer = (offer: Offer | null): string | null => {
     if (!offer) return null;
-    if (offer.user?.id) return getSafeString(offer.user.id);
-    if (offer.sellerId) return getSafeString(offer.sellerId);
-    if (offer.userId) return getSafeString(offer.userId);
+    if (offer.user?.id) return offer.user.id;
+    if (offer.sellerId) return offer.sellerId;
+    if (offer.userId) return offer.userId;
     return null;
   };
 
   // Helper: Get current user ID
   const getCurrentUserId = (): string | null => {
     if (!clientUser) return null;
-    return getSafeString(clientUser.id) || getSafeString(clientUser._id) || getSafeString(clientUser.userId) || null;
+    return clientUser.id || clientUser._id || clientUser.userId || null;
   };
 
   // Helper: Get currency symbol safely
@@ -191,51 +150,36 @@ const Offers = () => {
     }
   };
 
-  // Helper: Get seller display info - COMPLETELY REWRITTEN
-  const getSellerDisplayInfo = (userObj: User | undefined | null) => {
+  // Helper: Format currency without symbol for calculations
+  const formatNumber = (amount: number | undefined | null): string => {
+    if (amount === undefined || amount === null || isNaN(amount)) {
+      return '0.00';
+    }
+    
+    if (amount < 0.01 && amount > 0) {
+      return amount.toFixed(8);
+    } else if (amount < 1) {
+      return amount.toFixed(4);
+    } else {
+      return amount.toLocaleString('en-US', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+      });
+    }
+  };
+
+  // Helper: Get seller display info
+  const getSellerDisplayInfo = (userObj: any) => {
     if (!userObj || typeof userObj !== 'object') {
       return { displayName: "@Seller", initial: "S" };
     }
     
-    // Check if the object itself is the problematic {id, name, createdAt} object
-    console.log('User object for display:', userObj);
-    
-    // Extract name safely
-    let nameValue = '';
-    
-    // First, check if userObj itself has name/username properties
-    if (userObj.name && typeof userObj.name === 'string') {
-      nameValue = userObj.name;
-    } else if (userObj.username && typeof userObj.username === 'string') {
-      nameValue = userObj.username;
-    } else if (userObj.email && typeof userObj.email === 'string') {
-      nameValue = userObj.email;
-    } else if (typeof userObj === 'string') {
-      nameValue = userObj;
-    } else if (userObj && typeof userObj === 'object') {
-      // Check if any property is a string
-      for (const key in userObj) {
-        if (typeof userObj[key] === 'string' && key !== 'id' && key !== 'createdAt') {
-          nameValue = userObj[key];
-          break;
-        }
-      }
-    }
-    
-    // If we still don't have a name, use fallback
-    if (!nameValue || nameValue.trim() === '') {
-      nameValue = "Seller";
-    }
-    
-    // Clean up the name
-    const displayName = nameValue.split('@')[0]; // Remove email domain if present
+    const nameValue = userObj.username || userObj.email || userObj.name || "Seller";
+    const displayName = typeof nameValue === 'string' ? nameValue : "Seller";
     const initial = displayName.charAt(0).toUpperCase();
     const prefixedName = displayName.startsWith("@") ? displayName : `@${displayName}`;
     
-    return { 
-      displayName: prefixedName.length > 20 ? prefixedName.substring(0, 20) + '...' : prefixedName, 
-      initial 
-    };
+    return { displayName: prefixedName, initial };
   };
 
   // Check if pay amount is valid
@@ -347,45 +291,7 @@ const Offers = () => {
       const trade = await createTrade();
       
       if (trade) {
-        saveTradeToLocalStorage(trade);
-        
-        const currentUserId = getCurrentUserId();
-        const sellerId = getSellerIdFromOffer(offer);
-        
-        if (currentUserId && sellerId) {
-          const isSeller = currentUserId === sellerId;
-          const recipientId = isSeller ? (trade.buyerId || trade.initiatorId) : sellerId;
-          
-          if (recipientId) {
-            const notificationData = {
-              type: 'NEW_TRADE_REQUEST' as const,
-              tradeId: trade.id || trade._id,
-              offerId: offer?.id || '',
-              initiatorId: currentUserId,
-              initiatorUsername: getUsername(clientUser),
-              amountFiat: parseFloat(payAmount),
-              amountCrypto: parseFloat(receiveAmount),
-              currency: currency,
-              crypto: offer?.crypto || 'BTC',
-              message: `${getUsername(clientUser)} wants to ${isSeller ? 'sell' : 'buy'} ${receiveAmount} ${offer?.crypto || 'crypto'}`,
-              recipientId: recipientId
-            };
-            
-            // Await and check notification result
-            const notifId = await sendNotification(notificationData);
-            
-            if (notifId) {
-              setSuccessMessage(`Trade created! Notification sent to ${isSeller ? 'buyer' : 'seller'}.`);
-              console.log('Notification sent with ID:', notifId);
-            } else {
-              setSuccessMessage("Trade created! (Notification may not have been delivered)");
-              console.warn("Notification send returned null");
-            }
-          }
-        } else {
-          setSuccessMessage("Trade created!");
-        }
-        
+        setSuccessMessage("Trade created successfully!");
         setShowSuccess(true);
         
         setTimeout(() => {
@@ -466,9 +372,12 @@ const Offers = () => {
           || countryCurrencyService.getCurrencyByCode('USD') 
           || DEFAULT_CURRENCY;
         
-        // Ensure symbol is a string
-        if (currencyData && currencyData.symbol && typeof currencyData.symbol !== 'string') {
-          currencyData.symbol = String(currencyData.symbol);
+        if (currencyData) {
+          // Ensure symbol is a string
+          if (currencyData.symbol && typeof currencyData.symbol !== 'string') {
+            console.warn('Currency symbol is not a string, converting:', currencyData.symbol);
+            currencyData.symbol = String(currencyData.symbol);
+          }
         }
         
         setSelectedCurrencyData(currencyData);
@@ -496,7 +405,7 @@ const Offers = () => {
     }
   }, [payAmount, fixedPrice]);
 
-  // Fetch offer - FIXED to handle object in user data
+  // Fetch offer
   useEffect(() => {
     const fetchOffer = async () => {
       const offerId = params.id as string;
@@ -539,7 +448,6 @@ const Offers = () => {
         }
 
         const data = await res.json();
-        console.log('API Response:', data); // Debug log
 
         let offerData: any = null;
 
@@ -551,13 +459,6 @@ const Offers = () => {
           offerData = data;
         } else {
           throw new Error("No offer data found");
-        }
-
-        // Debug the user object
-        if (offerData.user) {
-          console.log('User object from API:', offerData.user);
-          console.log('Type of user.name:', typeof offerData.user?.name);
-          console.log('Type of user.username:', typeof offerData.user?.username);
         }
 
         let pricePerUnit: number | null = null;
@@ -584,48 +485,30 @@ const Offers = () => {
         setFixedPrice(pricePerUnit);
         setTradePrice(totalTradePrice);
 
-        // Create a safe user object
-        let safeUser: User | undefined = undefined;
-        if (offerData.user) {
-          safeUser = {
-            id: getSafeString(offerData.user.id),
-            _id: getSafeString(offerData.user._id),
-            userId: getSafeString(offerData.user.userId),
-            username: getSafeString(offerData.user.username),
-            email: getSafeString(offerData.user.email),
-            name: getSafeString(offerData.user.name)
-          };
-          
-          // If name is still an object, set it to empty string
-          if (safeUser.name && typeof safeUser.name === 'object') {
-            safeUser.name = '';
-          }
-        }
-
         setOffer({
-          id: getSafeString(offerData.id) || offerId,
-          crypto: getSafeString(offerData.crypto) || "BTC",
-          currency: getSafeString(offerData.currency) || currency,
-          margin: parseFloat(getSafeString(offerData.margin)) || 0,
-          minLimit: parseFloat(getSafeString(offerData.minLimit)) || 0,
-          maxLimit: parseFloat(getSafeString(offerData.maxLimit)) || 0,
-          status: getSafeString(offerData.status) || "ACTIVE",
-          time: getSafeString(offerData.time) || "30 minutes",
-          createdAt: getSafeString(offerData.createdAt) || "",
-          paymentMethod: getSafeString(offerData.paymentMethod) || "Bank Transfer",
-          paymentTerms: getSafeString(offerData.paymentTerms) || "",
-          paymentTime: getSafeString(offerData.paymentTime) || "30 minutes",
-          type: getSafeString(offerData.type) || "SELL",
-          completionRate: parseFloat(getSafeString(offerData.completionRate)) || 100,
-          ordersCompleted: parseFloat(getSafeString(offerData.ordersCompleted)) || 100,
-          rating: parseFloat(getSafeString(offerData.rating)) || 99.99,
-          avgReleaseTime: getSafeString(offerData.avgReleaseTime) || "15 min",
+          id: offerData.id || offerId,
+          crypto: offerData.crypto || "BTC",
+          currency: offerData.currency || currency,
+          margin: parseFloat(offerData.margin) || 0,
+          minLimit: parseFloat(offerData.minLimit) || 0,
+          maxLimit: parseFloat(offerData.maxLimit) || 0,
+          status: offerData.status || "ACTIVE",
+          time: offerData.time || "30 minutes",
+          createdAt: offerData.createdAt || "",
+          paymentMethod: offerData.paymentMethod || "Bank Transfer",
+          paymentTerms: offerData.paymentTerms || "",
+          paymentTime: offerData.paymentTime || "30 minutes",
+          type: offerData.type || "SELL",
+          completionRate: parseFloat(offerData.completionRate) || 100,
+          ordersCompleted: parseFloat(offerData.ordersCompleted) || 100,
+          rating: parseFloat(offerData.rating) || 99.99,
+          avgReleaseTime: offerData.avgReleaseTime || "15 min",
           price: pricePerUnit,
           tradePrice: totalTradePrice,
-          processingFee: parseFloat(getSafeString(offerData.processingFee)) || 0.0005,
-          user: safeUser,
-          sellerId: getSafeString(offerData.sellerId),
-          userId: getSafeString(offerData.userId)
+          processingFee: parseFloat(offerData.processingFee) || 0.0005,
+          user: offerData.user || undefined,
+          sellerId: offerData.sellerId || undefined,
+          userId: offerData.userId || undefined
         });
 
       } catch (error) {
@@ -640,20 +523,6 @@ const Offers = () => {
       fetchOffer();
     }
   }, [params.id, currency, loadingCurrencies]);
-
-  // Debug effect to check what's causing the error
-  useEffect(() => {
-    if (offer && offer.user) {
-      console.log('Final offer.user object:', offer.user);
-      console.log('offer.user.name value:', offer.user.name);
-      console.log('Type of offer.user.name:', typeof offer.user.name);
-      
-      // Check each property
-      Object.entries(offer.user).forEach(([key, value]) => {
-        console.log(`offer.user.${key}:`, value, 'Type:', typeof value);
-      });
-    }
-  }, [offer]);
 
   if (loadingOffer || loadingCurrencies) {
     return (
@@ -682,7 +551,6 @@ const Offers = () => {
   }
 
   const sellerInfo = getSellerDisplayInfo(offer.user);
-  console.log('Seller info:', sellerInfo); // Debug log
 
   return (
     <main className="min-h-screen bg-[#0F1012] text-white">
@@ -722,7 +590,7 @@ const Offers = () => {
         <div className="flex flex-col lg:flex-row gap-6">
           {/* Left Section */}
           <div className="flex-1">
-            {/* Seller Info Container - FIXED to handle object */}
+            {/* Seller Info Container */}
             <div className="bg-[#222222] rounded-xl p-4 lg:p-6 mb-6">
               <div className="flex items-center gap-2 mb-4">
                 <div className="flex items-center bg-[#4A4A4A] w-6 h-6 rounded-full p-1">
@@ -731,16 +599,9 @@ const Offers = () => {
                   </p>
                   <Image src={Vector} alt="vector" className="ml-1 w-2 h-2" />
                 </div>
-                {/* SAFE RENDERING - This was causing the error */}
-                <div className="text-sm lg:text-base text-white font-medium whitespace-nowrap overflow-hidden text-ellipsis">
-                  {(() => {
-                      const display = sellerInfo.displayName;
-                      if (typeof display === 'string') {
-                        return display;
-                      }
-                      return '@Seller';
-                    })()}
-                </div>
+                <p className="text-sm lg:text-base text-white font-medium whitespace-nowrap">
+                  {sellerInfo.displayName}
+                </p>
                 <Image src={Mark_green} alt="mark" className="w-3 h-3" />
               </div>
 
@@ -954,8 +815,8 @@ const Offers = () => {
                 const isSeller = currentUserId === sellerId;
                 
                 return isSeller 
-                  ? "Buyers will be notified when you create a trade" 
-                  : "The seller will be notified of your trade request";
+                  ? "You are creating a trade as the seller" 
+                  : "You are creating a trade as the buyer";
               })()}
             </div>
 
