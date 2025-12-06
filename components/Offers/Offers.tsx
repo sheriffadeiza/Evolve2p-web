@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useContext } from "react";
+import { useState, useEffect } from "react";
 import Nav from "../../components/NAV/Nav";
 import { useRouter, useParams, useSearchParams } from "next/navigation";
 import Image from "next/image";
@@ -14,84 +14,170 @@ import Dminus from "../../public/Assets/Evolve2p_Dminus/Divider.svg";
 import Verified from "../../public/Assets/Evolve2p_verified/Makretplace/elements.svg";
 import UPa from "../../public/Assets/Evolve2p_upA/Makretplace/elements.svg";
 import CircY from "../../public/Assets/Evolve2p_circY/Makretplace/elements.svg";
-import Dols from "../../public/Assets/Evolve2p_Dols/Makretplace/elements.svg";
 import BTC from "../../public/Assets/Evolve2p_BTC/Bitcoin (BTC).svg";
 import ETH from "../../public/Assets/Evolve2p_ETH/Ethereum (ETH).svg";
 import USDT from "../../public/Assets/Evolve2p_USDT/Tether (USDT).svg";
 import USDC from "../../public/Assets/Evolve2p_USDC/USD Coin (USDC).svg";
 import Arrow_great from "../../public/Assets/Evolve2p_Larrow/arrow-right-01.svg";
-import Times from "../../public/Assets/Evolve2p_times/Icon container.png";
 import Footer from "../../components/Footer/Footer";
 import { countryCurrencyService, CurrencyOption } from "../../utils/countryCurrencyService";
 import { useNotifications } from "../../Context/provider";
 
-const OffersComponent = () => {
+interface User {
+  id?: string;
+  _id?: string;
+  userId?: string;
+  username?: string;
+  email?: string;
+  name?: string;
+  [key: string]: any;
+}
+
+interface Offer {
+  id: string;
+  crypto: string;
+  currency: string;
+  margin: number;
+  minLimit: number;
+  maxLimit: number;
+  status: string;
+  time: string;
+  createdAt: string;
+  paymentMethod: string;
+  paymentTerms: string;
+  paymentTime: string;
+  type: string;
+  completionRate: number;
+  ordersCompleted: number;
+  rating: number;
+  avgReleaseTime: string;
+  price: number | null;
+  tradePrice: number | null;
+  processingFee: number;
+  user?: User;
+  sellerId?: string;
+  userId?: string;
+}
+
+// Create a default currency option that matches the CurrencyOption type
+const DEFAULT_CURRENCY: CurrencyOption = {
+  code: 'USD',
+  symbol: '$',
+  name: 'US Dollar',
+  country: 'United States',
+  countryCode: 'US',
+  flag: 'https://flagcdn.com/w320/us.png'
+};
+
+// Helper function to safely extract string from any value
+const getSafeString = (value: any): string => {
+  if (typeof value === 'string') return value;
+  if (typeof value === 'number') return String(value);
+  if (typeof value === 'boolean') return String(value);
+  if (value === null || value === undefined) return '';
+  
+  if (typeof value === 'object') {
+    // If it's an object with a name property
+    if (value.name && typeof value.name === 'string') {
+      return value.name;
+    }
+    // If it's an object with a username property
+    if (value.username && typeof value.username === 'string') {
+      return value.username;
+    }
+    // If it's an object with an email property
+    if (value.email && typeof value.email === 'string') {
+      return value.email;
+    }
+    // Try to stringify if it's a simple object
+    try {
+      return JSON.stringify(value);
+    } catch {
+      return '';
+    }
+  }
+  
+  return '';
+};
+
+const Offers = () => {
   const router = useRouter();
   const params = useParams();
   const searchParams = useSearchParams();
   
-  // Use notification context
-  const { 
-    sendNotification, 
-    saveTradeToLocalStorage, 
-    debugUserData,
-    testNotification 
-  } = useNotifications();
+  const { sendNotification, saveTradeToLocalStorage } = useNotifications();
   
   const [isTermsOpen, setIsTermsOpen] = useState(false);
-  const [isSellerOpen, setIsSellerOpen] = useState(false);
-  const [clientUser, setClientUser] = useState<any>(null);
-  const [offer, setOffer] = useState<any>(null);
-  const [loadingOffer, setLoadingOffer] = useState(false);
+  const [clientUser, setClientUser] = useState<User | null>(null);
+  const [offer, setOffer] = useState<Offer | null>(null);
+  const [loadingOffer, setLoadingOffer] = useState(true);
   const [fixedPrice, setFixedPrice] = useState<number | null>(null);
   const [tradePrice, setTradePrice] = useState<number | null>(null);
-  const [currency, setCurrency] = useState<string>("USD");
+  const [currency, setCurrency] = useState("USD");
   const [isCreatingTrade, setIsCreatingTrade] = useState(false);
-  const [showNotificationSuccess, setShowNotificationSuccess] = useState(false);
-  const [notificationMessage, setNotificationMessage] = useState("");
+  const [showSuccess, setShowSuccess] = useState(false);
+  const [successMessage, setSuccessMessage] = useState("");
 
-  const toggleSeller = () => setIsSellerOpen((prev) => !prev);
-  const [payAmount, setPayAmount] = useState<string>("");
-  const [receiveAmount, setReceiveAmount] = useState<string>("0.00");
+  const [payAmount, setPayAmount] = useState("");
+  const [receiveAmount, setReceiveAmount] = useState("0.00");
+  const [selectedCurrencyData, setSelectedCurrencyData] = useState<CurrencyOption | null>(DEFAULT_CURRENCY);
+  const [loadingCurrencies, setLoadingCurrencies] = useState(true);
 
-  // New currency service state
-  const [selectedCurrencyData, setSelectedCurrencyData] = useState<CurrencyOption | null>(null);
-  const [loadingCurrencies, setLoadingCurrencies] = useState<boolean>(true);
-
-  const tabs = [
-    { key: "offers", label: "Active offers" },
-    { key: "feedbacks", label: "Feedbacks" },
-  ];
-
-  const [activeTab, setActiveTab] = useState("offers");
-
-  // Show success notification
-  const showSuccessNotification = (message: string) => {
-    setNotificationMessage(message);
-    setShowNotificationSuccess(true);
+  // Helper: Get username from user object
+  const getUsername = (user: User | null): string => {
+    if (!user) return "Unknown User";
     
-    setTimeout(() => {
-      setShowNotificationSuccess(false);
-      setNotificationMessage("");
-    }, 5000);
+    // Use getSafeString for each property
+    const username = getSafeString(user.username);
+    const email = getSafeString(user.email);
+    const name = getSafeString(user.name);
+    
+    return username || email || name || "Unknown User";
   };
 
-  // Helper function to safely render values
-  const renderSafeValue = (value: any): string => {
-    if (value === null || value === undefined) return "N/A";
-    if (typeof value === 'string' || typeof value === 'number') return String(value);
-    if (typeof value === 'object' && value.name) return value.name;
-    if (typeof value === 'object') return "Object";
-    return String(value);
+  // Helper: Extract seller ID from offer
+  const getSellerIdFromOffer = (offer: Offer | null): string | null => {
+    if (!offer) return null;
+    if (offer.user?.id) return getSafeString(offer.user.id);
+    if (offer.sellerId) return getSafeString(offer.sellerId);
+    if (offer.userId) return getSafeString(offer.userId);
+    return null;
   };
 
-  // Helper function to format currency
-  const formatCurrency = (amount: number | undefined | null, currencyCode: string = currency): string => {
+  // Helper: Get current user ID
+  const getCurrentUserId = (): string | null => {
+    if (!clientUser) return null;
+    return getSafeString(clientUser.id) || getSafeString(clientUser._id) || getSafeString(clientUser.userId) || null;
+  };
+
+  // Helper: Get currency symbol safely
+  const getCurrencySymbol = (): string => {
+    if (!selectedCurrencyData) return '$';
+    
+    const symbol = selectedCurrencyData.symbol;
+    
+    // Handle different possible symbol formats
+    if (typeof symbol === 'string') {
+      return symbol.trim() || '$';
+    } else if (symbol && typeof symbol === 'object') {
+      // If symbol is an object, try to get a string representation
+      try {
+        return JSON.stringify(symbol);
+      } catch {
+        return '$';
+      }
+    }
+    
+    return '$';
+  };
+
+  // Helper: Format currency
+  const formatCurrency = (amount: number | undefined | null): string => {
     if (amount === undefined || amount === null || isNaN(amount)) {
       return 'Loading...';
     }
     
-    const symbol = selectedCurrencyData?.symbol || '$';
+    const symbol = getCurrencySymbol();
     
     if (amount < 0.01 && amount > 0) {
       return `${symbol}${amount.toFixed(8)}`;
@@ -105,130 +191,78 @@ const OffersComponent = () => {
     }
   };
 
+  // Helper: Get seller display info - COMPLETELY REWRITTEN
+  const getSellerDisplayInfo = (userObj: User | undefined | null) => {
+    if (!userObj || typeof userObj !== 'object') {
+      return { displayName: "@Seller", initial: "S" };
+    }
+    
+    // Check if the object itself is the problematic {id, name, createdAt} object
+    console.log('User object for display:', userObj);
+    
+    // Extract name safely
+    let nameValue = '';
+    
+    // First, check if userObj itself has name/username properties
+    if (userObj.name && typeof userObj.name === 'string') {
+      nameValue = userObj.name;
+    } else if (userObj.username && typeof userObj.username === 'string') {
+      nameValue = userObj.username;
+    } else if (userObj.email && typeof userObj.email === 'string') {
+      nameValue = userObj.email;
+    } else if (typeof userObj === 'string') {
+      nameValue = userObj;
+    } else if (userObj && typeof userObj === 'object') {
+      // Check if any property is a string
+      for (const key in userObj) {
+        if (typeof userObj[key] === 'string' && key !== 'id' && key !== 'createdAt') {
+          nameValue = userObj[key];
+          break;
+        }
+      }
+    }
+    
+    // If we still don't have a name, use fallback
+    if (!nameValue || nameValue.trim() === '') {
+      nameValue = "Seller";
+    }
+    
+    // Clean up the name
+    const displayName = nameValue.split('@')[0]; // Remove email domain if present
+    const initial = displayName.charAt(0).toUpperCase();
+    const prefixedName = displayName.startsWith("@") ? displayName : `@${displayName}`;
+    
+    return { 
+      displayName: prefixedName.length > 20 ? prefixedName.substring(0, 20) + '...' : prefixedName, 
+      initial 
+    };
+  };
+
   // Check if pay amount is valid
-  const isPayAmountValid = () => {
+  const isPayAmountValid = (): boolean => {
     if (!payAmount || payAmount.trim() === "") return false;
     const amount = parseFloat(payAmount);
     
     if (isNaN(amount) || amount <= 0) return false;
     
-    if (offer && offer.minLimit && offer.maxLimit) {
+    if (offer && offer.minLimit !== undefined && offer.maxLimit !== undefined) {
       return amount >= offer.minLimit && amount <= offer.maxLimit;
     }
     
     return true;
   };
 
-  // Get validation error message
-  const getValidationError = () => {
-    if (!payAmount || payAmount.trim() === "") return "";
-    
-    const amount = parseFloat(payAmount);
-    if (isNaN(amount)) return "Please enter a valid number";
-    if (amount <= 0) return "Amount must be greater than 0";
-    
-    if (offer && offer.minLimit && offer.maxLimit) {
-      if (amount < offer.minLimit) {
-        return `Minimum amount is ${formatCurrency(offer.minLimit)}`;
-      }
-      if (amount > offer.maxLimit) {
-        return `Maximum amount is ${formatCurrency(offer.maxLimit)}`;
-      }
-    }
-    
-    return "";
-  };
-
-  // Check if current user is the seller
-  const isCurrentUserSeller = () => {
-    if (!clientUser || !offer || !offer.user) return false;
-    
-    // Get current user ID with multiple fallbacks
-    const getCurrentUserId = () => {
-      return clientUser.id || clientUser._id || clientUser.userId;
-    };
-    
-    // Get seller ID with multiple fallbacks
-    const getSellerId = () => {
-      const sellerUser = offer.user;
-      return sellerUser.id || sellerUser._id || sellerUser.userId || offer.userId;
-    };
-    
-    const currentUserId = getCurrentUserId();
-    const sellerId = getSellerId();
-    
-    console.log("👥 Checking if current user is seller:", {
-      currentUserId,
-      sellerId,
-      clientUser,
-      offerUser: offer.user
-    });
-    
-    return currentUserId === sellerId;
-  };
-
-  // Enhanced validation before trade creation
-  const validateTradeData = () => {
-    if (!offer?.id) {
-      return "Invalid offer ID";
-    }
-    
-    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-    if (!uuidRegex.test(offer.id)) {
-      return "Invalid offer ID format (must be UUID)";
-    }
-    
-    const amountFiat = parseFloat(payAmount);
-    const amountCrypto = parseFloat(receiveAmount);
-    
-    if (isNaN(amountFiat) || amountFiat <= 0) {
-      return "Invalid fiat amount";
-    }
-    
-    if (isNaN(amountCrypto) || amountCrypto <= 0) {
-      return "Invalid crypto amount";
-    }
-    
-    if (offer.minLimit && amountFiat < (offer.minLimit - 0.01)) {
-      return `Amount below minimum limit of ${formatCurrency(offer.minLimit)}`;
-    }
-    
-    if (offer.maxLimit && amountFiat > (offer.maxLimit + 0.01)) {
-      return `Amount above maximum limit of ${formatCurrency(offer.maxLimit)}`;
-    }
-    
-    if (!tradePrice) {
-      return "Trade price not available";
-    }
-    
-    return null;
-  };
-
-  // Get user ID from user object
-  const getUserId = (user: any): string | null => {
-    if (!user) return null;
-    return user.id || user._id || user.userId;
-  };
-
-  // Get username from user object
-  const getUsername = (user: any): string => {
-    if (!user) return "Unknown User";
-    return user.username || user.email || user.name || "Unknown User";
-  };
-
   // Create trade function
-  const createTrade = async () => {
-    console.log("🎯 Starting trade creation...");
-    
+  const createTrade = async (): Promise<any> => {
     if (!isPayAmountValid() || !offer || !clientUser) {
-      console.error("❌ Validation failed");
+      alert("Please enter a valid amount");
       return null;
     }
 
     try {
       setIsCreatingTrade(true);
       
-      const userDataRaw = typeof window !== "undefined" ? localStorage.getItem("UserData") : null;
+      const userDataRaw = localStorage.getItem("UserData");
       let token = "";
 
       if (userDataRaw) {
@@ -236,36 +270,26 @@ const OffersComponent = () => {
           const userData = JSON.parse(userDataRaw);
           token = userData?.accessToken || userData?.token;
         } catch (e) {
-          console.error("❌ Error parsing user data:", e);
+          console.error("Error parsing user data:", e);
         }
-      }
-
-      const headers: any = { 
-        "Content-Type": "application/json",
-      };
-      
-      if (token) {
-        headers.Authorization = `Bearer ${token}`;
       }
 
       const amountFiat = parseFloat(payAmount);
       const amountCrypto = parseFloat(receiveAmount);
 
       if (isNaN(amountFiat) || isNaN(amountCrypto) || amountFiat <= 0 || amountCrypto <= 0) {
-        throw new Error(`Invalid amount values: Fiat=${amountFiat}, Crypto=${amountCrypto}`);
+        throw new Error("Invalid amount values");
       }
 
       if (!tradePrice || tradePrice <= 0) {
-        throw new Error("Trade price not available from offer");
+        throw new Error("Trade price not available");
       }
 
-      // Get user IDs for trade creation
-      const currentUserId = getUserId(clientUser);
-      const sellerId = getUserId(offer.user) || currentUserId;
+      const currentUserId = getCurrentUserId();
+      const sellerId = getSellerIdFromOffer(offer);
 
-      if (!currentUserId) {
-        throw new Error("Could not determine current user ID");
-      }
+      if (!currentUserId) throw new Error("Could not determine your user ID");
+      if (!sellerId) throw new Error("Could not determine seller ID");
 
       const tradeData = {
         offerId: offer.id,
@@ -284,299 +308,142 @@ const OffersComponent = () => {
         initiatorId: currentUserId
       };
 
-      console.log("🔄 Creating trade with data:", tradeData);
-
       const response = await fetch(
         "https://evolve2p-backend.onrender.com/api/create-trade",
         {
           method: "POST",
-          headers: headers,
+          headers: {
+            "Content-Type": "application/json",
+            ...(token ? { Authorization: `Bearer ${token}` } : {})
+          },
           body: JSON.stringify(tradeData),
         }
       );
 
-      console.log("📡 Response status:", response.status);
-      
       if (!response.ok) {
-        let errorMessage = `Trade creation failed with status ${response.status}`;
-        
-        try {
-          const errorData = await response.text();
-          console.error("❌ Raw error response:", errorData);
-          
-          try {
-            const parsedError = JSON.parse(errorData);
-            errorMessage = parsedError.message || parsedError.error || errorMessage;
-          } catch (parseError) {
-            errorMessage = errorData || errorMessage;
-          }
-        } catch (e) {
-          console.error("❌ Could not read error response");
-        }
-        
-        throw new Error(errorMessage);
+        throw new Error(`Trade creation failed: ${response.status}`);
       }
 
       const result = await response.json();
-      console.log("✅ Trade created successfully:", result);
-
+      
       if (result.success && result.data) {
         return result.data;
       } else if (result.trade) {
         return result.trade;
       } else {
-        throw new Error(result.message || "Failed to create trade - no trade data returned");
+        throw new Error("No trade data returned");
       }
     } catch (error) {
-      if (error instanceof Error) {
-        console.error("❌ Error creating trade:", error.message);
-      } else {
-        console.error("❌ Unknown error creating trade:", error);
-      }
+      console.error("Error creating trade:", error);
       throw error;
     } finally {
       setIsCreatingTrade(false);
     }
   };
 
-  // Get button text
-  const getButtonText = () => {
-    if (isCreatingTrade) {
-      return "Creating Trade...";
-    }
-    
-    const isSeller = isCurrentUserSeller();
-    
-    if (isSeller) {
-      return `${offer.type} ${offer.crypto}`;
-    } else {
-      const oppositeType = offer.type?.toUpperCase() === 'BUY' ? 'SELL' : 'BUY';
-      return `${oppositeType} ${offer.crypto}`;
-    }
-  };
-
-  // Handle trade action with notification
-  const handleTradeAction = async () => {
-    if (!isPayAmountValid()) {
-      alert("Please enter a valid amount");
-      return;
-    }
-    
-    const validationError = validateTradeData();
-    if (validationError) {
-      alert(`Validation error: ${validationError}`);
-      return;
-    }
-    
-    console.log("🎯 Starting trade creation process...");
-    
+  // Handle trade action
+  const handleTradeAction = async (): Promise<void> => {
     try {
-      // First, debug user data
-      debugUserData();
-      
-      // Create trade
       const trade = await createTrade();
       
       if (trade) {
-        console.log("🚀 Trade created, navigating...", trade);
+        saveTradeToLocalStorage(trade);
         
-        // Save trade to localStorage
-        const savedTrade = saveTradeToLocalStorage(trade);
+        const currentUserId = getCurrentUserId();
+        const sellerId = getSellerIdFromOffer(offer);
         
-        if (savedTrade) {
-          // Get user IDs
-          const currentUserId = getUserId(clientUser);
-          const sellerId = getUserId(offer.user) || offer.userId;
-          
-          console.log("👥 User IDs for notification:", {
-            currentUserId,
-            sellerId,
-            tradeBuyerId: trade.buyerId,
-            tradeSellerId: trade.sellerId,
-            tradeInitiatorId: trade.initiatorId
-          });
-          
-          // Determine if current user is seller
+        if (currentUserId && sellerId) {
           const isSeller = currentUserId === sellerId;
-          console.log("🤔 Is current user seller?", isSeller);
+          const recipientId = isSeller ? (trade.buyerId || trade.initiatorId) : sellerId;
           
-          // Determine recipient ID (the OTHER party)
-          let recipientId = '';
-          
-          if (isSeller) {
-            // Current user is seller, recipient is buyer
-            recipientId = trade.buyerId || trade.initiatorId;
-          } else {
-            // Current user is buyer, recipient is seller
-            recipientId = sellerId;
-          }
-          
-          console.log("📨 Notification recipient ID:", recipientId);
-          
-          // Only send notification if we have a valid recipient ID
-          if (recipientId && recipientId.trim() !== '') {
-            // Create notification
+          if (recipientId) {
             const notificationData = {
               type: 'NEW_TRADE_REQUEST' as const,
-              tradeId: savedTrade.id || trade.id,
-              offerId: offer.id,
-              initiatorId: currentUserId || 'unknown',
+              tradeId: trade.id,
+              offerId: offer?.id || '',
+              initiatorId: currentUserId,
               initiatorUsername: getUsername(clientUser),
               amountFiat: parseFloat(payAmount),
               amountCrypto: parseFloat(receiveAmount),
               currency: currency,
-              crypto: offer.crypto,
-              message: `${getUsername(clientUser)} wants to ${isSeller ? 'sell' : 'buy'} ${receiveAmount} ${offer.crypto}`,
+              crypto: offer?.crypto || 'BTC',
+              message: `${getUsername(clientUser)} wants to ${isSeller ? 'sell' : 'buy'} ${receiveAmount} ${offer?.crypto || 'crypto'}`,
               recipientId: recipientId
             };
-
-            console.log("📤 Sending notification data:", notificationData);
             
-            // Send notification
-            const notificationId = sendNotification(notificationData);
-            
-            if (notificationId) {
-              const successMsg = isSeller 
-                ? `Trade created! Notification sent to buyer.` 
-                : `Trade request sent! Seller has been notified.`;
-              
-              showSuccessNotification(successMsg);
-              console.log("✅ Notification sent with ID:", notificationId);
-              
-              // Also send a test notification to yourself for debugging
-              if (currentUserId) {
-                setTimeout(() => {
-                  const testId = testNotification(currentUserId);
-                  console.log("🧪 Test notification sent to self:", testId);
-                }, 1000);
-              }
-            } else {
-              const warningMsg = `Trade created! (Notification may not have been sent)`;
-              showSuccessNotification(warningMsg);
-              console.warn("⚠️ Notification may not have been sent successfully");
-            }
-          } else {
-            console.warn("⚠️ No valid recipient ID found for notification");
-            console.warn("Available IDs:", {
-              currentUserId,
-              sellerId,
-              tradeBuyerId: trade.buyerId,
-              tradeSellerId: trade.sellerId
-            });
-            showSuccessNotification(`Trade created! (Could not identify recipient)`);
+            sendNotification(notificationData);
+            setSuccessMessage(`Trade created! Notification sent to ${isSeller ? 'buyer' : 'seller'}.`);
           }
-
-          // Get trade ID for navigation
-          const tradeId = trade.id || trade._id || savedTrade.id;
-          
-          if (!tradeId) {
-            throw new Error("No trade ID returned from API");
-          }
-          
-          // Navigate to appropriate page
-          setTimeout(() => {
-            const isSeller = currentUserId === sellerId;
-            if (isSeller) {
-              router.push(`/prc_sell?tradeId=${tradeId}&offerId=${offer.id}&currency=${currency}&payAmount=${payAmount}`);
-            } else {
-              if (offer.type?.toUpperCase() === 'SELL') {
-                router.push(`/prc_buy?tradeId=${tradeId}&offerId=${offer.id}&currency=${currency}&payAmount=${payAmount}`);
-              } else {
-                router.push(`/prc_sell?tradeId=${tradeId}&offerId=${offer.id}&currency=${currency}&payAmount=${payAmount}`);
-              }
-            }
-          }, 1500);
+        } else {
+          setSuccessMessage("Trade created!");
         }
+        
+        setShowSuccess(true);
+        
+        setTimeout(() => {
+          const tradeId = trade.id || trade._id;
+          if (tradeId) {
+            const currentUserId = getCurrentUserId();
+            const sellerId = getSellerIdFromOffer(offer);
+            const isSeller = currentUserId === sellerId;
+            
+            if (isSeller) {
+              router.push(`/prc_sell?tradeId=${tradeId}`);
+            } else {
+              router.push(`/prc_buy?tradeId=${tradeId}`);
+            }
+          }
+        }, 2000);
       }
     } catch (error) {
-      console.error("💥 Failed to create trade:", error);
-      if (error instanceof Error) {
-        alert(`Failed to create trade: ${error.message}`);
-      } else {
-        alert(`Failed to create trade: Unknown error occurred.`);
-      }
+      console.error("Trade creation failed:", error);
+      alert(error instanceof Error ? error.message : "Unknown error occurred");
     }
   };
 
-  // Get user role indicator text
-  const getUserRoleText = () => {
-    if (!clientUser || !offer.user) return "";
+  // Get button text
+  const getButtonText = (): string => {
+    if (isCreatingTrade) return "Creating Trade...";
     
-    const isSeller = isCurrentUserSeller();
-    const offerType = offer.type?.toUpperCase();
+    const currentUserId = getCurrentUserId();
+    const sellerId = getSellerIdFromOffer(offer);
+    const isSeller = currentUserId === sellerId;
     
     if (isSeller) {
-      return "You are the owner of this offer";
+      return `${offer?.type} ${offer?.crypto}`;
     } else {
-      if (offerType === 'SELL') {
-        return "You are buying from this seller";
-      } else {
-        return "You are selling to this buyer";
-      }
+      const oppositeType = offer?.type?.toUpperCase() === 'BUY' ? 'SELL' : 'BUY';
+      return `${oppositeType} ${offer?.crypto}`;
     }
   };
 
-  // Format payment terms for display
-  const formatPaymentTerms = (terms: string): string[] => {
-    if (!terms) return [];
-    
-    return terms
-      .split(/[\n,]/)
-      .map(term => term.trim())
-      .filter(term => term.length > 0)
-      .map(term => term.startsWith('•') ? term : `• ${term}`);
-  };
-
-  // Fixed: Proper null handling for localStorage
+  // Load client user
   useEffect(() => {
     if (typeof window === "undefined") return;
     
     const raw = localStorage.getItem("UserData");
     if (!raw) {
-      console.log("❌ No UserData found in localStorage");
+      router.push("/login");
       return;
     }
     
     try {
       const parsed = JSON.parse(raw);
-      console.log("📊 Parsed UserData for client:", parsed);
+      let userData: User | null = null;
       
-      // EXTRACT USER FROM YOUR SPECIFIC STRUCTURE
-      let userData = null;
-      
-      if (parsed.userData) {
-        // Your structure: { accessToken, userData: {...} }
-        userData = parsed.userData;
-        console.log("✅ Using userData from parsed.userData");
-      } else if (parsed.data) {
-        // Alternative structure: { data: {...} }
-        userData = parsed.data;
-        console.log("✅ Using userData from parsed.data");
-      } else if (parsed.user) {
-        // Alternative structure: { user: {...} }
-        userData = parsed.user;
-        console.log("✅ Using userData from parsed.user");
-      } else {
-        // Direct user object
-        userData = parsed;
-        console.log("✅ Using userData directly from parsed");
-      }
-      
-      // Also include the accessToken if available
-      if (parsed.accessToken && !userData.accessToken) {
-        userData.accessToken = parsed.accessToken;
-      }
+      if (parsed.userData) userData = parsed.userData;
+      else if (parsed.data) userData = parsed.data;
+      else if (parsed.user) userData = parsed.user;
+      else userData = parsed;
       
       setClientUser(userData);
-      console.log("👤 Client user set:", userData);
-      
     } catch (e) {
-      console.error("❌ Error setting client user:", e);
-      setClientUser(null);
+      console.error("Error setting client user:", e);
+      router.push("/login");
     }
-  }, []);
+  }, [router]);
 
-  // Load currency data from country currency service
+  // Load currency data
   useEffect(() => {
     const loadCurrencyData = async () => {
       setLoadingCurrencies(true);
@@ -589,14 +456,19 @@ const OffersComponent = () => {
         
         const currencyData = countryCurrencyService.getCurrencyByCode(currencyCode) 
           || countryCurrencyService.getCurrencyByCode('USD') 
-          || null;
+          || DEFAULT_CURRENCY;
+        
+        // Ensure symbol is a string
+        if (currencyData && currencyData.symbol && typeof currencyData.symbol !== 'string') {
+          currencyData.symbol = String(currencyData.symbol);
+        }
         
         setSelectedCurrencyData(currencyData);
         setCurrency(currencyData?.code || 'USD');
         
       } catch (error) {
         console.error('Error loading currency data:', error);
-        setSelectedCurrencyData(null);
+        setSelectedCurrencyData(DEFAULT_CURRENCY);
       } finally {
         setLoadingCurrencies(false);
       }
@@ -605,7 +477,7 @@ const OffersComponent = () => {
     loadCurrencyData();
   }, [searchParams]);
 
-  // Update receive amount when pay amount changes
+  // Update receive amount
   useEffect(() => {
     if (fixedPrice && payAmount && !isNaN(parseFloat(payAmount))) {
       const amount = parseFloat(payAmount);
@@ -616,19 +488,20 @@ const OffersComponent = () => {
     }
   }, [payAmount, fixedPrice]);
 
-  // Get offer ID from URL parameters and fetch specific offer
+  // Fetch offer - FIXED to handle object in user data
   useEffect(() => {
     const fetchOffer = async () => {
-      const offerId = params.id;
+      const offerId = params.id as string;
 
       if (!offerId) {
-        console.error("No offer ID found in URL parameters");
+        console.error("No offer ID found");
+        setLoadingOffer(false);
         return;
       }
 
       setLoadingOffer(true);
       try {
-        const userDataRaw = typeof window !== "undefined" ? localStorage.getItem("UserData") : null;
+        const userDataRaw = localStorage.getItem("UserData");
         let token = "";
 
         if (userDataRaw) {
@@ -640,12 +513,10 @@ const OffersComponent = () => {
           }
         }
 
-        const headers: any = { "Content-Type": "application/json" };
+        const headers: Record<string, string> = { "Content-Type": "application/json" };
         if (token) {
           headers.Authorization = `Bearer ${token}`;
         }
-
-        console.log("🔄 Fetching offer with ID:", offerId);
 
         const res = await fetch(
           `https://evolve2p-backend.onrender.com/api/get-offer/${offerId}`,
@@ -656,13 +527,13 @@ const OffersComponent = () => {
         );
 
         if (!res.ok) {
-          throw new Error(`API request failed with status ${res.status}`);
+          throw new Error(`API request failed: ${res.status}`);
         }
 
         const data = await res.json();
-        console.log("📊 Offer API response:", data);
+        console.log('API Response:', data); // Debug log
 
-        let offerData = null;
+        let offerData: any = null;
 
         if (data.data) {
           offerData = data.data;
@@ -671,71 +542,86 @@ const OffersComponent = () => {
         } else if (data.id) {
           offerData = data;
         } else {
-          throw new Error("No offer data found in response");
+          throw new Error("No offer data found");
+        }
+
+        // Debug the user object
+        if (offerData.user) {
+          console.log('User object from API:', offerData.user);
+          console.log('Type of user.name:', typeof offerData.user?.name);
+          console.log('Type of user.username:', typeof offerData.user?.username);
         }
 
         let pricePerUnit: number | null = null;
         let totalTradePrice: number | null = null;
 
         if (offerData.price) {
-          pricePerUnit = offerData.price;
+          pricePerUnit = parseFloat(offerData.price);
         } else if (offerData.basePrice) {
-          pricePerUnit = offerData.basePrice;
+          pricePerUnit = parseFloat(offerData.basePrice);
         }
 
         if (offerData.totalPrice) {
-          totalTradePrice = offerData.totalPrice;
+          totalTradePrice = parseFloat(offerData.totalPrice);
         } else if (offerData.tradePrice) {
-          totalTradePrice = offerData.tradePrice;
+          totalTradePrice = parseFloat(offerData.tradePrice);
         } else if (offerData.finalPrice) {
-          totalTradePrice = offerData.finalPrice;
+          totalTradePrice = parseFloat(offerData.finalPrice);
         }
 
         if (!pricePerUnit && totalTradePrice && offerData.cryptoAmount) {
-          pricePerUnit = totalTradePrice / offerData.cryptoAmount;
+          pricePerUnit = totalTradePrice / parseFloat(offerData.cryptoAmount);
         }
 
         setFixedPrice(pricePerUnit);
         setTradePrice(totalTradePrice);
 
+        // Create a safe user object
+        let safeUser: User | undefined = undefined;
+        if (offerData.user) {
+          safeUser = {
+            id: getSafeString(offerData.user.id),
+            _id: getSafeString(offerData.user._id),
+            userId: getSafeString(offerData.user.userId),
+            username: getSafeString(offerData.user.username),
+            email: getSafeString(offerData.user.email),
+            name: getSafeString(offerData.user.name)
+          };
+          
+          // If name is still an object, set it to empty string
+          if (safeUser.name && typeof safeUser.name === 'object') {
+            safeUser.name = '';
+          }
+        }
+
         setOffer({
-          id: offerData.id || offerId,
-          crypto: offerData.crypto || "BTC",
-          currency: offerData.currency || currency,
-          margin: offerData.margin || 0,
-          minLimit: offerData.minLimit || 0,
-          maxLimit: offerData.maxLimit || 0,
-          status: offerData.status || "ACTIVE",
-          time: offerData.time || "30 minutes",
-          createdAt: offerData.createdAt || "",
-          paymentMethod: offerData.paymentMethod || "Bank Transfer",
-          paymentTerms: offerData.paymentTerms || "",
-          paymentTime: offerData.paymentTime || "30 minutes",
-          type: offerData.type || "SELL",
-          completionRate: offerData.completionRate || 100,
-          ordersCompleted: offerData.ordersCompleted || 100,
-          rating: offerData.rating || 99.99,
-          avgReleaseTime: offerData.avgReleaseTime || "15 min",
+          id: getSafeString(offerData.id) || offerId,
+          crypto: getSafeString(offerData.crypto) || "BTC",
+          currency: getSafeString(offerData.currency) || currency,
+          margin: parseFloat(getSafeString(offerData.margin)) || 0,
+          minLimit: parseFloat(getSafeString(offerData.minLimit)) || 0,
+          maxLimit: parseFloat(getSafeString(offerData.maxLimit)) || 0,
+          status: getSafeString(offerData.status) || "ACTIVE",
+          time: getSafeString(offerData.time) || "30 minutes",
+          createdAt: getSafeString(offerData.createdAt) || "",
+          paymentMethod: getSafeString(offerData.paymentMethod) || "Bank Transfer",
+          paymentTerms: getSafeString(offerData.paymentTerms) || "",
+          paymentTime: getSafeString(offerData.paymentTime) || "30 minutes",
+          type: getSafeString(offerData.type) || "SELL",
+          completionRate: parseFloat(getSafeString(offerData.completionRate)) || 100,
+          ordersCompleted: parseFloat(getSafeString(offerData.ordersCompleted)) || 100,
+          rating: parseFloat(getSafeString(offerData.rating)) || 99.99,
+          avgReleaseTime: getSafeString(offerData.avgReleaseTime) || "15 min",
           price: pricePerUnit,
           tradePrice: totalTradePrice,
-          processingFee: offerData.processingFee || 0.0005,
-          user: offerData.user || clientUser,
-        });
-
-        console.log("✅ Final offer object:", {
-          currency: offerData.currency || currency,
-          crypto: offerData.crypto || "BTC",
-          pricePerUnit: pricePerUnit,
-          totalTradePrice: totalTradePrice,
-          type: offerData.type,
-          id: offerData.id || offerId,
-          minLimit: offerData.minLimit,
-          maxLimit: offerData.maxLimit,
-          user: offerData.user
+          processingFee: parseFloat(getSafeString(offerData.processingFee)) || 0.0005,
+          user: safeUser,
+          sellerId: getSafeString(offerData.sellerId),
+          userId: getSafeString(offerData.userId)
         });
 
       } catch (error) {
-        console.error("❌ Error fetching offer:", error);
+        console.error("Error fetching offer:", error);
         setOffer(null);
       } finally {
         setLoadingOffer(false);
@@ -745,14 +631,27 @@ const OffersComponent = () => {
     if (currency && !loadingCurrencies) {
       fetchOffer();
     }
-  }, [params.id, clientUser, currency, loadingCurrencies]);
+  }, [params.id, currency, loadingCurrencies]);
+
+  // Debug effect to check what's causing the error
+  useEffect(() => {
+    if (offer && offer.user) {
+      console.log('Final offer.user object:', offer.user);
+      console.log('offer.user.name value:', offer.user.name);
+      console.log('Type of offer.user.name:', typeof offer.user.name);
+      
+      // Check each property
+      Object.entries(offer.user).forEach(([key, value]) => {
+        console.log(`offer.user.${key}:`, value, 'Type:', typeof value);
+      });
+    }
+  }, [offer]);
 
   if (loadingOffer || loadingCurrencies) {
     return (
       <main className="min-h-screen bg-[#0F1012] flex items-center justify-center text-white">
         <div className="text-center">
           <div className="text-xl">Loading offer details...</div>
-          <div className="text-sm text-gray-400 mt-2">Please wait while we fetch the offer</div>
         </div>
       </main>
     );
@@ -763,9 +662,6 @@ const OffersComponent = () => {
       <main className="min-h-screen bg-[#0F1012] flex items-center justify-center text-white">
         <div className="text-center">
           <div className="text-xl">Offer not found</div>
-          <div className="text-sm text-gray-400 mt-2">
-            The offer may have been removed or is unavailable
-          </div>
           <button
             onClick={() => router.push('/market_place')}
             className="mt-4 px-6 py-2 bg-[#4DF2BE] text-[#0F1012] rounded-full font-semibold"
@@ -777,10 +673,13 @@ const OffersComponent = () => {
     );
   }
 
+  const sellerInfo = getSellerDisplayInfo(offer.user);
+  console.log('Seller info:', sellerInfo); // Debug log
+
   return (
     <main className="min-h-screen bg-[#0F1012] text-white">
-      {/* Success Notification Toast */}
-      {showNotificationSuccess && (
+      {/* Success Toast */}
+      {showSuccess && (
         <div className="fixed top-4 right-4 z-50 animate-slideIn">
           <div className="bg-[#222222] border border-[#4DF2BE] rounded-lg p-4 shadow-2xl max-w-sm">
             <div className="flex items-center gap-3">
@@ -788,11 +687,11 @@ const OffersComponent = () => {
                 <span className="text-[#4DF2BE] font-bold">✓</span>
               </div>
               <div className="flex-1">
-                <p className="font-semibold text-white">Notification Sent!</p>
-                <p className="text-sm text-[#C7C7C7] mt-1">{notificationMessage}</p>
+                <p className="font-semibold text-white">Success!</p>
+                <p className="text-sm text-[#C7C7C7] mt-1">{successMessage}</p>
               </div>
               <button
-                onClick={() => setShowNotificationSuccess(false)}
+                onClick={() => setShowSuccess(false)}
                 className="text-[#8F8F8F] hover:text-white"
               >
                 ×
@@ -812,96 +711,29 @@ const OffersComponent = () => {
           <p>Back to Marketplace</p>
         </div>
 
-        {/* Debug Buttons */}
-        <div className="flex gap-2 mb-4">
-          <button 
-            onClick={() => {
-              debugUserData();
-              alert("Check console for user data debug info");
-            }}
-            className="px-4 py-2 bg-blue-500 text-white rounded text-sm font-medium"
-          >
-            Debug User Data
-          </button>
-          
-          <button 
-            onClick={() => {
-              const testId = testNotification();
-              if (testId) {
-                alert(`Test notification sent! ID: ${testId}`);
-              } else {
-                alert("Failed to send test notification");
-              }
-            }}
-            className="px-4 py-2 bg-green-500 text-white rounded text-sm font-medium"
-          >
-            Test Notification
-          </button>
-        </div>
-
-        {/* Currency Display */}
-        <div className="p-3 bg-[#222222] rounded-lg mb-6">
-          <div className="flex flex-wrap items-center gap-2 text-xs lg:text-sm">
-            {selectedCurrencyData && (
-              <img
-                src={selectedCurrencyData.flag}
-                alt={`${selectedCurrencyData.country} flag`}
-                className="w-4 h-3 rounded object-cover"
-                onError={(e) => {
-                  (e.target as HTMLImageElement).src = 'https://flagcdn.com/w320/us.png';
-                }}
-              />
-            )}
-            <span className="text-[#8F8F8F]">Selected Currency:</span>
-            <span className="text-[#4DF2BE] font-semibold">
-              {selectedCurrencyData?.code} - {selectedCurrencyData?.name}
-            </span>
-            <span className="text-[#C7C7C7]">
-              Symbol: {selectedCurrencyData?.symbol}
-            </span>
-          </div>
-        </div>
-
-        {/* Main Content Container */}
         <div className="flex flex-col lg:flex-row gap-6">
           {/* Left Section */}
           <div className="flex-1">
-            {/* Seller Info Container */}
+            {/* Seller Info Container - FIXED to handle object */}
             <div className="bg-[#222222] rounded-xl p-4 lg:p-6 mb-6">
               <div className="flex items-center gap-2 mb-4">
                 <div className="flex items-center bg-[#4A4A4A] w-6 h-6 rounded-full p-1">
-                  {(() => {
-                    const sellerUser = offer.user || clientUser;
-                    const rawName = sellerUser?.username || sellerUser?.email || "Seller";
-                    const uname = typeof rawName === "string" ? rawName : String(rawName);
-                    const displayName = uname.startsWith("@") ? uname : `@${uname}`;
-                    const initial = uname.charAt(0).toUpperCase();
-
-                    return (
-                      <>
-                        <p className="text-xs font-bold text-[#8F8F8F] ml-1">
-                          {initial}
-                        </p>
-                        <Image src={Vector} alt="vector" className="ml-1 w-2 h-2" />
-                      </>
-                    );
-                  })()}
+                  <p className="text-xs font-bold text-[#8F8F8F] ml-1">
+                    {sellerInfo.initial}
+                  </p>
+                  <Image src={Vector} alt="vector" className="ml-1 w-2 h-2" />
                 </div>
-                <p className="text-sm lg:text-base text-white font-medium whitespace-nowrap">
+                {/* SAFE RENDERING - This was causing the error */}
+                <div className="text-sm lg:text-base text-white font-medium whitespace-nowrap overflow-hidden text-ellipsis">
                   {(() => {
-                    const sellerUser = offer.user || clientUser;
-                    const rawName = sellerUser?.username || sellerUser?.email || "Seller";
-                    const uname = typeof rawName === "string" ? rawName : String(rawName);
-                    return uname.startsWith("@") ? uname : `@${uname}`;
-                  })()}
-                </p>
+                      const display = sellerInfo.displayName;
+                      if (typeof display === 'string') {
+                        return display;
+                      }
+                      return '@Seller';
+                    })()}
+                </div>
                 <Image src={Mark_green} alt="mark" className="w-3 h-3" />
-                <Image
-                  onClick={() => setIsSellerOpen(true)}
-                  src={Arrow_great}
-                  alt="greater"
-                  className="w-3 h-3 cursor-pointer"
-                />
               </div>
 
               {/* Seller Stats */}
@@ -919,28 +751,15 @@ const OffersComponent = () => {
 
               {/* Price Info */}
               <div className="text-sm lg:text-base font-bold text-[#DBDBDB] mb-3">
-                1 {offer.crypto} = {fixedPrice ? formatCurrency(fixedPrice) : 'Loading...'}
+                1 {offer.crypto} = {fixedPrice !== null ? formatCurrency(fixedPrice) : 'Loading...'}
               </div>
-
-              {/* Trade Price Display */}
-              {tradePrice && (
-                <div className="text-sm font-medium text-[#C7C7C7] mb-4">
-                  Trade Price: <span className="text-[#4DF2BE] font-bold">
-                    {formatCurrency(tradePrice)}
-                  </span>
-                </div>
-              )}
 
               {/* Order limit */}
               <div className="flex flex-wrap items-center text-[#C7C7C7] text-sm gap-2 mb-4">
                 <p>Order limit:</p>
-                <p>
-                  {formatCurrency(offer.minLimit)}
-                </p>
+                <p>{offer.minLimit !== undefined ? formatCurrency(offer.minLimit) : '0.00'}</p>
                 <Image src={Dminus} alt="minus" className="w-3 h-3" />
-                <p>
-                  {formatCurrency(offer.maxLimit)}
-                </p>
+                <p>{offer.maxLimit !== undefined ? formatCurrency(offer.maxLimit) : '0.00'}</p>
               </div>
 
               {/* Verification Badges */}
@@ -954,46 +773,37 @@ const OffersComponent = () => {
                   <p className="text-[#DBDBDB] text-xs font-medium">ID Verified</p>
                 </div>
               </div>
-
-              <div className="text-sm font-medium text-[#C7C7C7]">
-                Feedbacks(21)
-              </div>
             </div>
 
-            {/* Offer Terms Section */}
+            {/* Offer Terms */}
             <div className="bg-[#2D2D2D] rounded-xl p-4 lg:p-6">
-              <div>
-                <div
-                  className="flex items-center justify-between cursor-pointer"
-                  onClick={() => setIsTermsOpen(!isTermsOpen)}
-                >
-                  <p className="text-sm lg:text-base font-bold text-white">
-                    Offer Terms (please read carefully)
-                  </p>
-                  <Image
-                    src={UPa}
-                    alt="up"
-                    className={`transition-transform duration-300 ${isTermsOpen ? "rotate-180" : "rotate-0"
-                      } w-4 h-4`}
-                  />
-                </div>
-
-                {isTermsOpen && (
-                  <div className="mt-3">
-                    {offer.paymentTerms ? (
-                      <ul className="text-[#DBDBDB] text-sm space-y-2 font-medium">
-                        {formatPaymentTerms(offer.paymentTerms).map((term, index) => (
-                          <li key={index}>{term}</li>
-                        ))}
-                      </ul>
-                    ) : (
-                      <p className="text-[#DBDBDB] text-sm font-medium">
-                        No specific terms provided by the seller.
-                      </p>
-                    )}
-                  </div>
-                )}
+              <div
+                className="flex items-center justify-between cursor-pointer"
+                onClick={() => setIsTermsOpen(!isTermsOpen)}
+              >
+                <p className="text-sm lg:text-base font-bold text-white">
+                  Offer Terms
+                </p>
+                <Image
+                  src={UPa}
+                  alt="up"
+                  className={`transition-transform duration-300 ${isTermsOpen ? "rotate-180" : "rotate-0"} w-4 h-4`}
+                />
               </div>
+
+              {isTermsOpen && offer.paymentTerms && (
+                <div className="mt-3">
+                  <ul className="text-[#DBDBDB] text-sm space-y-2 font-medium">
+                    {offer.paymentTerms
+                      .split(/[\n,]/)
+                      .map((term: string) => term.trim())
+                      .filter((term: string) => term.length > 0)
+                      .map((term: string, index: number) => (
+                        <li key={index}>{term.startsWith('•') ? term : `• ${term}`}</li>
+                      ))}
+                  </ul>
+                </div>
+              )}
             </div>
           </div>
 
@@ -1005,16 +815,13 @@ const OffersComponent = () => {
                 <Image src={CircY} alt="circ" className="w-6 h-6" />
                 <div className="flex flex-col">
                   <p className="text-sm lg:text-base font-medium text-[#DBDBDB]">
-                    1 {offer.crypto} = {fixedPrice ? formatCurrency(fixedPrice) : 'Loading...'}
+                    1 {offer.crypto} = {fixedPrice !== null ? formatCurrency(fixedPrice) : 'Loading...'}
                   </p>
-                  {tradePrice && (
+                  {tradePrice !== null && (
                     <p className="text-xs lg:text-sm font-medium text-[#4DF2BE] mt-1">
                       Total Trade Price: {formatCurrency(tradePrice)}
                     </p>
                   )}
-                  <p className="text-xs lg:text-sm font-medium text-[#C7C7C7] mt-1">
-                    Processing fee = {offer.processingFee} {offer.crypto}
-                  </p>
                 </div>
               </div>
             </div>
@@ -1042,7 +849,7 @@ const OffersComponent = () => {
                     <span className="text-[#C7C7C7] font-normal text-xl lg:text-2xl">|</span>
                   </div>
                   <div className="flex items-center bg-[#2D2D2D] gap-2 px-3 py-1 rounded-full">
-                    {selectedCurrencyData && (
+                    {selectedCurrencyData && selectedCurrencyData.flag && (
                       <img
                         src={selectedCurrencyData.flag}
                         alt={`${selectedCurrencyData.country} flag`}
@@ -1056,11 +863,6 @@ const OffersComponent = () => {
                       {selectedCurrencyData?.code || currency}
                     </p>
                   </div>
-                </div>
-                <div className="text-sm font-medium text-[#C7C7C7]">
-                  1 {currency} = <span className="text-[#DBDBDB]">
-                    {fixedPrice ? (1 / fixedPrice).toFixed(8) : "0.00000000"} {offer.crypto}
-                  </span>
                 </div>
               </div>
             </div>
@@ -1100,14 +902,14 @@ const OffersComponent = () => {
               <div className="flex items-center justify-between w-full h-12 bg-[#2D2D2D] px-4 rounded-t-lg">
                 <p className="text-sm lg:text-base font-normal text-[#DBDBDB]">Limit</p>
                 <p className="text-sm lg:text-base font-medium text-white">
-                  {formatCurrency(offer.minLimit)} - {formatCurrency(offer.maxLimit)}
+                  {offer.minLimit !== undefined ? formatCurrency(offer.minLimit) : '0.00'} - {offer.maxLimit !== undefined ? formatCurrency(offer.maxLimit) : '0.00'}
                 </p>
               </div>
 
               <div className="flex items-center justify-between w-full h-12 bg-[#2D2D2D] px-4 border-l-2 border-l-[#FFFA66]">
                 <p className="text-sm lg:text-base font-normal text-[#DBDBDB]">Payment</p>
                 <p className="text-sm lg:text-base font-medium text-white">
-                  {renderSafeValue(offer.paymentMethod)}
+                  {offer.paymentMethod}
                 </p>
               </div>
 
@@ -1136,223 +938,21 @@ const OffersComponent = () => {
               </button>
             </div>
 
-            {/* Notification Info */}
+            {/* Info Message */}
             <div className="text-center mt-4 text-xs text-[#8F8F8F]">
-              {isCurrentUserSeller() ? (
-                <span>Buyers will be notified when you create a trade</span>
-              ) : (
-                <span>The seller will be notified of your trade request</span>
-              )}
+              {(() => {
+                const currentUserId = getCurrentUserId();
+                const sellerId = getSellerIdFromOffer(offer);
+                const isSeller = currentUserId === sellerId;
+                
+                return isSeller 
+                  ? "Buyers will be notified when you create a trade" 
+                  : "The seller will be notified of your trade request";
+              })()}
             </div>
-
-            {/* Validation message */}
-            {payAmount !== "" && (
-              <div className={`text-center mt-3 text-sm ${
-                isPayAmountValid() ? "text-[#4DF2BE]" : "text-[#FF6B6B]"
-              }`}>
-                {isPayAmountValid() 
-                  ? "Amount is within limits ✓" 
-                  : getValidationError()
-                }
-              </div>
-            )}
-
-            {/* User role indicator */}
-            {clientUser && offer.user && (
-              <div className="text-center mt-2 text-xs text-[#8F8F8F]">
-                {getUserRoleText()}
-              </div>
-            )}
-
-            {/* Trade Price Info */}
-            {tradePrice && (
-              <div className="text-center mt-4 text-xs text-[#8F8F8F]">
-                Trade Price: {formatCurrency(tradePrice)}
-              </div>
-            )}
 
           </div>
         </div>
-
-        {/* Seller Details Modal */}
-        {isSellerOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
-            <div className="bg-[#0F1012] rounded-xl w-full max-w-lg lg:max-w-2xl max-h-[80vh] overflow-y-auto">
-              <div className="flex items-center justify-between p-4 lg:p-6">
-                <p className="text-base lg:text-lg font-bold text-white">
-                  Seller details
-                </p>
-                <Image
-                  src={Times}
-                  alt="Close"
-                  width={24}
-                  height={24}
-                  className="cursor-pointer w-6 h-6 lg:w-8 lg:h-8"
-                  onClick={toggleSeller}
-                />
-              </div>
-
-              <div className="bg-[#1A1A1A] p-4 lg:p-6 max-h-[60vh] overflow-y-auto space-y-4 lg:space-y-6">
-                {/* Header Profile Section */}
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center">
-                    <div className="flex items-center bg-[#4A4A4A] w-6 h-6 rounded-full p-1 mr-3">
-                      {(() => {
-                        const sellerUser = offer.user || clientUser;
-                        const rawName = sellerUser?.username || sellerUser?.email || "Seller";
-                        const uname = typeof rawName === "string" ? rawName : String(rawName);
-                        const initial = uname.charAt(0).toUpperCase();
-                        return (
-                          <p className="text-xs font-bold text-[#8F8F8F] ml-1">
-                            {initial}
-                          </p>
-                        );
-                      })()}
-                    </div>
-                    <div className="flex flex-col">
-                      <p className="text-sm lg:text-base text-white font-medium whitespace-nowrap">
-                        {(() => {
-                          const sellerUser = offer.user || clientUser;
-                          const rawName = sellerUser?.username || sellerUser?.email || "Seller";
-                          const uname = typeof rawName === "string" ? rawName : String(rawName);
-                          return uname.startsWith("@") ? uname : `@${uname}`;
-                        })()}
-                      </p>
-                      <p className="text-sm font-medium text-[#C7C7C7]">
-                        Online
-                      </p>
-                    </div>
-                    <Image src={Mark_green} alt="mark" className="ml-2 w-3 h-3" />
-                  </div>
-                  <button className="w-20 h-10 rounded-full border border-[#2D2D2D] text-[#4DF2BE] text-sm font-bold bg-[#2D2D2D]">
-                    Follow
-                  </button>
-                </div>
-
-                {/* Badges */}
-                <div className="flex flex-wrap gap-3">
-                  {["Email", "SMS", "ID Verification", "Address"].map(
-                    (item, i) => (
-                      <span
-                        key={i}
-                        className="text-sm font-medium text-[#DBDBDB] flex items-center"
-                      >
-                        <Image
-                          src={Verified}
-                          alt="ver"
-                          className="mr-1 w-3 h-3"
-                        />
-                        {item}
-                      </span>
-                    )
-                  )};
-                </div>
-
-                {/* Stats */}
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  <div className="flex flex-col bg-[#2D2D2D] p-3 items-center rounded-lg">
-                    <p className="text-base font-medium text-white">
-                      {offer.ordersCompleted}
-                    </p>
-                    <p className="text-sm font-medium text-[#C7C7C7]">
-                      Trades Completed
-                    </p>
-                  </div>
-                  <div className="flex flex-col bg-[#2D2D2D] p-3 items-center rounded-lg">
-                    <p className="text-base font-medium text-white">
-                      {offer.completionRate}%
-                    </p>
-                    <p className="text-sm font-medium text-[#C7C7C7]">
-                      Completion Rate
-                    </p>
-                  </div>
-                  <div className="flex flex-col bg-[#2D2D2D] p-3 items-center rounded-lg">
-                    <p className="text-base font-medium text-white">
-                      {offer.avgReleaseTime}
-                    </p>
-                    <p className="text-sm font-medium text-[#C7C7C7]">
-                      Avg. Release Time
-                    </p>
-                  </div>
-                </div>
-
-                <div className="w-full h-px bg-[#2D2D2D]"></div>
-
-                {/* Payment Methods */}
-                <div>
-                  <p className="font-medium text-sm text-[#C7C7C7] mb-3">
-                    Payment Methods
-                  </p>
-                  <div className="flex flex-wrap gap-2">
-                    {[
-                      renderSafeValue(offer.paymentMethod),
-                      "PayPal",
-                      "Skrill",
-                      "Mobile Money",
-                      "Gift Cards",
-                    ].map((method, i) => (
-                      <span
-                        key={i}
-                        className="flex items-center gap-2 justify-center bg-[#3A3A3A] rounded-2xl text-xs px-3 py-2"
-                      >
-                        <Image src={Verified} alt="ver" className="w-3 h-3" />
-                        {method}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="w-full h-px bg-[#2D2D2D]"></div>
-
-                {/* Info */}
-                <p className="font-bold text-[#C7C7C7] text-base">
-                  Info
-                </p>
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between bg-[#2D2D2D] rounded-lg h-10 px-3">
-                    <p className="text-sm text-[#DBDBDB] font-medium">
-                      Joined
-                    </p>
-                    <p className="text-sm text-white font-medium">
-                      {offer.createdAt ? new Date(offer.createdAt).toLocaleDateString() : "N/A"}
-                    </p>
-                  </div>
-                  <div className="flex items-center justify-between bg-[#2D2D2D] rounded-lg h-10 px-3">
-                    <p className="text-sm text-[#DBDBDB] font-medium">
-                      Location
-                    </p>
-                    <p className="text-sm text-white font-medium">
-                      Nigeria
-                    </p>
-                  </div>
-                </div>
-
-                <div className="w-full h-px bg-[#2D2D2D]"></div>
-
-                {/* Tabs */}
-                <div className="flex bg-[#2D2D2D] rounded-[56px] w-full max-w-xs h-12 p-1 items-center justify-between mx-auto">
-                  {tabs.map((tab) => {
-                    const isActive = activeTab === tab.key;
-
-                    return (
-                      <div
-                        key={tab.key}
-                        onClick={() => setActiveTab(tab.key)}
-                        className={`flex items-center justify-center rounded-[56px] text-sm transition no-underline cursor-pointer
-                          ${isActive
-                            ? "bg-[#4A4A4A] text-white font-medium"
-                            : "bg-transparent text-[#DBDBDB] font-normal"
-                          } w-28 h-10`}
-                      >
-                        {tab.label}
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
 
         <div className="w-[100%] h-[1px] bg-[#fff] mt-[50%] opacity-20 my-8"></div>
         
@@ -1364,4 +964,4 @@ const OffersComponent = () => {
   );
 };
 
-export default OffersComponent;
+export default Offers;
