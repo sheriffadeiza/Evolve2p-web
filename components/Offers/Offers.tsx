@@ -23,100 +23,20 @@ import Arrow_great from "../../public/Assets/Evolve2p_Larrow/arrow-right-01.svg"
 import Times from "../../public/Assets/Evolve2p_times/Icon container.png";
 import Footer from "../../components/Footer/Footer";
 import { countryCurrencyService, CurrencyOption } from "../../utils/countryCurrencyService";
-
-// Create a safe wrapper that doesn't crash if context is not available
-const useSafeNotifications = () => {
-  const [notificationsAvailable, setNotificationsAvailable] = useState(false);
-  const [sendNotification, setSendNotification] = useState<((notification: any) => string | null) | null>(null);
-  const [saveTradeToLocalStorage, setSaveTradeToLocalStorage] = useState<((trade: any) => any) | null>(null);
-
-  useEffect(() => {
-    const loadContext = async () => {
-      try {
-        // Dynamic import to avoid circular dependencies
-        const { useNotifications } = await import("../../Context/provider");
-        const context = useNotifications();
-        setSendNotification(() => context.sendNotification);
-        setSaveTradeToLocalStorage(() => context.saveTradeToLocalStorage);
-        setNotificationsAvailable(true);
-      } catch (error) {
-        console.warn("Notifications context not available:", error);
-        // Provide fallback functions
-        setSendNotification(() => (notification: any) => {
-          console.warn("Notification context not available, using fallback:", notification);
-          
-          // Try to save to localStorage anyway
-          try {
-            const allNotifications = JSON.parse(
-              localStorage.getItem('evolve2p_notifications') || '{}'
-            );
-            
-            const userId = notification.recipientId;
-            if (!userId) {
-              console.error("No recipient ID in notification");
-              return null;
-            }
-            
-            const userNotifications = allNotifications[userId] || [];
-            const newNotification = {
-              ...notification,
-              id: `notif_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-              createdAt: new Date(),
-              read: false
-            };
-            
-            userNotifications.unshift(newNotification);
-            allNotifications[userId] = userNotifications;
-            localStorage.setItem('evolve2p_notifications', JSON.stringify(allNotifications));
-            
-            console.log("📨 Fallback notification saved:", newNotification.id);
-            return newNotification.id;
-          } catch (e) {
-            console.error("Failed to save fallback notification:", e);
-            return null;
-          }
-        });
-        setSaveTradeToLocalStorage(() => (trade: any) => {
-          console.warn("Trade storage context not available, using localStorage directly:", trade);
-          try {
-            const trades = JSON.parse(localStorage.getItem('evolve2p_trades') || '{}');
-            const tradeId = trade.id || trade._id || `trade_${Date.now()}`;
-            const enhancedTrade = {
-              ...trade,
-              id: tradeId,
-              createdAt: new Date().toISOString(),
-              status: 'PENDING',
-              updatedAt: new Date().toISOString()
-            };
-            trades[tradeId] = enhancedTrade;
-            localStorage.setItem('evolve2p_trades', JSON.stringify(trades));
-            return enhancedTrade;
-          } catch (e) {
-            console.error("Failed to save trade to localStorage:", e);
-            return trade;
-          }
-        });
-        setNotificationsAvailable(true);
-      }
-    };
-
-    loadContext();
-  }, []);
-
-  return {
-    sendNotification: sendNotification || (() => null),
-    saveTradeToLocalStorage: saveTradeToLocalStorage || ((trade: any) => trade),
-    notificationsAvailable
-  };
-};
+import { useNotifications } from "../../Context/provider";
 
 const OffersComponent = () => {
   const router = useRouter();
   const params = useParams();
   const searchParams = useSearchParams();
   
-  // Use the safe wrapper
-  const { sendNotification, saveTradeToLocalStorage, notificationsAvailable } = useSafeNotifications();
+  // Use notification context
+  const { 
+    sendNotification, 
+    saveTradeToLocalStorage, 
+    debugUserData,
+    testNotification 
+  } = useNotifications();
   
   const [isTermsOpen, setIsTermsOpen] = useState(false);
   const [isSellerOpen, setIsSellerOpen] = useState(false);
@@ -223,29 +143,28 @@ const OffersComponent = () => {
   const isCurrentUserSeller = () => {
     if (!clientUser || !offer || !offer.user) return false;
     
-    const sellerUser = offer.user;
-    const currentUserId = clientUser.id || clientUser._id || clientUser.userId;
-    const sellerId = sellerUser.id || sellerUser._id || sellerUser.userId;
+    // Get current user ID with multiple fallbacks
+    const getCurrentUserId = () => {
+      return clientUser.id || clientUser._id || clientUser.userId;
+    };
     
-    if (currentUserId && sellerId) {
-      return currentUserId === sellerId;
-    }
+    // Get seller ID with multiple fallbacks
+    const getSellerId = () => {
+      const sellerUser = offer.user;
+      return sellerUser.id || sellerUser._id || sellerUser.userId || offer.userId;
+    };
     
-    const currentUserEmail = clientUser.email;
-    const sellerEmail = sellerUser.email;
+    const currentUserId = getCurrentUserId();
+    const sellerId = getSellerId();
     
-    if (currentUserEmail && sellerEmail) {
-      return currentUserEmail === sellerEmail;
-    }
+    console.log("👥 Checking if current user is seller:", {
+      currentUserId,
+      sellerId,
+      clientUser,
+      offerUser: offer.user
+    });
     
-    const currentUsername = clientUser.username;
-    const sellerUsername = sellerUser.username;
-    
-    if (currentUsername && sellerUsername) {
-      return currentUsername === sellerUsername;
-    }
-    
-    return false;
+    return currentUserId === sellerId;
   };
 
   // Enhanced validation before trade creation
@@ -283,6 +202,18 @@ const OffersComponent = () => {
     }
     
     return null;
+  };
+
+  // Get user ID from user object
+  const getUserId = (user: any): string | null => {
+    if (!user) return null;
+    return user.id || user._id || user.userId;
+  };
+
+  // Get username from user object
+  const getUsername = (user: any): string => {
+    if (!user) return "Unknown User";
+    return user.username || user.email || user.name || "Unknown User";
   };
 
   // Create trade function
@@ -329,8 +260,12 @@ const OffersComponent = () => {
       }
 
       // Get user IDs for trade creation
-      const currentUserId = clientUser.id || clientUser._id || clientUser.userId;
-      const sellerId = offer.user?.id || offer.user?._id || offer.user?.userId || currentUserId;
+      const currentUserId = getUserId(clientUser);
+      const sellerId = getUserId(offer.user) || currentUserId;
+
+      if (!currentUserId) {
+        throw new Error("Could not determine current user ID");
+      }
 
       const tradeData = {
         offerId: offer.id,
@@ -344,9 +279,9 @@ const OffersComponent = () => {
         margin: offer.margin || 0,
         fiatCurrency: currency,
         paymentTimeLimit: offer.paymentTime || "30 minutes",
-        buyerId: currentUserId, // Add buyer ID
-        sellerId: sellerId, // Add seller ID
-        initiatorId: currentUserId // Who initiated the trade
+        buyerId: currentUserId,
+        sellerId: sellerId,
+        initiatorId: currentUserId
       };
 
       console.log("🔄 Creating trade with data:", tradeData);
@@ -420,51 +355,7 @@ const OffersComponent = () => {
     }
   };
 
-  // Test notification function
-  const testNotification = () => {
-    const userData = localStorage.getItem("UserData");
-    let userId = "";
-    
-    if (userData) {
-      try {
-        const parsed = JSON.parse(userData);
-        userId = parsed.id || parsed._id || parsed.userId;
-      } catch (e) {
-        console.error("Error parsing user data:", e);
-      }
-    }
-    
-    if (!userId) {
-      alert("No user ID found in localStorage");
-      return;
-    }
-    
-    const testNotif = {
-      type: 'NEW_TRADE_REQUEST' as const,
-      tradeId: `test_${Date.now()}`,
-      offerId: offer?.id || 'test_offer',
-      initiatorId: userId,
-      initiatorUsername: 'Test User',
-      amountFiat: 100,
-      amountCrypto: 0.002,
-      currency: 'USD',
-      crypto: 'BTC',
-      message: 'This is a test notification',
-      recipientId: userId // Send to yourself for testing
-    };
-    
-    console.log("🧪 Sending test notification:", testNotif);
-    const notifId = sendNotification(testNotif);
-    
-    if (notifId) {
-      alert(`Test notification sent successfully! ID: ${notifId}`);
-      showSuccessNotification("Test notification sent successfully!");
-    } else {
-      alert("Failed to send test notification");
-    }
-  };
-
-  // Handle buy/sell button click with notification
+  // Handle trade action with notification
   const handleTradeAction = async () => {
     if (!isPayAmountValid()) {
       alert("Please enter a valid amount");
@@ -480,67 +371,68 @@ const OffersComponent = () => {
     console.log("🎯 Starting trade creation process...");
     
     try {
+      // First, debug user data
+      debugUserData();
+      
+      // Create trade
       const trade = await createTrade();
       
       if (trade) {
         console.log("🚀 Trade created, navigating...", trade);
         
-        // Save trade to localStorage using context or fallback
+        // Save trade to localStorage
         const savedTrade = saveTradeToLocalStorage(trade);
         
         if (savedTrade) {
-          // Get user IDs properly
-          const currentUser = clientUser;
-          const sellerUser = offer.user || {};          
-          // Extract IDs with fallbacks
-          const currentUserId = clientUser?.id;
-
-           const sellerId = sellerUser?.id || offer.userId;          const offerCreatorId = sellerId; // The seller created the offer
+          // Get user IDs
+          const currentUserId = getUserId(clientUser);
+          const sellerId = getUserId(offer.user) || offer.userId;
           
-          console.log("👥 User IDs:", {
+          console.log("👥 User IDs for notification:", {
             currentUserId,
             sellerId,
-            offerCreatorId,
-            currentUser,
-            sellerUser
+            tradeBuyerId: trade.buyerId,
+            tradeSellerId: trade.sellerId,
+            tradeInitiatorId: trade.initiatorId
           });
           
-          // Check if current user is the seller (offer creator)
-          const isSeller = currentUserId === offerCreatorId;
+          // Determine if current user is seller
+          const isSeller = currentUserId === sellerId;
           console.log("🤔 Is current user seller?", isSeller);
           
-          // Determine recipient (the OTHER party)
+          // Determine recipient ID (the OTHER party)
           let recipientId = '';
           
           if (isSeller) {
-            // If current user is seller, recipient is buyer (who initiated this trade)
-            recipientId = trade.buyerId || trade.initiatorId || currentUserId;
+            // Current user is seller, recipient is buyer
+            recipientId = trade.buyerId || trade.initiatorId;
           } else {
-            // If current user is buyer, recipient is seller (offer creator)
-            recipientId = offerCreatorId;
+            // Current user is buyer, recipient is seller
+            recipientId = sellerId;
           }
           
           console.log("📨 Notification recipient ID:", recipientId);
           
           // Only send notification if we have a valid recipient ID
           if (recipientId && recipientId.trim() !== '') {
-            // Create notification for the other party
+            // Create notification
             const notificationData = {
               type: 'NEW_TRADE_REQUEST' as const,
-              tradeId: savedTrade.id,
+              tradeId: savedTrade.id || trade.id,
               offerId: offer.id,
-              initiatorId: currentUserId,
-              initiatorUsername: currentUser?.username || currentUser?.email || 'User',
+              initiatorId: currentUserId || 'unknown',
+              initiatorUsername: getUsername(clientUser),
               amountFiat: parseFloat(payAmount),
               amountCrypto: parseFloat(receiveAmount),
               currency: currency,
               crypto: offer.crypto,
-              message: `${currentUser?.username || currentUser?.email} wants to ${isSeller ? 'sell' : 'buy'} ${receiveAmount} ${offer.crypto}`,
+              message: `${getUsername(clientUser)} wants to ${isSeller ? 'sell' : 'buy'} ${receiveAmount} ${offer.crypto}`,
               recipientId: recipientId
             };
 
-            // Send notification using context
-            console.log("📤 Sending notification:", notificationData);
+            console.log("📤 Sending notification data:", notificationData);
+            
+            // Send notification
             const notificationId = sendNotification(notificationData);
             
             if (notificationId) {
@@ -550,6 +442,14 @@ const OffersComponent = () => {
               
               showSuccessNotification(successMsg);
               console.log("✅ Notification sent with ID:", notificationId);
+              
+              // Also send a test notification to yourself for debugging
+              if (currentUserId) {
+                setTimeout(() => {
+                  const testId = testNotification(currentUserId);
+                  console.log("🧪 Test notification sent to self:", testId);
+                }, 1000);
+              }
             } else {
               const warningMsg = `Trade created! (Notification may not have been sent)`;
               showSuccessNotification(warningMsg);
@@ -557,19 +457,25 @@ const OffersComponent = () => {
             }
           } else {
             console.warn("⚠️ No valid recipient ID found for notification");
+            console.warn("Available IDs:", {
+              currentUserId,
+              sellerId,
+              tradeBuyerId: trade.buyerId,
+              tradeSellerId: trade.sellerId
+            });
             showSuccessNotification(`Trade created! (Could not identify recipient)`);
           }
 
-          // Get trade ID
+          // Get trade ID for navigation
           const tradeId = trade.id || trade._id || savedTrade.id;
           
           if (!tradeId) {
             throw new Error("No trade ID returned from API");
           }
           
-          // Wait a moment for user to see success message, then navigate
+          // Navigate to appropriate page
           setTimeout(() => {
-            const isSeller = currentUserId === offerCreatorId;
+            const isSeller = currentUserId === sellerId;
             if (isSeller) {
               router.push(`/prc_sell?tradeId=${tradeId}&offerId=${offer.id}&currency=${currency}&payAmount=${payAmount}`);
             } else {
@@ -621,78 +527,54 @@ const OffersComponent = () => {
       .map(term => term.startsWith('•') ? term : `• ${term}`);
   };
 
-  // Make it available globally for testing
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      (window as any).debugOffer = () => {
-        console.log("🔍 Debug Offer:", offer);
-        console.log("🔍 Debug Client User:", clientUser);
-        console.log("🔍 Debug Amounts:", { payAmount, receiveAmount });
-        console.log("🔍 Debug Trade Price:", tradePrice);
-        console.log("🔍 Debug Fixed Price:", fixedPrice);
-      };
-      
-      (window as any).debugUsers = () => {
-        console.log("🔍 Debug Users:", {
-          clientUser,
-          offerUser: offer?.user,
-          currentUserId: clientUser?.id || clientUser?._id,
-          sellerId: offer?.user?.id || offer?.user?._id,
-          isCurrentUserSeller: isCurrentUserSeller()
-        });
-      };
-    }
-  }, [offer, clientUser, payAmount, receiveAmount, tradePrice, fixedPrice]);
-
   // Fixed: Proper null handling for localStorage
-  // In OffersComponent.tsx, update the useEffect that loads clientUser:
-useEffect(() => {
-  if (typeof window === "undefined") return;
-  
-  const raw = localStorage.getItem("UserData");
-  if (!raw) {
-    console.log("❌ No UserData found in localStorage");
-    return;
-  }
-  
-  try {
-    const parsed = JSON.parse(raw);
-    console.log("📊 Parsed UserData:", parsed);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
     
-    // EXTRACT USER FROM YOUR SPECIFIC STRUCTURE
-    let userData = null;
-    
-    if (parsed.userData) {
-      // Your structure: { accessToken, userData: {...} }
-      userData = parsed.userData;
-      console.log("✅ Using userData from parsed.userData");
-    } else if (parsed.data) {
-      // Alternative structure: { data: {...} }
-      userData = parsed.data;
-      console.log("✅ Using userData from parsed.data");
-    } else if (parsed.user) {
-      // Alternative structure: { user: {...} }
-      userData = parsed.user;
-      console.log("✅ Using userData from parsed.user");
-    } else {
-      // Direct user object
-      userData = parsed;
-      console.log("✅ Using userData directly from parsed");
+    const raw = localStorage.getItem("UserData");
+    if (!raw) {
+      console.log("❌ No UserData found in localStorage");
+      return;
     }
     
-    // Also include the accessToken if available
-    if (parsed.accessToken && !userData.accessToken) {
-      userData.accessToken = parsed.accessToken;
+    try {
+      const parsed = JSON.parse(raw);
+      console.log("📊 Parsed UserData for client:", parsed);
+      
+      // EXTRACT USER FROM YOUR SPECIFIC STRUCTURE
+      let userData = null;
+      
+      if (parsed.userData) {
+        // Your structure: { accessToken, userData: {...} }
+        userData = parsed.userData;
+        console.log("✅ Using userData from parsed.userData");
+      } else if (parsed.data) {
+        // Alternative structure: { data: {...} }
+        userData = parsed.data;
+        console.log("✅ Using userData from parsed.data");
+      } else if (parsed.user) {
+        // Alternative structure: { user: {...} }
+        userData = parsed.user;
+        console.log("✅ Using userData from parsed.user");
+      } else {
+        // Direct user object
+        userData = parsed;
+        console.log("✅ Using userData directly from parsed");
+      }
+      
+      // Also include the accessToken if available
+      if (parsed.accessToken && !userData.accessToken) {
+        userData.accessToken = parsed.accessToken;
+      }
+      
+      setClientUser(userData);
+      console.log("👤 Client user set:", userData);
+      
+    } catch (e) {
+      console.error("❌ Error setting client user:", e);
+      setClientUser(null);
     }
-    
-    setClientUser(userData);
-    console.log("👤 Client user set:", userData);
-    
-  } catch (e) {
-    console.error("❌ Error setting client user:", e);
-    setClientUser(null);
-  }
-}, []);
+  }, []);
 
   // Load currency data from country currency service
   useEffect(() => {
@@ -848,7 +730,8 @@ useEffect(() => {
           type: offerData.type,
           id: offerData.id || offerId,
           minLimit: offerData.minLimit,
-          maxLimit: offerData.maxLimit
+          maxLimit: offerData.maxLimit,
+          user: offerData.user
         });
 
       } catch (error) {
@@ -929,13 +812,32 @@ useEffect(() => {
           <p>Back to Marketplace</p>
         </div>
 
-        {/* Debug Button (Temporary) */}
-        <button 
-          onClick={testNotification}
-          className="mt-2 mb-4 px-4 py-2 bg-yellow-500 text-black rounded text-sm font-medium"
-        >
-          Test Notification
-        </button>
+        {/* Debug Buttons */}
+        <div className="flex gap-2 mb-4">
+          <button 
+            onClick={() => {
+              debugUserData();
+              alert("Check console for user data debug info");
+            }}
+            className="px-4 py-2 bg-blue-500 text-white rounded text-sm font-medium"
+          >
+            Debug User Data
+          </button>
+          
+          <button 
+            onClick={() => {
+              const testId = testNotification();
+              if (testId) {
+                alert(`Test notification sent! ID: ${testId}`);
+              } else {
+                alert("Failed to send test notification");
+              }
+            }}
+            className="px-4 py-2 bg-green-500 text-white rounded text-sm font-medium"
+          >
+            Test Notification
+          </button>
+        </div>
 
         {/* Currency Display */}
         <div className="p-3 bg-[#222222] rounded-lg mb-6">
@@ -1457,9 +1359,9 @@ useEffect(() => {
         <div className="mb-[80px] mt-[10%]">
           <Footer />
         </div>
-        </div>
+      </div>
     </main>
-  );                                                     
+  );
 };
 
 export default OffersComponent;

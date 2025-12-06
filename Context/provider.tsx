@@ -31,6 +31,8 @@ interface NotificationContextType {
   saveTradeToLocalStorage: (trade: any) => any;
   getTradesFromLocalStorage: () => Record<string, any>;
   getUnreadTradeRequests: () => Notification[];
+  debugUserData: () => void;
+  testNotification: (recipientId?: string) => string | null;
 }
 
 const NotificationContext = createContext<NotificationContextType | undefined>(undefined);
@@ -43,60 +45,81 @@ export const NotificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
   const [unreadCount, setUnreadCount] = useState(0);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
-  // Get current user from localStorage with better validation
-  // Replace the getCurrentUserFromStorage function with this:
-const getCurrentUserFromStorage = useCallback((): string | null => {
-  try {
-    if (typeof window === "undefined") return null;
-    
-    const userData = localStorage.getItem('UserData');
-    if (!userData) {
-      console.warn("⚠️ No UserData found in localStorage");
+  // Get current user from localStorage with multiple fallbacks
+  const getCurrentUserFromStorage = useCallback((): string | null => {
+    try {
+      if (typeof window === "undefined") return null;
+      
+      const userData = localStorage.getItem('UserData');
+      if (!userData) {
+        console.warn("⚠️ No UserData found in localStorage");
+        return null;
+      }
+      
+      const parsed = JSON.parse(userData);
+      console.log("📊 Parsed UserData structure for ID extraction:", {
+        root: parsed,
+        userData: parsed.userData,
+        data: parsed.data,
+        user: parsed.user
+      });
+      
+      // Try multiple possible ID locations
+      const possibleIds = [
+        parsed.userData?.id,
+        parsed.userData?._id,
+        parsed.userData?.userId,
+        parsed.data?.id,
+        parsed.data?._id,
+        parsed.data?.userId,
+        parsed.user?.id,
+        parsed.user?._id,
+        parsed.user?.userId,
+        parsed.id,
+        parsed._id,
+        parsed.userId
+      ];
+      
+      for (const id of possibleIds) {
+        if (id && typeof id === 'string' && id.trim() !== '') {
+          console.log("✅ Found user ID:", id);
+          return id;
+        }
+      }
+      
+      console.warn("⚠️ No valid user ID found in any location");
+      return null;
+      
+    } catch (error) {
+      console.error('❌ Error getting user from storage:', error);
       return null;
     }
-    
-    const parsed = JSON.parse(userData);
-    console.log("📊 Parsed UserData from localStorage:", parsed);
-    
-    // YOUR SPECIFIC STRUCTURE: ID is inside userData object
-    if (parsed.userData && parsed.userData.id) {
-      const userId = parsed.userData.id;
-      console.log("✅ Found user ID in userData.id:", userId);
-      return userId;
+  }, []);
+
+  // Debug function to show user data structure
+  const debugUserData = useCallback(() => {
+    try {
+      if (typeof window === "undefined") return;
+      
+      const userData = localStorage.getItem("UserData");
+      console.log("🔍 Raw UserData from localStorage:", userData);
+      if (userData) {
+        const parsed = JSON.parse(userData);
+        console.log("🔍 Parsed UserData structure:", {
+          root: parsed,
+          userData: parsed.userData,
+          data: parsed.data,
+          user: parsed.user,
+          allKeys: Object.keys(parsed),
+          userDataKeys: parsed.userData ? Object.keys(parsed.userData) : [],
+          dataKeys: parsed.data ? Object.keys(parsed.data) : []
+        });
+      }
+    } catch (e) {
+      console.error("Error debugging user data:", e);
     }
-    
-    // Also check for other possible structures
-    if (parsed.id) {
-      console.log("✅ Found user ID in root id:", parsed.id);
-      return parsed.id;
-    }
-    
-    if (parsed.userId) {
-      console.log("✅ Found user ID in root userId:", parsed.userId);
-      return parsed.userId;
-    }
-    
-    if (parsed._id) {
-      console.log("✅ Found user ID in root _id:", parsed._id);
-      return parsed._id;
-    }
-    
-    // Check nested in data if exists
-    if (parsed.data && parsed.data.id) {
-      console.log("✅ Found user ID in data.id:", parsed.data.id);
-      return parsed.data.id;
-    }
-    
-    console.warn("⚠️ No user ID found in any expected location");
-    console.log("🔍 Available keys in UserData:", Object.keys(parsed));
-    
-    return null;
-    
-  } catch (error) {
-    console.error('❌ Error getting user from storage:', error);
-    return null;
-  }
-}, []);
+  }, []);
+
   // Initialize storage
   const initializeStorage = useCallback(() => {
     if (typeof window === "undefined") return;
@@ -131,6 +154,8 @@ const getCurrentUserFromStorage = useCallback((): string | null => {
         localStorage.getItem(NOTIFICATION_STORAGE_KEY) || '{}'
       );
 
+      console.log("📊 All notifications in storage for user", userId, ":", allNotifications[userId] || []);
+
       const userNotifications: any[] = allNotifications[userId] || [];
       
       // Parse notifications with validation
@@ -163,7 +188,7 @@ const getCurrentUserFromStorage = useCallback((): string | null => {
       const unread = parsedNotifications.filter(n => !n.read).length;
       setUnreadCount(unread);
       
-      console.log(`📊 Loaded ${parsedNotifications.length} notifications, ${unread} unread`);
+      console.log(`📊 Loaded ${parsedNotifications.length} notifications, ${unread} unread for user ${userId}`);
       
     } catch (error) {
       console.error('❌ Error loading notifications:', error);
@@ -179,6 +204,7 @@ const getCurrentUserFromStorage = useCallback((): string | null => {
     // Set current user ID
     const userId = getCurrentUserFromStorage();
     setCurrentUserId(userId);
+    console.log("👤 Current user ID set to:", userId);
     
     // Load initial notifications
     loadNotifications();
@@ -215,24 +241,25 @@ const getCurrentUserFromStorage = useCallback((): string | null => {
     }
   }, []);
 
-  // Send notification to another user - returns notification ID or null
+  // Enhanced send notification function with better logging
   const sendNotification = useCallback((notification: Omit<Notification, 'id' | 'createdAt' | 'read'>): string | null => {
     try {
+      console.log("📤 Starting sendNotification with data:", notification);
+      
       // Validate recipient ID
-      if (!notification.recipientId || 
-          typeof notification.recipientId !== 'string' || 
-          notification.recipientId.trim() === '') {
+      if (!notification.recipientId || typeof notification.recipientId !== 'string' || notification.recipientId.trim() === '') {
         console.error("❌ Cannot send notification: Invalid recipient ID", notification.recipientId);
         return null;
       }
 
       // Validate initiator
       if (!notification.initiatorId || notification.initiatorId.trim() === '') {
-        console.error("❌ Cannot send notification: Invalid initiator ID");
+        console.error("❌ Cannot send notification: Invalid initiator ID", notification.initiatorId);
         return null;
       }
 
-      console.log("📤 Sending notification to:", notification.recipientId);
+      console.log("📤 Sending notification to recipient:", notification.recipientId);
+      console.log("📤 Notification from initiator:", notification.initiatorId);
 
       const newNotification: Notification = {
         ...notification,
@@ -246,9 +273,12 @@ const getCurrentUserFromStorage = useCallback((): string | null => {
         localStorage.getItem(NOTIFICATION_STORAGE_KEY) || '{}'
       );
 
+      console.log("📊 Current notification storage keys:", Object.keys(allNotifications));
+
       // Initialize if doesn't exist
       if (!allNotifications[notification.recipientId]) {
         allNotifications[notification.recipientId] = [];
+        console.log("📝 Created new notification array for recipient:", notification.recipientId);
       }
 
       const recipientNotifications = allNotifications[notification.recipientId];
@@ -259,6 +289,7 @@ const getCurrentUserFromStorage = useCallback((): string | null => {
       );
       
       if (existingIndex !== -1) {
+        console.log("🔄 Removing duplicate notification");
         recipientNotifications.splice(existingIndex, 1);
       }
       
@@ -273,8 +304,9 @@ const getCurrentUserFromStorage = useCallback((): string | null => {
       
       try {
         localStorage.setItem(NOTIFICATION_STORAGE_KEY, JSON.stringify(allNotifications));
-        console.log("✅ Notification saved for user:", notification.recipientId);
+        console.log("✅ Notification saved successfully for user:", notification.recipientId);
         console.log("📊 Total notifications for this user:", recipientNotifications.length);
+        console.log("📋 Notification data saved:", newNotification);
       } catch (storageError) {
         console.error("❌ Storage error:", storageError);
         // Try to clear some space
@@ -295,6 +327,7 @@ const getCurrentUserFromStorage = useCallback((): string | null => {
               tag: notification.tradeId || 'trade-notification',
               requireInteraction: true
             });
+            console.log("🔔 Browser notification shown");
           } catch (notifError) {
             console.warn("⚠️ Could not show browser notification:", notifError);
           }
@@ -311,6 +344,7 @@ const getCurrentUserFromStorage = useCallback((): string | null => {
           return [newNotification, ...filtered.slice(0, 99)];
         });
         setUnreadCount(prev => prev + 1);
+        console.log("🔄 Updated local state for current user");
       }
 
       // Dispatch storage event for other tabs
@@ -319,12 +353,46 @@ const getCurrentUserFromStorage = useCallback((): string | null => {
         newValue: JSON.stringify(allNotifications)
       }));
 
+      console.log("✅ Notification process completed successfully, ID:", newNotification.id);
       return newNotification.id;
     } catch (error) {
-      console.error("❌ Error sending notification:", error);
+      console.error("❌ Error in sendNotification:", error);
       return null;
     }
   }, [currentUserId]);
+
+  // Test notification function
+  const testNotification = useCallback((recipientId?: string): string | null => {
+    try {
+      const userId = getCurrentUserFromStorage();
+      const targetRecipientId = recipientId || userId;
+      
+      if (!targetRecipientId) {
+        console.error("❌ No recipient ID for test notification");
+        return null;
+      }
+      
+      const testNotif = {
+        type: 'NEW_TRADE_REQUEST' as const,
+        tradeId: `test_${Date.now()}`,
+        offerId: 'test_offer',
+        initiatorId: userId || 'test_user',
+        initiatorUsername: 'Test User',
+        amountFiat: 100,
+        amountCrypto: 0.002,
+        currency: 'USD',
+        crypto: 'BTC',
+        message: 'This is a test notification',
+        recipientId: targetRecipientId
+      };
+      
+      console.log("🧪 Sending test notification:", testNotif);
+      return sendNotification(testNotif);
+    } catch (error) {
+      console.error("❌ Error in testNotification:", error);
+      return null;
+    }
+  }, [getCurrentUserFromStorage, sendNotification]);
 
   // Save trade to localStorage
   const saveTradeToLocalStorage = useCallback((trade: any) => {
@@ -437,6 +505,7 @@ const getCurrentUserFromStorage = useCallback((): string | null => {
   }, [currentUserId]);
 
   const checkForNewNotifications = useCallback(() => {
+    console.log("🔄 Manually checking for new notifications");
     loadNotifications();
   }, [loadNotifications]);
 
@@ -455,7 +524,9 @@ const getCurrentUserFromStorage = useCallback((): string | null => {
     refreshNotifications,
     saveTradeToLocalStorage,
     getTradesFromLocalStorage,
-    getUnreadTradeRequests
+    getUnreadTradeRequests,
+    debugUserData,
+    testNotification
   };
 
   return (
