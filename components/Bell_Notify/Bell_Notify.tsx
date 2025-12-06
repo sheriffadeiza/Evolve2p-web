@@ -1,3 +1,4 @@
+// components/Bell_Notify.tsx
 "use client";
 
 import React, { useState, useEffect, useCallback, useMemo } from "react";
@@ -5,40 +6,15 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import Less_than from "../../public/Assets/Evolve2p_lessthan/Makretplace/arrow-left-01.svg";
 import ArrowRight from "../../public/Assets/Evolve2p_Larrow/arrow-right-01.svg";
+import notificationService, { NotificationData } from "../../utils/notificationService";
 
-interface Notification {
-  id: string;
-  type: "NEW_TRADE_REQUEST" | "PAYMENT_SENT" | "PAYMENT_RECEIVED" | "TRADE_ACCEPTED" | "TRADE_DECLINED" | "TRADE_COMPLETED" | "SYSTEM";
-  tradeId?: string;
-  offerId?: string;
-  initiatorId?: string;
-  initiatorUsername?: string;
-  amountFiat?: number;
-  amountCrypto?: number;
-  currency?: string;
-  crypto?: string;
-  message?: string;
-  recipientId?: string;
-  recipientUsername?: string; // Added recipient info
-  createdAt: string;
-  read: boolean;
-  // Added fields for better trade tracking
-  isBuyer?: boolean;
-  isSeller?: boolean;
-  tradeStatus?: string;
-}
-
-interface NotificationConfig {
-  title: string;
-  icon: string;
-  color: string;
-  borderColor: string;
+const NOTIFICATION_CONFIG: Record<string, { 
+  title: string; 
+  icon: string; 
+  color: string; 
+  borderColor: string; 
   bgColor: string;
-}
-
-type NotificationType = Notification['type'];
-
-const NOTIFICATION_CONFIG: Record<NotificationType, NotificationConfig> = {
+}> = {
   NEW_TRADE_REQUEST: {
     title: "New Trade Request",
     icon: "💰",
@@ -65,18 +41,32 @@ const NOTIFICATION_CONFIG: Record<NotificationType, NotificationConfig> = {
     icon: "💸",
     color: "#FFC051",
     borderColor: "#FFC051",
-    bgColor: "#342827"
+    bgColor: "#352E21"
   },
   PAYMENT_RECEIVED: {
     title: "Payment Received",
     icon: "💸",
     color: "#FFC051",
     borderColor: "#FFC051",
-    bgColor: "#342827"
+    bgColor: "#352E21"
   },
   TRADE_DECLINED: {
     title: "Trade Declined",
     icon: "❌",
+    color: "#FE857D",
+    borderColor: "#FE857D",
+    bgColor: "#342827"
+  },
+  TRADE_CANCELLED: {
+    title: "Trade Cancelled",
+    icon: "⛔",
+    color: "#FE857D",
+    borderColor: "#FE857D",
+    bgColor: "#342827"
+  },
+  DISPUTE_OPENED: {
+    title: "Dispute Opened",
+    icon: "⚖️",
     color: "#FE857D",
     borderColor: "#FE857D",
     bgColor: "#342827"
@@ -90,7 +80,7 @@ const NOTIFICATION_CONFIG: Record<NotificationType, NotificationConfig> = {
   }
 };
 
-const DEFAULT_CONFIG: NotificationConfig = {
+const DEFAULT_CONFIG = {
   title: "Notification",
   icon: "🔔",
   color: "#4DF2BE",
@@ -99,181 +89,98 @@ const DEFAULT_CONFIG: NotificationConfig = {
 };
 
 const Bell_Notify: React.FC = () => {
-  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const router = useRouter();
+  const [notifications, setNotifications] = useState<NotificationData[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [activeFilter, setActiveFilter] = useState<'all' | 'unread' | 'trade'>('all');
-  const [loading, setLoading] = useState(true);
-  const router = useRouter();
+  const [loading, setLoading] = useState(false);
+  const [lastUpdate, setLastUpdate] = useState<number>(Date.now());
 
-  // Get current user ID
-  const getCurrentUserId = useCallback((): string | null => {
-    try {
-      const userData = localStorage.getItem("UserData");
-      if (!userData) return null;
-      
-      const parsed = JSON.parse(userData);
-      return parsed.userData?.id || parsed.id || parsed._id;
-    } catch (error) {
-      console.error("Error getting current user ID:", error);
-      return null;
-    }
-  }, []);
-
-  // Get current username
-  const getCurrentUsername = useCallback((): string | null => {
-    try {
-      const userData = localStorage.getItem("UserData");
-      if (!userData) return null;
-      
-      const parsed = JSON.parse(userData);
-      return parsed.userData?.username || parsed.username || null;
-    } catch (error) {
-      console.error("Error getting current username:", error);
-      return null;
-    }
-  }, []);
-
-  // Load notifications from userData with enhanced trade info
+  // Load notifications
   const loadNotifications = useCallback(() => {
-    if (typeof window !== "undefined") {
-      try {
-        const userData = localStorage.getItem("UserData");
-        if (!userData) {
-          setNotifications([]);
-          setUnreadCount(0);
-          setLoading(false);
-          return;
-        }
-
-        const parsed = JSON.parse(userData);
-        const userNotifs = parsed?.userData?.notifications || parsed?.notifications || [];
-        const currentUserId = getCurrentUserId();
-        const currentUsername = getCurrentUsername();
-        
-        // Enhance notifications with user role info
-        const enhancedNotifs = userNotifs.map((n: Notification) => {
-          const notification = { ...n };
-          
-          // For trade requests, determine if user is initiator or recipient
-          if (notification.type === "NEW_TRADE_REQUEST") {
-            const isInitiator = notification.initiatorId === currentUserId;
-            const isRecipient = notification.recipientId === currentUserId;
-            
-            notification.isBuyer = !isInitiator; // Recipient is usually the buyer
-            notification.isSeller = isInitiator; // Initiator is usually the seller
-            
-            // Ensure recipientUsername exists
-            if (!notification.recipientUsername && currentUsername && isRecipient) {
-              notification.recipientUsername = currentUsername;
-            }
-          }
-          
-          return notification;
-        });
-        
-        // Sort by newest first
-        const sorted = [...enhancedNotifs].sort((a, b) => 
-          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-        );
-        
-        setNotifications(sorted);
-        setUnreadCount(sorted.filter((n: Notification) => !n.read).length);
-        setLoading(false);
-      } catch (error) {
-        console.error("Error loading notifications:", error);
-        setLoading(false);
-      }
+    setLoading(true);
+    try {
+      const allNotifications = notificationService.getNotifications();
+      setNotifications(allNotifications);
+      setUnreadCount(notificationService.getUnreadCount());
+      setLastUpdate(Date.now());
+    } catch (error) {
+      console.error('Error loading notifications:', error);
+    } finally {
+      setLoading(false);
     }
-  }, [getCurrentUserId, getCurrentUsername]);
+  }, []);
 
-  useEffect(() => {
+  // Mark notification as read
+  const handleMarkAsRead = useCallback((notificationId: string) => {
+    notificationService.markAsRead(notificationId);
     loadNotifications();
-
-    const interval = setInterval(loadNotifications, 10000);
-    
-    if (typeof window !== "undefined") {
-      window.addEventListener("storage", loadNotifications);
-    }
-
-    return () => {
-      clearInterval(interval);
-      if (typeof window !== "undefined") {
-        window.removeEventListener("storage", loadNotifications);
-      }
-    };
   }, [loadNotifications]);
 
-  const updateNotifications = useCallback((updater: (notifs: Notification[]) => Notification[]) => {
-    if (typeof window !== "undefined") {
-      const userData = localStorage.getItem("UserData");
+  // Mark all as read
+  const handleMarkAllAsRead = useCallback(() => {
+    notificationService.markAllAsRead();
+    loadNotifications();
+  }, [loadNotifications]);
+
+  // Clear all notifications
+  const handleClearAllNotifications = useCallback(() => {
+    if (window.confirm("Are you sure you want to clear all notifications?")) {
+      notificationService.clearAllNotifications();
+      loadNotifications();
+    }
+  }, [loadNotifications]);
+
+  // Handle notification click
+  const handleNotificationClick = useCallback((notification: NotificationData) => {
+    // Mark as read
+    if (!notification.read) {
+      handleMarkAsRead(notification.id);
+    }
+
+    // Navigate based on notification type
+    if (notification.tradeId) {
+      // Get current user to determine if they're buyer or seller
+      const userData = localStorage.getItem('UserData');
       if (userData) {
         try {
           const parsed = JSON.parse(userData);
-          const currentNotifs = parsed?.userData?.notifications || parsed?.notifications || [];
-          const updated = updater(currentNotifs);
-
-          if (parsed.userData) {
-            parsed.userData.notifications = updated;
-          } else {
-            parsed.notifications = updated;
-          }
-          localStorage.setItem("UserData", JSON.stringify(parsed));
-
-          // Sort by newest first
-          const sorted = [...updated].sort((a, b) => 
-            new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-          );
+          const user = parsed.userData || parsed.data || parsed.user || parsed;
+          const userId = user.id || user._id || user.userId;
           
-          setNotifications(sorted);
-          setUnreadCount(sorted.filter(n => !n.read).length);
+          if (notification.type === 'NEW_TRADE_REQUEST') {
+            // If user is initiator, go to seller page, else buyer page
+            if (userId === notification.initiatorId) {
+              router.push(`/prc_sell?tradeId=${notification.tradeId}`);
+            } else {
+              router.push(`/prc_buy?tradeId=${notification.tradeId}`);
+            }
+          } else if (notification.type === 'PAYMENT_SENT') {
+            // Seller receives payment sent notification
+            router.push(`/prc_sell?tradeId=${notification.tradeId}`);
+          } else if (notification.type === 'TRADE_COMPLETED') {
+            // Buyer receives trade completed notification
+            router.push(`/prc_buy?tradeId=${notification.tradeId}`);
+          } else if (notification.type === 'DISPUTE_OPENED') {
+            // Both parties go to their respective trade pages
+            if (userId === notification.initiatorId) {
+              router.push(`/prc_sell?tradeId=${notification.tradeId}`);
+            } else {
+              router.push(`/prc_buy?tradeId=${notification.tradeId}`);
+            }
+          }
         } catch (error) {
-          console.error("Error updating notifications:", error);
+          console.error('Error parsing user data:', error);
+          router.push(`/prc_buy?tradeId=${notification.tradeId}`);
         }
       }
+    } else if (notification.offerId) {
+      router.push(`/offer/${notification.offerId}`);
     }
-  }, []);
+  }, [router, handleMarkAsRead]);
 
-  const markAsRead = (notificationId: string) => {
-    updateNotifications(notifs => 
-      notifs.map(n => n.id === notificationId ? { ...n, read: true } : n)
-    );
-  };
-
-  const markAllAsRead = () => {
-    updateNotifications(notifs => notifs.map(n => ({ ...n, read: true })));
-  };
-
-  const clearAllNotifications = () => {
-    if (typeof window !== "undefined" && window.confirm("Are you sure you want to clear all notifications?")) {
-      updateNotifications(() => []);
-    }
-  };
-
-  const handleNotificationClick = (notification: Notification) => {
-    markAsRead(notification.id);
-
-    if (notification.type === "NEW_TRADE_REQUEST" && notification.tradeId) {
-      const userId = getCurrentUserId();
-      
-      // Determine the correct route based on user role
-      let tradeRoute = "";
-      
-      if (notification.initiatorId === userId) {
-        // User is the initiator (seller in most cases)
-        tradeRoute = "/prc_sell";
-      } else if (notification.recipientId === userId) {
-        // User is the recipient (buyer in most cases)
-        tradeRoute = "/prc_buy";
-      } else {
-        // Fallback to default
-        tradeRoute = userId === notification.initiatorId ? "/prc_sell" : "/prc_buy";
-      }
-      
-      router.push(`${tradeRoute}?tradeId=${notification.tradeId}`);
-    }
-  };
-
-  const formatTime = (dateString: string): string => {
+  // Format time
+  const formatTime = useCallback((dateString: string): string => {
     try {
       const date = new Date(dateString);
       const now = new Date();
@@ -290,58 +197,69 @@ const Bell_Notify: React.FC = () => {
     } catch {
       return "Recently";
     }
-  };
+  }, []);
 
-  const getNotificationMessage = (notification: Notification): string => {
-    const currentUserId = getCurrentUserId();
-    const isInitiator = notification.initiatorId === currentUserId;
-    
-    switch (notification.type) {
-      case 'NEW_TRADE_REQUEST':
-        if (isInitiator) {
-          return `You requested to trade ${notification.amountFiat} ${notification.currency} for ${notification.amountCrypto} ${notification.crypto} with ${notification.recipientUsername || 'a user'}`;
-        } else {
-          return `${notification.initiatorUsername} wants to trade ${notification.amountFiat} ${notification.currency} for ${notification.amountCrypto} ${notification.crypto} with you`;
-        }
-      case 'TRADE_ACCEPTED':
-        return "Your trade request has been accepted";
-      case 'TRADE_DECLINED':
-        return "Your trade request was declined";
-      case 'PAYMENT_SENT':
-        return "Payment has been sent for your trade";
-      case 'PAYMENT_RECEIVED':
-        return "Payment has been received";
-      case 'TRADE_COMPLETED':
-        return "Trade has been completed successfully";
-      case 'SYSTEM':
-        return notification.message || "System notification";
-      default:
-        return notification.message || "New notification";
-    }
-  };
-
-  const getTradeStatusLabel = (notification: Notification): string => {
-    const currentUserId = getCurrentUserId();
-    const isInitiator = notification.initiatorId === currentUserId;
-    
-    if (isInitiator) {
-      return "Waiting for response";
-    } else {
-      return "Action required";
-    }
-  };
-
+  // Get filtered notifications
   const filteredNotifications = useMemo(() => {
     return notifications.filter(notification => {
       if (activeFilter === 'unread') return !notification.read;
-      if (activeFilter === 'trade') return notification.type === 'NEW_TRADE_REQUEST';
+      if (activeFilter === 'trade') {
+        return [
+          'NEW_TRADE_REQUEST', 
+          'PAYMENT_SENT', 
+          'TRADE_COMPLETED', 
+          'TRADE_CANCELLED',
+          'DISPUTE_OPENED'
+        ].includes(notification.type);
+      }
       return true;
     });
   }, [notifications, activeFilter]);
 
-  const unreadTradeCount = notifications.filter(n => !n.read && n.type === 'NEW_TRADE_REQUEST').length;
+  // Get unread trade count
+  const unreadTradeCount = useMemo(() => {
+    return notifications.filter(n => 
+      !n.read && [
+        'NEW_TRADE_REQUEST',
+        'PAYMENT_SENT',
+        'TRADE_COMPLETED',
+        'TRADE_CANCELLED',
+        'DISPUTE_OPENED'
+      ].includes(n.type)
+    ).length;
+  }, [notifications]);
 
-  // FULL PAGE NOTIFICATIONS VIEW
+  // Load notifications on mount
+  useEffect(() => {
+    loadNotifications();
+
+    // Listen for storage events (updates from other tabs)
+    const handleStorageChange = () => {
+      loadNotifications();
+    };
+
+    // Listen for custom notification events
+    const handleNotificationUpdate = () => {
+      loadNotifications();
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    window.addEventListener('notification-updated', handleNotificationUpdate);
+    window.addEventListener('bell-notification-update', handleNotificationUpdate);
+
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener('notification-updated', handleNotificationUpdate);
+      window.removeEventListener('bell-notification-update', handleNotificationUpdate);
+    };
+  }, [loadNotifications]);
+
+  // Auto-refresh every 30 seconds
+  useEffect(() => {
+    const interval = setInterval(loadNotifications, 30000);
+    return () => clearInterval(interval);
+  }, [loadNotifications]);
+
   return (
     <main className="min-h-screen bg-[#0F1012] text-white">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 md:py-8">
@@ -419,7 +337,7 @@ const Bell_Notify: React.FC = () => {
         <div className="flex flex-wrap gap-3 mb-8">
           {unreadCount > 0 && (
             <button
-              onClick={markAllAsRead}
+              onClick={handleMarkAllAsRead}
               className="px-4 py-2 bg-[#1B362B] text-[#1ECB84] rounded-lg text-sm font-medium hover:bg-[#1A4030] transition-colors flex items-center gap-2"
             >
               <span className="text-lg">✅</span>
@@ -428,7 +346,7 @@ const Bell_Notify: React.FC = () => {
           )}
           {notifications.length > 0 && (
             <button
-              onClick={clearAllNotifications}
+              onClick={handleClearAllNotifications}
               className="px-4 py-2 bg-[#342827] text-[#FE857D] rounded-lg text-sm font-medium hover:bg-[#2A1F1F] transition-colors flex items-center gap-2"
             >
               <span className="text-lg">🗑️</span>
@@ -445,159 +363,151 @@ const Bell_Notify: React.FC = () => {
         </div>
 
         {/* Notifications List */}
-        {!loading && (
-          <div className="space-y-4">
-            {filteredNotifications.length > 0 ? (
-              filteredNotifications.map((notification) => {
-                const config = NOTIFICATION_CONFIG[notification.type] || DEFAULT_CONFIG;
-                const currentUserId = getCurrentUserId();
-                const isInitiator = notification.initiatorId === currentUserId;
-                const isTradeRequest = notification.type === 'NEW_TRADE_REQUEST';
-                
-                return (
-                  <div
-                    key={notification.id}
-                    onClick={() => handleNotificationClick(notification)}
-                    className={`bg-[#222222] rounded-xl p-4 cursor-pointer hover:bg-[#2A2A2A] transition-all duration-200 border-l-4 ${
-                      notification.read ? 'opacity-70' : 'bg-[#1A1A1A] shadow-lg'
-                    }`}
-                    style={{ borderLeftColor: config?.borderColor || "#4DF2BE" }}
-                  >
-                    <div className="flex items-start gap-4">
-                      {/* Icon */}
-                      <div className={`w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0 ${
-                        notification.read ? 'bg-[#3A3A3A]' : 'bg-[#2D2D2D]'
-                      }`}>
-                        <span className="text-2xl" style={{ color: config?.color || "#4DF2BE" }}>
-                          {config?.icon || "🔔"}
-                        </span>
-                      </div>
+        <div className="space-y-4">
+          {filteredNotifications.length > 0 ? (
+            filteredNotifications.map((notification) => {
+              const config = NOTIFICATION_CONFIG[notification.type] || DEFAULT_CONFIG;
+              const isUnread = !notification.read;
+              
+              return (
+                <div
+                  key={notification.id}
+                  onClick={() => handleNotificationClick(notification)}
+                  className={`bg-[#222222] rounded-xl p-4 cursor-pointer hover:bg-[#2A2A2A] transition-all duration-200 border-l-4 ${
+                    isUnread ? 'bg-[#1A1A1A] shadow-lg' : 'opacity-80'
+                  }`}
+                  style={{ borderLeftColor: config.borderColor }}
+                >
+                  <div className="flex items-start gap-4">
+                    {/* Icon */}
+                    <div className={`w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0 ${
+                      isUnread ? 'bg-[#2D2D2D]' : 'bg-[#3A3A3A]'
+                    }`}>
+                      <span className="text-2xl" style={{ color: config.color }}>
+                        {config.icon}
+                      </span>
+                    </div>
 
-                      {/* Content */}
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-start justify-between gap-2 mb-2">
-                          <div className="flex-1">
-                            <div className="flex items-center gap-2 mb-1 flex-wrap">
-                              <p className="font-bold text-white text-sm">
-                                {config?.title || "Notification"}
-                              </p>
-                              {isTradeRequest && (
-                                <span className={`text-xs px-2 py-1 rounded-full font-medium ${
-                                  isInitiator 
-                                    ? 'bg-[#1B362B] text-[#1ECB84]' 
-                                    : 'bg-[#342827] text-[#FFC051]'
-                                }`}>
-                                  {isInitiator ? 'You initiated' : 'Requested'}
-                                </span>
-                              )}
-                              {!notification.read && (
-                                <span className="w-2 h-2 bg-[#4DF2BE] rounded-full flex-shrink-0"></span>
-                              )}
-                            </div>
-                            <p className={`text-sm leading-relaxed ${notification.read ? 'text-[#C7C7C7]' : 'text-white'}`}>
-                              {getNotificationMessage(notification)}
+                    {/* Content */}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-start justify-between gap-2 mb-2">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-1 flex-wrap">
+                            <p className="font-bold text-white text-sm">
+                              {config.title}
                             </p>
+                            {isUnread && (
+                              <span className="w-2 h-2 bg-[#4DF2BE] rounded-full flex-shrink-0"></span>
+                            )}
                           </div>
-
-                          <div className="flex flex-col items-end gap-2 flex-shrink-0">
-                            <span className="text-xs text-[#8F8F8F] whitespace-nowrap">
-                              {formatTime(notification.createdAt)}
-                            </span>
-                          </div>
+                          <p className={`text-sm leading-relaxed ${isUnread ? 'text-white' : 'text-[#C7C7C7]'}`}>
+                            {notification.message}
+                          </p>
+                          {notification.initiatorUsername && (
+                            <p className="text-xs text-[#8F8F8F] mt-1">
+                              From: {notification.initiatorUsername}
+                            </p>
+                          )}
                         </div>
 
-                        {/* Trade Details */}
-                        {notification.type === 'NEW_TRADE_REQUEST' && (
-                          <div className="mt-4 p-3 bg-[#2D2D2D] rounded-lg border border-[#3A3A3A]">
-                            <div className="grid grid-cols-2 gap-4 mb-3">
-                              <div>
-                                <p className="text-xs text-[#C7C7C7] mb-1">Fiat Amount</p>
-                                <p className="text-white font-medium text-sm">
-                                  {notification.amountFiat?.toLocaleString()} {notification.currency}
-                                </p>
-                              </div>
-                              <div>
-                                <p className="text-xs text-[#C7C7C7] mb-1">Crypto Amount</p>
-                                <p className="text-[#4DF2BE] font-medium text-sm">
-                                  {notification.amountCrypto} {notification.crypto}
-                                </p>
-                              </div>
+                        <div className="flex flex-col items-end gap-2 flex-shrink-0">
+                          <span className="text-xs text-[#8F8F8F] whitespace-nowrap">
+                            {formatTime(notification.createdAt)}
+                          </span>
+                          {isUnread && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleMarkAsRead(notification.id);
+                              }}
+                              className="text-xs text-[#4DF2BE] hover:text-[#3DD2A5] transition-colors"
+                            >
+                              Mark read
+                            </button>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Trade Details */}
+                      {(notification.type === 'NEW_TRADE_REQUEST' || 
+                        notification.type === 'PAYMENT_SENT' ||
+                        notification.type === 'TRADE_COMPLETED') && 
+                        notification.amountFiat && notification.amountCrypto && (
+                        <div className="mt-4 p-3 bg-[#2D2D2D] rounded-lg border border-[#3A3A3A]">
+                          <div className="grid grid-cols-2 gap-4 mb-3">
+                            <div>
+                              <p className="text-xs text-[#C7C7C7] mb-1">Amount</p>
+                              <p className="text-white font-medium text-sm">
+                                {notification.amountFiat?.toLocaleString()} {notification.currency}
+                              </p>
                             </div>
+                            <div>
+                              <p className="text-xs text-[#C7C7C7] mb-1">Crypto</p>
+                              <p className="text-[#4DF2BE] font-medium text-sm">
+                                {notification.amountCrypto} {notification.crypto}
+                              </p>
+                            </div>
+                          </div>
+                          {notification.tradeId && (
                             <div className="flex items-center justify-between">
-                              <div>
-                                <span className="text-xs text-[#C7C7C7]">
-                                  {getTradeStatusLabel(notification)}
-                                </span>
-                                <p className="text-xs text-[#8F8F8F] mt-1">
-                                  {isInitiator ? 'Waiting for other party' : 'Your action required'}
-                                </p>
-                              </div>
                               <div className="flex items-center gap-2">
                                 <span className="text-xs text-[#4DF2BE] font-medium">
-                                  {isInitiator ? 'Monitor Trade' : 'Review Trade'}
+                                  View Trade
                                 </span>
                                 <Image src={ArrowRight} alt="arrow" width={12} height={12} />
                               </div>
                             </div>
-                          </div>
-                        )}
-                      </div>
+                          )}
+                        </div>
+                      )}
                     </div>
                   </div>
-                );
-              })
-            ) : (
-              // Empty State
-              <div className="text-center py-16">
-                <div className="w-32 h-32 mx-auto mb-6 rounded-full bg-[#2D2D2D] flex items-center justify-center">
-                  <span className="text-4xl">🔔</span>
                 </div>
-                <h3 className="text-xl font-medium text-white mb-2">No notifications</h3>
-                <p className="text-[#C7C7C7] max-w-md mx-auto mb-6">
-                  {activeFilter === 'unread'
-                    ? "You've read all your notifications"
-                    : activeFilter === 'trade'
-                    ? "No trade requests at the moment"
-                    : "You don't have any notifications yet"}
-                </p>
-                <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                  <button
-                    onClick={() => router.push("/market_place")}
-                    className="px-6 py-3 bg-[#4DF2BE] text-[#0F1012] font-bold rounded-full hover:bg-[#3DD2A5] transition-colors"
-                  >
-                    Browse Marketplace
-                  </button>
-                  <button
-                    onClick={() => router.push("/create-offer")}
-                    className="px-6 py-3 bg-[#2D2D2D] text-white font-bold rounded-full hover:bg-[#3A3A3A] transition-colors border border-[#4A4A4A]"
-                  >
-                    Create Offer
-                  </button>
-                </div>
+              );
+            })
+          ) : (
+            // Empty State
+            <div className="text-center py-16">
+              <div className="w-32 h-32 mx-auto mb-6 rounded-full bg-[#2D2D2D] flex items-center justify-center">
+                <span className="text-4xl">🔔</span>
               </div>
-            )}
-          </div>
-        )}
-
-        {/* Loading State */}
-        {loading && (
-          <div className="text-center py-16">
-            <div className="inline-block animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-[#4DF2BE] mb-4"></div>
-            <p className="text-[#C7C7C7]">Loading notifications...</p>
-          </div>
-        )}
+              <h3 className="text-xl font-medium text-white mb-2">No notifications</h3>
+              <p className="text-[#C7C7C7] max-w-md mx-auto mb-6">
+                {activeFilter === 'unread'
+                  ? "You've read all your notifications"
+                  : activeFilter === 'trade'
+                  ? "No trade requests at the moment"
+                  : "You don't have any notifications yet"}
+              </p>
+              <div className="flex flex-col sm:flex-row gap-4 justify-center">
+                <button
+                  onClick={() => router.push("/market_place")}
+                  className="px-6 py-3 bg-[#4DF2BE] text-[#0F1012] font-bold rounded-full hover:bg-[#3DD2A5] transition-colors"
+                >
+                  Browse Marketplace
+                </button>
+                <button
+                  onClick={() => router.push("/create-offer")}
+                  className="px-6 py-3 bg-[#2D2D2D] text-white font-bold rounded-full hover:bg-[#3A3A3A] transition-colors border border-[#4A4A4A]"
+                >
+                  Create Offer
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
 
         {/* Stats Footer */}
-        {filteredNotifications.length > 0 && !loading && (
+        {filteredNotifications.length > 0 && (
           <div className="mt-8 p-4 bg-[#222222] rounded-lg border border-[#2D2D2D]">
             <div className="flex flex-wrap items-center justify-between text-sm text-[#C7C7C7]">
               <div className="flex items-center gap-6">
                 <span>Total: <span className="text-[#4DF2BE] font-medium">{notifications.length}</span></span>
                 <span>Unread: <span className="text-[#1ECB84] font-medium">{unreadCount}</span></span>
-                <span>Trade Requests: <span className="text-[#FFC051] font-medium">{unreadTradeCount}</span></span>
+                <span>Trade Notifications: <span className="text-[#FFC051] font-medium">{unreadTradeCount}</span></span>
               </div>
               <span className="text-xs text-[#8F8F8F]">
-                Updated: {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                Updated: {new Date(lastUpdate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
               </span>
             </div>
           </div>
