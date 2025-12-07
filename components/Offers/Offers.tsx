@@ -11,7 +11,6 @@ import Divider from "../../public/Assets/Evolve2p_divider/Divider.svg";
 import Thumbs from "../../public/Assets/Evolve2p_thumbs/elements.svg";
 import Timer from "../../public/Assets/Evolve2p_timer/elements.svg";
 import Dminus from "../../public/Assets/Evolve2p_Dminus/Divider.svg";
-import notificationService from "../../utils/notificationService";
 
 import Verified from "../../public/Assets/Evolve2p_verified/Makretplace/elements.svg";
 import UPa from "../../public/Assets/Evolve2p_upA/Makretplace/elements.svg";
@@ -91,19 +90,20 @@ const Offers = () => {
   const [loadingCurrencies, setLoadingCurrencies] = useState(true);
 
   // Helper: Get username from user object
-  const getUsername = (user: User | null | undefined): string => {
-    if (!user) return "Unknown User";
-    return user.username || user.email || user.name || "Unknown User";
-  };
+  // Helper: Get username from user object
+const getUsername = (user: User | null | undefined): string => {
+  if (!user) return "Unknown User";
+  return user.username || user.email || user.name || "Unknown User";
+};
 
   // Helper: Extract seller ID from offer
   const getSellerIdFromOffer = (offer: Offer | null): string | null => {
-    if (!offer) return null;
-    if (offer.user?.id) return offer.user.id;
-    if (offer.sellerId) return offer.sellerId;
-    if (offer.userId) return offer.userId;
-    return null;
-  };
+  if (!offer) return null;
+  if (offer.user?.id) return offer.user.id;
+  if (offer.sellerId) return offer.sellerId;
+  if (offer.userId) return offer.userId;
+  return null;
+};
 
   // Helper: Get current user ID
   const getCurrentUserId = (): string | null => {
@@ -202,106 +202,14 @@ const Offers = () => {
 
   // Create trade function
   const createTrade = async (): Promise<any> => {
-    if (!isPayAmountValid() || !offer || !clientUser) {
-      alert("Please enter a valid amount");
-      return null;
-    }
+  if (!isPayAmountValid() || !offer || !clientUser) {
+    alert("Please enter a valid amount");
+    return null;
+  }
 
-    try {
-      setIsCreatingTrade(true);
-      
-      const userDataRaw = localStorage.getItem("UserData");
-      let token = "";
-
-      if (userDataRaw) {
-        try {
-          const userData = JSON.parse(userDataRaw);
-          token = userData?.accessToken || userData?.token;
-        } catch (e) {
-          console.error("Error parsing user data:", e);
-        }
-      }
-
-      const amountFiat = parseFloat(payAmount);
-      const amountCrypto = parseFloat(receiveAmount);
-
-      if (isNaN(amountFiat) || isNaN(amountCrypto) || amountFiat <= 0 || amountCrypto <= 0) {
-        throw new Error("Invalid amount values");
-      }
-
-      if (!tradePrice || tradePrice <= 0) {
-        throw new Error("Trade price not available");
-      }
-
-      const currentUserId = getCurrentUserId();
-      const sellerId = getSellerIdFromOffer(offer);
-
-      if (!currentUserId) throw new Error("Could not determine your user ID");
-      if (!sellerId) throw new Error("Could not determine seller ID");
-
-      const tradeData = {
-        offerId: offer.id,
-        amountFiat: amountFiat,
-        amountCrypto: amountCrypto,
-        tradePrice: tradePrice,
-        currency: currency,
-        cryptoType: offer.crypto,
-        paymentMethod: offer.paymentMethod,
-        pricePerUnit: fixedPrice,
-        margin: offer.margin || 0,
-        fiatCurrency: currency,
-        paymentTimeLimit: offer.paymentTime || "30 minutes",
-        buyerId: currentUserId,
-        sellerId: sellerId,
-        initiatorId: currentUserId
-      };
-
-      const response = await fetch(
-        "https://evolve2p-backend.onrender.com/api/create-trade",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            ...(token ? { Authorization: `Bearer ${token}` } : {})
-          },
-          body: JSON.stringify(tradeData),
-        }
-      );
-
-      if (!response.ok) {
-        throw new Error(`Trade creation failed: ${response.status}`);
-      }
-
-      const result = await response.json();
-      
-      if (result.success && result.data) {
-        return result.data;
-      } else if (result.trade) {
-        return result.trade;
-      } else {
-        throw new Error("No trade data returned");
-      }
-    } catch (error) {
-      console.error("Error creating trade:", error);
-      throw error;
-    } finally {
-      setIsCreatingTrade(false);
-    }
-  };
-
-// Helper: Create trade notification
-const createTradeNotification = async (
-  tradeId: string,
-  recipientId: string,
-  recipientName: string,
-  type: string,
-  amountFiat: number,
-  amountCrypto: number,
-  currency: string,
-  crypto: string,
-  message: string
-): Promise<void> => {
   try {
+    setIsCreatingTrade(true);
+    
     const userDataRaw = localStorage.getItem("UserData");
     let token = "";
 
@@ -314,86 +222,173 @@ const createTradeNotification = async (
       }
     }
 
-    const notificationData = {
-      tradeId,
-      recipientId,
-      recipientName,
-      type,
-      amountFiat,
-      amountCrypto,
-      currency,
-      crypto,
-      message,
+    const amountFiat = parseFloat(payAmount);
+    const amountCrypto = parseFloat(receiveAmount);
+
+    if (isNaN(amountFiat) || isNaN(amountCrypto) || amountFiat <= 0 || amountCrypto <= 0) {
+      throw new Error("Invalid amount values");
+    }
+
+    if (!tradePrice || tradePrice <= 0) {
+      throw new Error("Trade price not available");
+    }
+
+    const currentUserId = getCurrentUserId();
+    const sellerId = getSellerIdFromOffer(offer);
+
+    if (!currentUserId) throw new Error("Could not determine your user ID");
+    if (!sellerId) throw new Error("Could not determine seller ID");
+
+    const tradeData = {
+      offerId: offer.id,
+      amountFiat: amountFiat,
+      amountCrypto: amountCrypto,
+      tradePrice: tradePrice,
+      currency: currency,
+      cryptoType: offer.crypto,
+      paymentMethod: offer.paymentMethod,
+      pricePerUnit: fixedPrice,
+      margin: offer.margin || 0,
+      fiatCurrency: currency,
+      paymentTimeLimit: offer.paymentTime || "30 minutes",
+      buyerId: currentUserId,
+      sellerId: sellerId,
+      initiatorId: currentUserId
     };
 
-    await fetch("https://evolve2p-backend.onrender.com/api/create-notification", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      },
-      body: JSON.stringify(notificationData),
-    });
+    const response = await fetch(
+      "https://evolve2p-backend.onrender.com/api/create-trade",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify(tradeData),
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error(`Trade creation failed: ${response.status}`);
+    }
+
+    const result = await response.json();
+    
+    if (result.success && result.data) {
+      return result.data;
+    } else if (result.trade) {
+      return result.trade;
+    } else {
+      throw new Error("No trade data returned");
+    }
   } catch (error) {
-    console.error("Error creating notification:", error);
+    console.error("Error creating trade:", error);
+    throw error;
+  } finally {
+    setIsCreatingTrade(false);
   }
 };
 
+
 // Handle trade action
+// In your Offers.tsx file, update the handleTradeAction function:
+
 const handleTradeAction = async (): Promise<void> => {
   try {
+    // Validate offer exists
+    if (!offer) {
+      alert("Offer not found. Please try again.");
+      return;
+    }
+
     const trade = await createTrade();
-    
+
     if (trade) {
+      const tradeId = trade.id || trade._id;
       const currentUserId = getCurrentUserId();
       const sellerId = getSellerIdFromOffer(offer);
-      
-      if (sellerId && currentUserId && offer) {
-        // Get seller username
-        const sellerUsername = getUsername(offer.user);
-        const buyerUsername = getUsername(clientUser);
-        
-        // Create notification for the seller
-        notificationService.createTradeNotification(
-          sellerId,
-          sellerUsername,
-          'NEW_TRADE_REQUEST',
-          trade.id || trade._id,
-          parseFloat(payAmount),
-          parseFloat(receiveAmount),
-          currency,
-          offer.crypto,
-          `${buyerUsername} wants to trade ${payAmount} ${currency} for ${receiveAmount} ${offer.crypto}`
-        );
+      const currentUsername = getUsername(clientUser);
+      const sellerUsername = getUsername(offer.user);
+
+      // Validate required data
+      if (!tradeId || !currentUserId) {
+        alert("Trade creation failed. Please try again.");
+        return;
       }
+
+      // Determine if current user is buyer or seller
+      const currentUserIsSeller = currentUserId === sellerId;
       
-      setSuccessMessage("Trade created successfully! Seller has been notified.");
+      // 1. Update localStorage for current user's notifications (optional)
+      const updateUserNotifications = (userId: string, username: string, isSeller: boolean) => {
+        const raw = localStorage.getItem("UserData");
+        if (!raw) return;
+        
+        try {
+          const parsed = JSON.parse(raw);
+          if (!parsed.userData) return;
+          
+          // Create notification object WITH TRADE ID
+          const newNotification = {
+            id: `notif_${Date.now()}`,
+            title: isSeller ? "New Trade Request" : "Trade Created",
+            message: isSeller 
+              ? `${currentUsername} wants to buy ${offer.crypto} from you`
+              : `You requested to buy ${offer.crypto} from ${sellerUsername}`,
+            timeAgo: "Just now",
+            type: isSeller ? "NEW_TRADE_REQUEST" : "TRADE_CREATED",
+            tradeId: tradeId // CRITICAL: Include tradeId here
+          };
+          
+          // Add to notifications array
+          if (!Array.isArray(parsed.userData.notifications)) {
+            parsed.userData.notifications = [];
+          }
+          
+          parsed.userData.notifications.unshift(newNotification);
+          localStorage.setItem("UserData", JSON.stringify(parsed));
+          
+        } catch (e) {
+          console.error("Error updating notifications:", e);
+        }
+      };
+
+      // Update current user's notifications
+      updateUserNotifications(currentUserId, currentUsername, currentUserIsSeller);
+      
+      setSuccessMessage("Trade created successfully!");
       setShowSuccess(true);
-      
-      // Rest of your existing code...
+
+      setTimeout(() => {
+        // Redirect buyer to prc_buy, seller to prc_sell
+        if (currentUserIsSeller) {
+          router.push(`/prc_sell?tradeId=${tradeId}`);
+        } else {
+          router.push(`/prc_buy?tradeId=${tradeId}`);
+        }
+      }, 2000);
     }
   } catch (error) {
     console.error("Trade creation failed:", error);
     alert(error instanceof Error ? error.message : "Unknown error occurred");
   }
 };
-
   // Get button text
-  const getButtonText = (): string => {
-    if (isCreatingTrade) return "Creating Trade...";
-    
-    const currentUserId = getCurrentUserId();
-    const sellerId = getSellerIdFromOffer(offer);
-    const isSeller = currentUserId === sellerId;
-    
-    if (isSeller) {
-      return `${offer?.type} ${offer?.crypto}`;
-    } else {
-      const oppositeType = offer?.type?.toUpperCase() === 'BUY' ? 'SELL' : 'BUY';
-      return `${oppositeType} ${offer?.crypto}`;
-    }
-  };
-
+ // Get button text
+const getButtonText = (): string => {
+  if (isCreatingTrade) return "Creating Trade...";
+  
+  const currentUserId = getCurrentUserId();
+  const sellerId = getSellerIdFromOffer(offer);
+  const isSeller = currentUserId === sellerId;
+  
+  if (isSeller) {
+    return `${offer?.type || 'TRADE'} ${offer?.crypto || ''}`;
+  } else {
+    const oppositeType = offer?.type?.toUpperCase() === 'BUY' ? 'SELL' : 'BUY';
+    return `${oppositeType} ${offer?.crypto || ''}`;
+  }
+};
   // Load client user
   useEffect(() => {
     if (typeof window === "undefined") return;
