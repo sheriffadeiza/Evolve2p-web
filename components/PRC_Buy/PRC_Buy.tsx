@@ -7,10 +7,10 @@ import Nav from "../../components/NAV/Nav";
 import Timer from "../../public/Assets/Evolve2p_time/P2P Marketplace/elements.svg";
 import Ochat from "../../public/Assets/Evolve2p_Ochat/P2P Marketplace/elements.svg";
 import GreatT from "../../public/Assets/Evolve2p_Larrow/arrow-right-01.svg";
-import notificationService from "../../utils/notificationService";
+
 // Crypto icons - import all available
 import BTC from "../../public/Assets/Evolve2p_BTC/Bitcoin (BTC).svg";
-import ETH from "../../public/Assets/Evolve2p_ETH/Ethereum (ETH).svg"; 
+import ETH from "../../public/Assets/Evolve2p_ETH/Ethereum (ETH).svg";
 import USDT from "../../public/Assets/Evolve2p_USDT/Tether (USDT).svg";
 import USDC from "../../public/Assets/Evolve2p_USDC/USD Coin (USDC).svg";
 // Import more crypto icons as needed:
@@ -292,7 +292,7 @@ const PRC_Buy = () => {
     cryptoType: tradeData?.cryptoType || tradeData?.offer?.crypto || "BTC"
   }), [tradeData, currentUser]);
 
- 
+  // Initialize Socket.IO connection
   useEffect(() => {
     if (!tradeData?.chat?.id || socket) return;
 
@@ -952,25 +952,6 @@ const PRC_Buy = () => {
       
       setPaidConfirmed(true);
       setPaidTime(new Date());
-      
-      // Create notification for seller about payment
-      try {
-        await notificationService.createTradeNotification(
-          tradeData?.seller.id || '',
-          sellerUsername,
-          'PAYMENT_SENT',
-          tradeId,
-          fiatAmount,
-          quantity,
-          fiatCurrency,
-          cryptoType,
-          `${currentUserUsername} marked payment as sent for ${quantity} ${cryptoType}`
-        );
-      } catch (notifError) {
-        console.error('Error creating notification:', notifError);
-        // Continue even if notification fails
-      }
-      
       alert('Trade marked as paid! The seller has been notified and payment is now in review.');
       setShowPaidModal(false);
       
@@ -1023,7 +1004,9 @@ const PRC_Buy = () => {
 
       const result: CancelTradeResponse = await response.json();
       
+      // Check for the new API response structure
       if (result.success) {
+        // Update trade data with the returned trade object
         if (result.trade) {
           setTradeData(prev => ({
             ...prev!,
@@ -1034,6 +1017,7 @@ const PRC_Buy = () => {
             seller: result.trade.seller || prev?.seller!
           }));
         } else {
+          // Fallback for backward compatibility
           if (tradeData) {
             setTradeData({
               ...tradeData,
@@ -1042,32 +1026,18 @@ const PRC_Buy = () => {
           }
         }
         
-        // Create notification for seller about cancellation
-        try {
-          await notificationService.createTradeNotification(
-            tradeData?.seller.id || '',
-            sellerUsername,
-            'TRADE_CANCELLED',
-            tradeId,
-            fiatAmount,
-            quantity,
-            fiatCurrency,
-            cryptoType,
-            `${currentUserUsername} cancelled the trade`
-          );
-        } catch (notifError) {
-          console.error('Error creating notification:', notifError);
-        }
-        
-        const successMessage = result.message || `Trade cancelled successfully!`;
+        // Show success message with the new format
+        const successMessage = result.message || `Trade cancelled successfully! Funds have been returned to @${sellerUsername}. Your trade has been cancelled and you won't be able to continue this transaction.`;
         alert(successMessage);
         
       } else {
+        // Handle API error
         throw new Error(result.message || 'Failed to cancel trade');
       }
       
       setShowCancelModal(false);
       
+      // Redirect after delay
       setTimeout(() => {
         router.push('/market_place');
       }, 3000);
@@ -1090,6 +1060,7 @@ const PRC_Buy = () => {
 
   // Submit dispute
   const handleSubmitDispute = async () => {
+    // Validation
     if (!disputeReason) {
       alert("Please select a reason for the dispute.");
       return;
@@ -1107,6 +1078,7 @@ const PRC_Buy = () => {
         throw new Error('Authentication required');
       }
 
+      // Prepare FormData with correct field names
       const formData = new FormData();
       formData.append('tradeId', tradeId);
       formData.append('reason', disputeReason === "other" ? otherReason : disputeReason);
@@ -1119,6 +1091,7 @@ const PRC_Buy = () => {
         formData.append('evidence', disputeFile);
       }
 
+      // API call
       const response = await fetch('https://evolve2p-backend.onrender.com/api/open-dispute', {
         method: 'POST',
         headers: {
@@ -1133,9 +1106,12 @@ const PRC_Buy = () => {
         throw new Error(result.message || `Failed to submit dispute: ${response.status}`);
       }
 
+      // Success handling
       if (result.success) {
+        // Show success modal instead of alert
         setShowDisputeSuccessModal(true);
         
+        // Update trade status
         if (tradeData) {
           setTradeData({
             ...tradeData,
@@ -1149,27 +1125,12 @@ const PRC_Buy = () => {
           });
         }
         
-        // Create notification for seller about dispute
-        try {
-          await notificationService.createTradeNotification(
-            tradeData?.seller.id || '',
-            sellerUsername,
-            'DISPUTE_OPENED',
-            tradeId,
-            fiatAmount,
-            quantity,
-            fiatCurrency,
-            cryptoType,
-            `${currentUserUsername} opened a dispute: ${disputeReason === "other" ? otherReason : disputeReason}`
-          );
-        } catch (notifError) {
-          console.error('Error creating notification:', notifError);
-        }
-        
+        // Reset and close dispute form modal
         setShowDisputeModal(false);
         resetDisputeForm();
         setShowDispute(false);
         
+        // Socket notification
         if (socket?.connected) {
           socket.emit('trade-dispute-opened', { tradeId, status: "DISPUTED" });
         }
@@ -1997,13 +1958,9 @@ const PRC_Buy = () => {
                     <div className="mt-3 p-3 bg-[#2D2D2D] rounded-lg flex items-center justify-between">
                       <div className="flex items-center gap-3">
                         <div className="w-10 h-10 bg-[#3A3A3A] rounded-lg flex items-center justify-center">
-                          {selectedFile.type.startsWith('image/') ? (
-                            <span className="text-lg">🖼️</span>
-                          ) : selectedFile.type.includes('pdf') ? (
-                            <span className="text-lg">📄</span>
-                          ) : (
-                            <span className="text-lg">📎</span>
-                          )}
+                          <span className="text-xs text-white">
+                            {getFileIcon(selectedFile.type)}
+                          </span>
                         </div>
                         <div>
                           <p className="text-sm text-white truncate max-w-[200px]">
@@ -2305,7 +2262,7 @@ const PRC_Buy = () => {
                       <div className="flex items-center justify-center gap-2">
                         <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-[#0F1012]"></div>
                         <span>Submitting...</span>
-                      </div>
+                    </div>
                     ) : (
                       'Submit Dispute'
                     )}
