@@ -63,40 +63,50 @@ const safeToString = (value: any): string => {
   return String(value);
 };
 
-// Format date to readable string
-const formatDateTime = (dateString: string | Date | undefined): string => {
-  if (!dateString) return 'Unknown date';
+// Format date to show only time for today, date for older
+const formatNotificationTime = (dateString: string | Date | undefined): string => {
+  if (!dateString) return '';
   
   try {
     const date = new Date(dateString);
-    if (isNaN(date.getTime())) return 'Invalid date';
+    if (isNaN(date.getTime())) return '';
     
     const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const notificationDate = new Date(date.getFullYear(), date.getMonth(), date.getDate());
     
-    // If today, show time only
-    if (date.toDateString() === now.toDateString()) {
-      return `Today, ${date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+    // If today, show time only (e.g., "14:30")
+    if (notificationDate.getTime() === today.getTime()) {
+      return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     }
     
     // If yesterday
-    const yesterday = new Date(now);
+    const yesterday = new Date(today);
     yesterday.setDate(yesterday.getDate() - 1);
-    if (date.toDateString() === yesterday.toDateString()) {
+    if (notificationDate.getTime() === yesterday.getTime()) {
       return `Yesterday, ${date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
     }
     
-    // Show full date and time
+    // This week, show weekday and time
+    const diffMs = now.getTime() - date.getTime();
+    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+    if (diffDays < 7) {
+      return `${date.toLocaleDateString([], { weekday: 'short' })}, ${date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+    }
+    
+    // Older, show full date
     return date.toLocaleDateString([], { 
-      year: 'numeric', 
       month: 'short', 
       day: 'numeric',
-    }) + `, ${date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+      hour: '2-digit',
+      minute: '2-digit'
+    });
   } catch (error) {
-    return 'Invalid date';
+    return '';
   }
 };
 
-// Get date header for grouping notifications by date
+// Get date header for grouping
 const getDateHeader = (dateString: string | Date | undefined): string => {
   if (!dateString) return 'Older';
   
@@ -118,20 +128,15 @@ const getDateHeader = (dateString: string | Date | undefined): string => {
       return 'Yesterday';
     }
     
-    // This week (last 7 days)
+    // This week
     const diffMs = now.getTime() - date.getTime();
     const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
     if (diffDays < 7) {
       return date.toLocaleDateString([], { weekday: 'long' });
     }
     
-    // This year
-    if (date.getFullYear() === now.getFullYear()) {
-      return date.toLocaleDateString([], { month: 'long', day: 'numeric' });
-    }
-    
     // Older
-    return date.toLocaleDateString([], { year: 'numeric', month: 'long', day: 'numeric' });
+    return date.toLocaleDateString([], { month: 'long', day: 'numeric', year: 'numeric' });
   } catch (error) {
     return 'Older';
   }
@@ -151,155 +156,203 @@ const groupNotificationsByDate = (notifications: Notification[]): Record<string,
     groups[dateHeader].push(notification);
   });
   
-  // Sort groups in chronological order (Today -> Yesterday -> Weekdays -> Older dates)
-  const sortedGroups: Record<string, Notification[]> = {};
-  const order = ['Today', 'Yesterday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-  
-  // Add ordered groups first
-  order.forEach(day => {
-    if (groups[day]) {
-      sortedGroups[day] = groups[day];
-    }
-  });
-  
-  // Add remaining groups (sorted dates)
-  Object.keys(groups)
-    .filter(day => !order.includes(day))
-    .sort((a, b) => {
-      // Try to parse as dates for comparison
-      try {
-        const dateA = new Date(a);
-        const dateB = new Date(b);
-        return dateB.getTime() - dateA.getTime(); // Most recent first
-      } catch {
-        return a.localeCompare(b);
-      }
-    })
-    .forEach(day => {
-      sortedGroups[day] = groups[day];
-    });
-  
-  return sortedGroups;
+  return groups;
 };
 
+// IMPROVED: Find the exact matching trade
 const findMatchingTrade = (notification: any, allTrades: Trade[], userId: string): Trade | null => {
   if (!notification || allTrades.length === 0) return null;
   
-  const notificationText = (safeToString(notification.title) + ' ' + safeToString(notification.message)).toLowerCase();
+  console.log('Finding match for notification:', {
+    notificationId: notification.id,
+    notificationText: notification.title + ' ' + notification.message,
+    allTradesCount: allTrades.length,
+    userId
+  });
   
-  // First, check if notification has direct tradeId
+  // 1. FIRST PRIORITY: Extract trade ID directly from notification
+  let potentialTradeId: string | null = null;
+  
+  // Check metadata first
   if (notification.metadata?.tradeId) {
-    const tradeId = safeToString(notification.metadata.tradeId);
-    const directMatch = allTrades.find(t => 
-      safeToString(t.id) === tradeId || 
-      safeToString(t.tradeId) === tradeId || 
-      safeToString(t._id) === tradeId
-    );
-    if (directMatch) return directMatch;
+    potentialTradeId = safeToString(notification.metadata.tradeId);
   }
-  
-  // Try to match by content - look for amount/price in notification
-  for (const trade of allTrades) {
-    const tradeAmount = trade.amount;
-    const tradePrice = trade.price;
-    
-    if (tradeAmount && notificationText.includes(tradeAmount.toString())) {
-      return trade;
-    }
-    
-    if (tradePrice && notificationText.includes(tradePrice.toString())) {
-      return trade;
+  // Check notification tradeId field
+  else if (notification.tradeId) {
+    potentialTradeId = safeToString(notification.tradeId);
+  }
+  // Try to extract from message/title
+  else {
+    const text = (safeToString(notification.title) + ' ' + safeToString(notification.message));
+    // Look for patterns like "trade ID: XYZ" or "trade: XYZ"
+    const tradeIdMatch = text.match(/(?:trade|id)[:\s]+([a-zA-Z0-9\-_]{6,})/i);
+    if (tradeIdMatch && tradeIdMatch[1]) {
+      potentialTradeId = tradeIdMatch[1];
     }
   }
   
-  // Return most recent pending trade
+  console.log('Extracted trade ID:', potentialTradeId);
+  
+  // 2. Try to match by extracted trade ID
+  if (potentialTradeId) {
+    const directMatch = allTrades.find(t => {
+      const tId = safeToString(t.id || t.tradeId || t._id);
+      return tId === potentialTradeId || tId.includes(potentialTradeId!) || potentialTradeId!.includes(tId);
+    });
+    
+    if (directMatch) {
+      console.log('Direct match found by ID:', directMatch.id);
+      return directMatch;
+    }
+  }
+  
+  // 3. SECOND PRIORITY: Match by user involvement and pending status
+  if (userId) {
+    // Find trades where current user is involved AND trade is pending
+    const userPendingTrades = allTrades.filter(t => {
+      const buyerId = safeToString(t.buyerId || t.buyer);
+      const sellerId = safeToString(t.sellerId || t.seller);
+      const isUserInvolved = buyerId === userId || sellerId === userId;
+      return isUserInvolved && t.status === 'pending';
+    });
+    
+    if (userPendingTrades.length === 1) {
+      console.log('Found single pending trade for user:', userPendingTrades[0].id);
+      return userPendingTrades[0];
+    }
+    
+    // If multiple pending trades, return most recent
+    if (userPendingTrades.length > 0) {
+      const mostRecent = userPendingTrades.sort((a, b) => 
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      )[0];
+      console.log('Found multiple pending trades, using most recent:', mostRecent.id);
+      return mostRecent;
+    }
+  }
+  
+  // 4. THIRD PRIORITY: Match by amount mentioned in notification
+  const notificationText = (safeToString(notification.title) + ' ' + safeToString(notification.message));
+  const amountMatch = notificationText.match(/\$(\d+(?:\.\d{1,2})?)/) || notificationText.match(/(\d+(?:\.\d{1,2})?)\s*(?:USD|usd)/);
+  
+  if (amountMatch && amountMatch[1]) {
+    const amount = parseFloat(amountMatch[1]);
+    
+    const amountMatchTrade = allTrades.find(t => {
+      // Check if amounts are close (within 0.01)
+      return Math.abs(t.amount - amount) < 0.01;
+    });
+    
+    if (amountMatchTrade) {
+      console.log('Matched by amount:', amount, 'found trade:', amountMatchTrade.id);
+      return amountMatchTrade;
+    }
+  }
+  
+  // 5. FOURTH PRIORITY: Return most recent pending trade
   const pendingTrades = allTrades.filter(t => t.status === 'pending');
   if (pendingTrades.length > 0) {
-    return pendingTrades.sort((a, b) => 
+    const mostRecentPending = pendingTrades.sort((a, b) => 
       new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
     )[0];
+    console.log('Using most recent pending trade:', mostRecentPending.id);
+    return mostRecentPending;
   }
   
-  // Return first trade
-  return allTrades.length > 0 ? allTrades[0] : null;
+  // 6. LAST RESORT: Return most recent trade
+  if (allTrades.length > 0) {
+    const mostRecent = allTrades.sort((a, b) => 
+      new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    )[0];
+    console.log('Using most recent trade:', mostRecent.id);
+    return mostRecent;
+  }
+  
+  console.log('No match found');
+  return null;
 };
 
 // Get trade ID safely
 const getTradeId = (trade: Trade | null | undefined): string | null => {
   if (!trade) return null;
   
-  if (trade.id) return trade.id;
-  if (trade.tradeId) return trade.tradeId;
-  if (trade._id) return trade._id;
-  
-  return null;
+  // Return in order of preference
+  return trade.id || trade.tradeId || trade._id || null;
 };
 
-// Get redirect page - buyer goes to buyer page, seller goes to seller page
+// IMPROVED: Get redirect page with better debugging
 const getRedirectPage = (
   trade: Trade, 
   currentUserId: string,
   userData: any
 ): string => {
   const tradeId = getTradeId(trade);
-  if (!tradeId) return '/trades';
+  if (!tradeId) {
+    console.error('No trade ID found for trade:', trade);
+    return '/trades';
+  }
   
   const buyerId = safeToString(trade.buyerId || trade.buyer);
   const sellerId = safeToString(trade.sellerId || trade.seller);
+  const currentUserIdStr = safeToString(currentUserId);
   
-  console.log('Redirect Logic:', {
-    currentUserId,
-    buyerId,
-    sellerId,
+  console.log('🚀 REDIRECT DEBUG:', {
     tradeId,
-    userIsBuyer: buyerId === currentUserId,
-    userIsSeller: sellerId === currentUserId
+    tradeBuyerId: buyerId,
+    tradeSellerId: sellerId,
+    currentUserId: currentUserIdStr,
+    tradeStatus: trade.status,
+    tradeType: trade.type,
+    isBuyer: buyerId === currentUserIdStr,
+    isSeller: sellerId === currentUserIdStr,
+    fullTrade: trade
   });
   
-  // Buyer goes to buyer page
-  if (buyerId === currentUserId) {
-    return `/prc_buy?tradeId=${tradeId}`; // Buyer goes to buyer page
+  // Check if current user is the buyer
+  if (buyerId === currentUserIdStr) {
+    console.log('✅ User is BUYER, redirecting to buyer page');
+    return `/prc_buy?tradeId=${tradeId}`;
   }
   
-  // Seller goes to seller page
-  if (sellerId === currentUserId) {
-    return `/prc_sell?tradeId=${tradeId}`; // Seller goes to seller page
+  // Check if current user is the seller
+  if (sellerId === currentUserIdStr) {
+    console.log('✅ User is SELLER, redirecting to seller page');
+    return `/prc_sell?tradeId=${tradeId}`;
   }
   
-  // Fallback: check userData trades arrays
-  if (userData) {
-    const userTradesAsBuyer = Array.isArray(userData.tradesAsBuyer) ? userData.tradesAsBuyer : [];
+  // Fallback logic based on trade type
+  console.log('⚠ User role not clear from IDs, using fallback logic');
+  
+  // If trade has type field, use it
+  if (trade.type === 'buy' && userData) {
+    // If it's a buy trade, current user might be the seller
     const userTradesAsSeller = Array.isArray(userData.tradesAsSeller) ? userData.tradesAsSeller : [];
-    
-    // Check if trade exists in user's tradesAsBuyer
-    const isBuyer = userTradesAsBuyer.some((t: any) => {
+    const isInSellerTrades = userTradesAsSeller.some((t: any) => {
       const tId = getTradeId(t);
       return tId === tradeId;
     });
     
-    if (isBuyer) {
-      return `/prc_buy?tradeId=${tradeId}`; // Buyer goes to buyer page
+    if (isInSellerTrades) {
+      console.log('✅ User found in seller trades, redirecting to seller page');
+      return `/prc_sell?tradeId=${tradeId}`;
     }
-    
-    // Check if trade exists in user's tradesAsSeller
-    const isSeller = userTradesAsSeller.some((t: any) => {
+  } else if (trade.type === 'sell' && userData) {
+    // If it's a sell trade, current user might be the buyer
+    const userTradesAsBuyer = Array.isArray(userData.tradesAsBuyer) ? userData.tradesAsBuyer : [];
+    const isInBuyerTrades = userTradesAsBuyer.some((t: any) => {
       const tId = getTradeId(t);
       return tId === tradeId;
     });
     
-    if (isSeller) {
-      return `/prc_sell?tradeId=${tradeId}`; // Seller goes to seller page
+    if (isInBuyerTrades) {
+      console.log('✅ User found in buyer trades, redirecting to buyer page');
+      return `/prc_buy?tradeId=${tradeId}`;
     }
   }
   
-  // Default fallback to buyer page
+  // Default to buyer page
+  console.log('⚠ Defaulting to buyer page');
   return `/prc_buy?tradeId=${tradeId}`;
-};
-
-// Fix notification text - REMOVED the text swapping since we're not swapping pages anymore
-const fixNotificationText = (text: string, userRole: 'buyer' | 'seller' | 'unknown'): string => {
-  // No text modification needed since buyer stays on buyer page and seller stays on seller page
-  return text || '';
 };
 
 const Bell_Notify = () => {
@@ -318,24 +371,47 @@ const Bell_Notify = () => {
         const parsed = JSON.parse(raw);
         
         if (parsed.userData) {
-          setUserData(parsed.userData);
-          const userId = parsed.userData.id;
+          const userDataObj = parsed.userData;
+          setUserData(userDataObj);
+          const userId = userDataObj.id || userDataObj.userId || userDataObj._id;
+
+          console.log('📊 Loading user data:', {
+            userId,
+            hasNotifications: Array.isArray(userDataObj.notifications),
+            notificationCount: Array.isArray(userDataObj.notifications) ? userDataObj.notifications.length : 0
+          });
 
           // Load trades
-          const buyerTrades: Trade[] = Array.isArray(parsed.userData.tradesAsBuyer) 
-            ? parsed.userData.tradesAsBuyer 
+          const buyerTrades: Trade[] = Array.isArray(userDataObj.tradesAsBuyer) 
+            ? userDataObj.tradesAsBuyer 
             : [];
           
-          const sellerTrades: Trade[] = Array.isArray(parsed.userData.tradesAsSeller) 
-            ? parsed.userData.tradesAsSeller 
+          const sellerTrades: Trade[] = Array.isArray(userDataObj.tradesAsSeller) 
+            ? userDataObj.tradesAsSeller 
             : [];
           
           const combinedTrades = [...buyerTrades, ...sellerTrades];
+          
+          console.log('📈 Loaded trades:', {
+            buyerTrades: buyerTrades.length,
+            sellerTrades: sellerTrades.length,
+            combinedTrades: combinedTrades.length,
+            sampleTrades: combinedTrades.slice(0, 3).map(t => ({
+              id: t.id,
+              tradeId: t.tradeId,
+              status: t.status,
+              buyerId: t.buyerId,
+              sellerId: t.sellerId,
+              amount: t.amount,
+              type: t.type
+            }))
+          });
+          
           setAllTrades(combinedTrades);
 
           // Load and match notifications
-          if (Array.isArray(parsed.userData.notifications)) {
-            const enhancedNotifications = parsed.userData.notifications.map((n: any, index: number) => {
+          if (Array.isArray(userDataObj.notifications)) {
+            const enhancedNotifications = userDataObj.notifications.map((n: any, index: number) => {
               const matchedTrade = findMatchingTrade(n, combinedTrades, userId);
               
               // Determine user role
@@ -343,34 +419,60 @@ const Bell_Notify = () => {
               if (matchedTrade && userId) {
                 const buyerId = safeToString(matchedTrade.buyerId || matchedTrade.buyer);
                 const sellerId = safeToString(matchedTrade.sellerId || matchedTrade.seller);
-                userRole = buyerId === userId ? 'buyer' : sellerId === userId ? 'seller' : 'unknown';
+                const currentUserId = safeToString(userId);
+                
+                if (buyerId === currentUserId) {
+                  userRole = 'buyer';
+                } else if (sellerId === currentUserId) {
+                  userRole = 'seller';
+                } else {
+                  // Check arrays as fallback
+                  const isInBuyerTrades = buyerTrades.some(t => getTradeId(t) === getTradeId(matchedTrade));
+                  const isInSellerTrades = sellerTrades.some(t => getTradeId(t) === getTradeId(matchedTrade));
+                  
+                  if (isInBuyerTrades) userRole = 'buyer';
+                  else if (isInSellerTrades) userRole = 'seller';
+                }
               }
               
               // Get notification creation time
               const notificationTime = n.createdAt || n.timestamp || n.date || n.timeAgo;
-              const formattedTime = formatDateTime(notificationTime);
-              const timeAgo = safeToString(n.timeAgo) || formattedTime;
+              const formattedTime = formatNotificationTime(notificationTime);
               
               // Get trade ID safely
               const tradeId = matchedTrade ? getTradeId(matchedTrade) : null;
+              
+              // Store original trade ID from notification if available
+              const originalTradeId = n.tradeId || n.metadata?.tradeId;
+              
+              console.log(`🔔 Notification ${index}:`, {
+                title: n.title,
+                message: n.message,
+                matchedTradeId: tradeId,
+                originalTradeId,
+                userRole,
+                hasMatchedTrade: !!matchedTrade,
+                matchedTradeStatus: matchedTrade?.status,
+                matchedTradeType: matchedTrade?.type
+              });
               
               return {
                 id: safeToString(n.id) || `notif-${index}-${Date.now()}`,
                 title: safeToString(n.title),
                 message: safeToString(n.message),
-                timeAgo: timeAgo,
+                timeAgo: formattedTime, // Use formatted time only
                 type: n.type ? safeToString(n.type) : undefined,
                 tradeId: tradeId || undefined,
                 metadata: n.metadata,
                 isRead: n.isRead || false,
                 matchedTrade: matchedTrade || undefined,
                 userRole: userRole,
-                originalTradeId: n.tradeId || n.metadata?.tradeId,
-                createdAt: notificationTime // Store the creation time for grouping
+                originalTradeId: originalTradeId ? safeToString(originalTradeId) : undefined,
+                createdAt: notificationTime
               };
             });
             
-            // Sort notifications by date (most recent first) - FIXED: Added proper types
+            // Sort notifications by date (most recent first)
             const sortedNotifications = enhancedNotifications.sort((a: Notification, b: Notification) => {
               try {
                 const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
@@ -382,10 +484,11 @@ const Bell_Notify = () => {
             });
             
             setNotifications(sortedNotifications);
+            console.log('✅ Loaded notifications:', sortedNotifications.length);
           }
         }
       } catch (err) {
-        console.error("Error loading UserData", err);
+        console.error("❌ Error loading UserData", err);
       }
     };
 
@@ -427,20 +530,20 @@ const Bell_Notify = () => {
     const currentUserId = getCurrentUserId();
     const trade = notification.matchedTrade;
     
+    console.log('👁 Viewing notification:', {
+      notificationId: notification.id,
+      notificationTitle: notification.title,
+      hasMatchedTrade: !!trade,
+      matchedTradeId: trade ? getTradeId(trade) : null,
+      currentUserId,
+      userRole: notification.userRole
+    });
+    
     if (!trade) {
-      // Try to find any pending trade for this user
-      const userPendingTrades = allTrades.filter(t => 
-        t.status === 'pending' && 
-        (safeToString(t.buyerId || t.buyer) === currentUserId || 
-         safeToString(t.sellerId || t.seller) === currentUserId)
-      );
-      
-      if (userPendingTrades.length > 0) {
-        const latestPendingTrade = userPendingTrades.sort((a, b) => 
-          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-        )[0];
-        
-        const redirectUrl = getRedirectPage(latestPendingTrade, currentUserId || '', userData);
+      // Try to use original trade ID from notification
+      if (notification.originalTradeId) {
+        console.log('⚠ No matched trade, trying with original trade ID:', notification.originalTradeId);
+        const redirectUrl = `/prc_buy?tradeId=${notification.originalTradeId}`;
         markNotificationAsRead(notification.id);
         router.push(redirectUrl);
         return;
@@ -450,9 +553,9 @@ const Bell_Notify = () => {
       return;
     }
 
-    // Use the dynamic trade ID from the matched trade
     const redirectUrl = getRedirectPage(trade, currentUserId || '', userData);
     markNotificationAsRead(notification.id);
+    console.log('➡ Redirecting to:', redirectUrl);
     router.push(redirectUrl);
   }, [router, markNotificationAsRead, allTrades, getCurrentUserId, userData]);
 
@@ -686,45 +789,39 @@ const Bell_Notify = () => {
                             {/* Show matched trade details */}
                             {trade && (
                               <div className="mt-2 flex flex-wrap items-center gap-2">
-                                <span className="text-[10px] px-2 py-0.5 bg-[#2A2B2F] rounded">
-                                  Status: {trade.status}
+                                <span className={`text-[10px] px-2 py-0.5 rounded ${
+                                  trade.status === 'pending' ? 'bg-yellow-500/20 text-yellow-400' :
+                                  trade.status === 'completed' ? 'bg-green-500/20 text-green-400' :
+                                  trade.status === 'cancelled' ? 'bg-red-500/20 text-red-400' :
+                                  'bg-[#2A2B2F] text-gray-300'
+                                }`}>
+                                  {trade.status.toUpperCase()}
                                 </span>
                                 {trade.amount && (
-                                  <span className="text-[10px] px-2 py-0.5 bg-[#2A2B2F] rounded">
+                                  <span className="text-[10px] px-2 py-0.5 bg-[#4DF2BE]/10 text-[#4DF2BE] rounded">
                                     ${trade.amount}
                                   </span>
                                 )}
                                 {tradeId && (
                                   <span className="text-[8px] px-2 py-0.5 bg-purple-500/10 text-purple-300 rounded truncate max-w-[80px]">
-                                    ID: {tradeId.substring(0, Math.min(8, tradeId.length))}...
+                                    ID: {tradeId.substring(0, Math.min(6, tradeId.length))}...
                                   </span>
                                 )}
-                                <span className="text-[10px] px-2 py-0.5 bg-blue-500/10 text-blue-300 rounded">
+                                <span className={`text-[10px] px-2 py-0.5 rounded ${
+                                  userRole === 'buyer' ? 'bg-blue-500/10 text-blue-300' :
+                                  userRole === 'seller' ? 'bg-green-500/10 text-green-300' :
+                                  'bg-gray-500/10 text-gray-300'
+                                }`}>
                                   {userRole.toUpperCase()}
                                 </span>
                               </div>
                             )}
                             
-                            {/* Show if no trade matched */}
-                            {!trade && notification.originalTradeId && (
-                              <div className="mt-2">
-                                <span className="text-[10px] px-2 py-0.5 bg-yellow-500/20 text-yellow-400 rounded">
-                                  ⚠ Using original trade ID
-                                </span>
-                                <span className="text-[8px] px-2 py-0.5 bg-purple-500/10 text-purple-300 rounded truncate max-w-[80px] ml-2">
-                                  ID: {notification.originalTradeId.substring(0, Math.min(8, notification.originalTradeId.length))}...
-                                </span>
-                              </div>
-                            )}
-                            
-                            {/* Show detailed timestamp */}
-                            <div className="flex justify-between items-center mt-2">
+                            {/* Show timestamp - ONLY ONCE */}
+                            <div className="mt-2">
                               <p className="text-[10px] sm:text-xs text-gray-500">
-                                {formatDateTime(notification.createdAt)}
-                              </p>
-                              <span className="text-[10px] text-gray-600">
                                 {notification.timeAgo}
-                              </span>
+                              </p>
                             </div>
                           </div>
                         </div>
