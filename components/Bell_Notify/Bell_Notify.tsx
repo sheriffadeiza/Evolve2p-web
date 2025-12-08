@@ -633,7 +633,7 @@ const Bell_Notify = () => {
           <div className="w-full h-[1px] bg-white opacity-20"></div>
         </div>
               
-        <div className="mb-16 whitespace-nowrap mt-[20%]">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6 mb-16 whitespace-nowrap mt-[20%]">
           <Footer />
         </div>
       </div>
