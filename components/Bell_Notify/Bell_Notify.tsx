@@ -32,6 +32,8 @@ interface Notification {
   isRead?: boolean;
   matchedTrade?: Trade;
   userRole?: 'buyer' | 'seller' | 'unknown';
+  originalTradeId?: string;
+  createdAt?: string;
 }
 
 type FilterType = "all" | "trades" | "wallet" | "others";
@@ -61,7 +63,125 @@ const safeToString = (value: any): string => {
   return String(value);
 };
 
-// Find matching trade from UserData
+// Format date to readable string
+const formatDateTime = (dateString: string | Date | undefined): string => {
+  if (!dateString) return 'Unknown date';
+  
+  try {
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) return 'Invalid date';
+    
+    const now = new Date();
+    
+    // If today, show time only
+    if (date.toDateString() === now.toDateString()) {
+      return `Today, ${date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+    }
+    
+    // If yesterday
+    const yesterday = new Date(now);
+    yesterday.setDate(yesterday.getDate() - 1);
+    if (date.toDateString() === yesterday.toDateString()) {
+      return `Yesterday, ${date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+    }
+    
+    // Show full date and time
+    return date.toLocaleDateString([], { 
+      year: 'numeric', 
+      month: 'short', 
+      day: 'numeric',
+    }) + `, ${date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+  } catch (error) {
+    return 'Invalid date';
+  }
+};
+
+// Get date header for grouping notifications by date
+const getDateHeader = (dateString: string | Date | undefined): string => {
+  if (!dateString) return 'Older';
+  
+  try {
+    const date = new Date(dateString);
+    const now = new Date();
+    
+    if (isNaN(date.getTime())) return 'Older';
+    
+    // Today
+    if (date.toDateString() === now.toDateString()) {
+      return 'Today';
+    }
+    
+    // Yesterday
+    const yesterday = new Date(now);
+    yesterday.setDate(yesterday.getDate() - 1);
+    if (date.toDateString() === yesterday.toDateString()) {
+      return 'Yesterday';
+    }
+    
+    // This week (last 7 days)
+    const diffMs = now.getTime() - date.getTime();
+    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+    if (diffDays < 7) {
+      return date.toLocaleDateString([], { weekday: 'long' });
+    }
+    
+    // This year
+    if (date.getFullYear() === now.getFullYear()) {
+      return date.toLocaleDateString([], { month: 'long', day: 'numeric' });
+    }
+    
+    // Older
+    return date.toLocaleDateString([], { year: 'numeric', month: 'long', day: 'numeric' });
+  } catch (error) {
+    return 'Older';
+  }
+};
+
+// Group notifications by date
+const groupNotificationsByDate = (notifications: Notification[]): Record<string, Notification[]> => {
+  const groups: Record<string, Notification[]> = {};
+  
+  notifications.forEach(notification => {
+    const dateHeader = getDateHeader(notification.createdAt);
+    
+    if (!groups[dateHeader]) {
+      groups[dateHeader] = [];
+    }
+    
+    groups[dateHeader].push(notification);
+  });
+  
+  // Sort groups in chronological order (Today -> Yesterday -> Weekdays -> Older dates)
+  const sortedGroups: Record<string, Notification[]> = {};
+  const order = ['Today', 'Yesterday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+  
+  // Add ordered groups first
+  order.forEach(day => {
+    if (groups[day]) {
+      sortedGroups[day] = groups[day];
+    }
+  });
+  
+  // Add remaining groups (sorted dates)
+  Object.keys(groups)
+    .filter(day => !order.includes(day))
+    .sort((a, b) => {
+      // Try to parse as dates for comparison
+      try {
+        const dateA = new Date(a);
+        const dateB = new Date(b);
+        return dateB.getTime() - dateA.getTime(); // Most recent first
+      } catch {
+        return a.localeCompare(b);
+      }
+    })
+    .forEach(day => {
+      sortedGroups[day] = groups[day];
+    });
+  
+  return sortedGroups;
+};
+
 const findMatchingTrade = (notification: any, allTrades: Trade[], userId: string): Trade | null => {
   if (!notification || allTrades.length === 0) return null;
   
@@ -104,58 +224,82 @@ const findMatchingTrade = (notification: any, allTrades: Trade[], userId: string
   return allTrades.length > 0 ? allTrades[0] : null;
 };
 
-// Get redirect page based on user role
-const getRedirectPage = (
-  trade: Trade, 
-  currentUserId: string
-): string => {
-  const tradeId = safeToString(trade.id || trade.tradeId || trade._id);
+// Get trade ID safely
+const getTradeId = (trade: Trade | null | undefined): string | null => {
+  if (!trade) return null;
   
-  if (currentUserId) {
-    const buyerId = safeToString(trade.buyerId || trade.buyer);
-    const sellerId = safeToString(trade.sellerId || trade.seller);
-    
-    if (buyerId === currentUserId) {
-      return `/prc_sell?tradeId=${tradeId}`; // Buyer goes to sell page
-    }
-    
-    if (sellerId === currentUserId) {
-      return `/prc_buy?tradeId=${tradeId}`; // Seller goes to buy page
-    }
-  }
+  if (trade.id) return trade.id;
+  if (trade.tradeId) return trade.tradeId;
+  if (trade._id) return trade._id;
   
-  return `/prc_sell?tradeId=${tradeId}`;
+  return null;
 };
 
-// Fix notification text to show correct action
-const fixNotificationText = (text: string, userRole: 'buyer' | 'seller' | 'unknown'): string => {
-  if (userRole === 'unknown' || !text) return text || '';
+// Get redirect page - buyer goes to buyer page, seller goes to seller page
+const getRedirectPage = (
+  trade: Trade, 
+  currentUserId: string,
+  userData: any
+): string => {
+  const tradeId = getTradeId(trade);
+  if (!tradeId) return '/trades';
   
-  let fixedText = text;
+  const buyerId = safeToString(trade.buyerId || trade.buyer);
+  const sellerId = safeToString(trade.sellerId || trade.seller);
   
-  if (userRole === 'buyer') {
-    // User is buyer -> show "sell to" in text
-    // Original might be "buy from X" -> change to "sell to X"
-    fixedText = fixedText
-      .replace(/buy from/g, 'sell to')
-      .replace(/buying from/g, 'selling to')
-      .replace(/to buy/g, 'to sell')
-      .replace(/want to buy/g, 'want to sell')
-      .replace(/request to buy/g, 'request to sell')
-      .replace(/trade request to buy/g, 'trade request to sell');
-  } else if (userRole === 'seller') {
-    // User is seller -> show "buy from" in text
-    // Original might be "sell to X" -> change to "buy from X"
-    fixedText = fixedText
-      .replace(/sell to/g, 'buy from')
-      .replace(/selling to/g, 'buying from')
-      .replace(/to sell/g, 'to buy')
-      .replace(/want to sell/g, 'want to buy')
-      .replace(/request to sell/g, 'request to buy')
-      .replace(/trade request to sell/g, 'trade request to buy');
+  console.log('Redirect Logic:', {
+    currentUserId,
+    buyerId,
+    sellerId,
+    tradeId,
+    userIsBuyer: buyerId === currentUserId,
+    userIsSeller: sellerId === currentUserId
+  });
+  
+  // Buyer goes to buyer page
+  if (buyerId === currentUserId) {
+    return `/prc_buy?tradeId=${tradeId}`; // Buyer goes to buyer page
   }
   
-  return fixedText;
+  // Seller goes to seller page
+  if (sellerId === currentUserId) {
+    return `/prc_sell?tradeId=${tradeId}`; // Seller goes to seller page
+  }
+  
+  // Fallback: check userData trades arrays
+  if (userData) {
+    const userTradesAsBuyer = Array.isArray(userData.tradesAsBuyer) ? userData.tradesAsBuyer : [];
+    const userTradesAsSeller = Array.isArray(userData.tradesAsSeller) ? userData.tradesAsSeller : [];
+    
+    // Check if trade exists in user's tradesAsBuyer
+    const isBuyer = userTradesAsBuyer.some((t: any) => {
+      const tId = getTradeId(t);
+      return tId === tradeId;
+    });
+    
+    if (isBuyer) {
+      return `/prc_buy?tradeId=${tradeId}`; // Buyer goes to buyer page
+    }
+    
+    // Check if trade exists in user's tradesAsSeller
+    const isSeller = userTradesAsSeller.some((t: any) => {
+      const tId = getTradeId(t);
+      return tId === tradeId;
+    });
+    
+    if (isSeller) {
+      return `/prc_sell?tradeId=${tradeId}`; // Seller goes to seller page
+    }
+  }
+  
+  // Default fallback to buyer page
+  return `/prc_buy?tradeId=${tradeId}`;
+};
+
+// Fix notification text - REMOVED the text swapping since we're not swapping pages anymore
+const fixNotificationText = (text: string, userRole: 'buyer' | 'seller' | 'unknown'): string => {
+  // No text modification needed since buyer stays on buyer page and seller stays on seller page
+  return text || '';
 };
 
 const Bell_Notify = () => {
@@ -202,34 +346,42 @@ const Bell_Notify = () => {
                 userRole = buyerId === userId ? 'buyer' : sellerId === userId ? 'seller' : 'unknown';
               }
               
-              // Fix notification text
-              const originalTitle = safeToString(n.title);
-              const originalMessage = safeToString(n.message);
-              const fixedTitle = fixNotificationText(originalTitle, userRole);
-              const fixedMessage = fixNotificationText(originalMessage, userRole);
+              // Get notification creation time
+              const notificationTime = n.createdAt || n.timestamp || n.date || n.timeAgo;
+              const formattedTime = formatDateTime(notificationTime);
+              const timeAgo = safeToString(n.timeAgo) || formattedTime;
               
-              console.log(`Notification ${index}:`, {
-                original: originalMessage,
-                fixed: fixedMessage,
-                userRole,
-                matchedTradeId: matchedTrade?.id
-              });
+              // Get trade ID safely
+              const tradeId = matchedTrade ? getTradeId(matchedTrade) : null;
               
               return {
                 id: safeToString(n.id) || `notif-${index}-${Date.now()}`,
-                title: fixedTitle,
-                message: fixedMessage,
-                timeAgo: safeToString(n.timeAgo),
+                title: safeToString(n.title),
+                message: safeToString(n.message),
+                timeAgo: timeAgo,
                 type: n.type ? safeToString(n.type) : undefined,
-                tradeId: matchedTrade ? safeToString(matchedTrade.id || matchedTrade.tradeId || matchedTrade._id) : undefined,
+                tradeId: tradeId || undefined,
                 metadata: n.metadata,
                 isRead: n.isRead || false,
                 matchedTrade: matchedTrade || undefined,
-                userRole: userRole
+                userRole: userRole,
+                originalTradeId: n.tradeId || n.metadata?.tradeId,
+                createdAt: notificationTime // Store the creation time for grouping
               };
             });
             
-            setNotifications(enhancedNotifications);
+            // Sort notifications by date (most recent first) - FIXED: Added proper types
+            const sortedNotifications = enhancedNotifications.sort((a: Notification, b: Notification) => {
+              try {
+                const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+                const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+                return dateB - dateA; // Most recent first
+              } catch {
+                return 0;
+              }
+            });
+            
+            setNotifications(sortedNotifications);
           }
         }
       } catch (err) {
@@ -244,12 +396,10 @@ const Bell_Notify = () => {
     return () => window.removeEventListener('focus', handleFocus);
   }, []);
 
-  // Get current user ID
   const getCurrentUserId = useCallback((): string | null => {
     return userData?.id || userData?.userId || userData?._id || null;
   }, [userData]);
 
-  // Mark notification as read
   const markNotificationAsRead = useCallback((notificationId: string) => {
     setNotifications(prev => prev.map(n => 
       n.id === notificationId ? { ...n, isRead: true } : n
@@ -278,10 +428,19 @@ const Bell_Notify = () => {
     const trade = notification.matchedTrade;
     
     if (!trade) {
-      // Try to use any pending trade
-      const pendingTrade = allTrades.find(t => t.status === 'pending');
-      if (pendingTrade) {
-        const redirectUrl = getRedirectPage(pendingTrade, currentUserId || '');
+      // Try to find any pending trade for this user
+      const userPendingTrades = allTrades.filter(t => 
+        t.status === 'pending' && 
+        (safeToString(t.buyerId || t.buyer) === currentUserId || 
+         safeToString(t.sellerId || t.seller) === currentUserId)
+      );
+      
+      if (userPendingTrades.length > 0) {
+        const latestPendingTrade = userPendingTrades.sort((a, b) => 
+          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+        )[0];
+        
+        const redirectUrl = getRedirectPage(latestPendingTrade, currentUserId || '', userData);
         markNotificationAsRead(notification.id);
         router.push(redirectUrl);
         return;
@@ -291,12 +450,12 @@ const Bell_Notify = () => {
       return;
     }
 
-    const redirectUrl = getRedirectPage(trade, currentUserId || '');
+    // Use the dynamic trade ID from the matched trade
+    const redirectUrl = getRedirectPage(trade, currentUserId || '', userData);
     markNotificationAsRead(notification.id);
     router.push(redirectUrl);
-  }, [router, markNotificationAsRead, allTrades, getCurrentUserId]);
+  }, [router, markNotificationAsRead, allTrades, getCurrentUserId, userData]);
 
-  // Filter buttons
   const filterButtons: { label: string; value: FilterType }[] = [
     { label: "All", value: "all" },
     { label: "Trades", value: "trades" },
@@ -304,7 +463,6 @@ const Bell_Notify = () => {
     { label: "Others", value: "others" },
   ];
 
-  // Dismiss notification
   const dismissNotification = useCallback((notificationId: string) => {
     setNotifications(prev => prev.filter(n => n.id !== notificationId));
     
@@ -325,7 +483,6 @@ const Bell_Notify = () => {
     }
   }, []);
 
-  // Mark all as read
   const markAllAsRead = useCallback(() => {
     setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
     
@@ -347,7 +504,6 @@ const Bell_Notify = () => {
     }
   }, []);
 
-  // Dismiss all notifications
   const dismissAllNotifications = useCallback(() => {
     setNotifications([]);
     
@@ -366,7 +522,6 @@ const Bell_Notify = () => {
     }
   }, []);
 
-  // Filter notifications
   const filteredNotifications = notifications.filter(notification => {
     if (activeFilter === "all") return true;
     if (activeFilter === "trades") {
@@ -389,6 +544,9 @@ const Bell_Notify = () => {
     }
     return true;
   });
+
+  // Group notifications by date
+  const groupedNotifications = groupNotificationsByDate(filteredNotifications);
 
   return (
     <main className="min-h-screen bg-[#0F1012] text-white">
@@ -438,11 +596,6 @@ const Bell_Notify = () => {
           ))}
         </div>
 
-        {/* Date Label */}
-        {filteredNotifications.length > 0 && (
-          <p className="text-sm text-gray-400 mb-4">Today</p>
-        )}
-
         {/* Empty State */}
         {filteredNotifications.length === 0 && (
           <div className="text-center py-12">
@@ -456,109 +609,133 @@ const Bell_Notify = () => {
           </div>
         )}
 
-        {/* Notification List */}
-        <div className="flex flex-col gap-4">
-          {filteredNotifications.map((notification, index) => {
-            const trade = notification.matchedTrade;
-            const userRole = notification.userRole || 'unknown';
-            
-            // Determine redirect page and button text
-            let buttonText = 'View Trade';
-            
-            if (userRole === 'buyer') {
-              buttonText = 'Go to Sell Page';
-            } else if (userRole === 'seller') {
-              buttonText = 'Go to Buy Page';
-            }
-            
-            const tradeId = trade ? safeToString(trade.id || trade.tradeId || trade._id) : null;
-            
-            return (
-              <div
-                key={notification.id || `notif-${index}`}
-                className={`bg-[#1A1B1E] p-4 sm:p-5 rounded-xl shadow-md border transition-colors duration-200 ${
-                  notification.isRead 
-                    ? 'border-[#2A2B2F] opacity-70' 
-                    : 'border-[#4DF2BE] border-opacity-30'
-                }`}
-              >
-                <div className="flex items-start gap-3">
-                  <div className={`w-3 h-3 rounded-full mt-1 ${
-                    notification.isRead ? 'bg-gray-500' :
-                    trade?.status === 'completed' ? 'bg-green-500' :
-                    trade?.status === 'cancelled' ? 'bg-red-500' :
-                    trade?.status === 'disputed' ? 'bg-yellow-500' :
-                    'bg-[#4DF2BE]'
-                  }`} />
+        {/* Notification List with Date Grouping */}
+        {filteredNotifications.length > 0 && (
+          <div className="flex flex-col gap-6">
+            {Object.entries(groupedNotifications).map(([dateHeader, dateNotifications]) => (
+              <div key={dateHeader} className="space-y-4">
+                {/* Date Header */}
+                <div className="sticky top-0 z-10 bg-[#0F1012] py-2">
+                  <p className="text-sm font-medium text-gray-400">{dateHeader}</p>
+                </div>
+                
+                {/* Notifications for this date */}
+                <div className="space-y-4">
+                  {dateNotifications.map((notification, index) => {
+                    const trade = notification.matchedTrade;
+                    const userRole = notification.userRole || 'unknown';
+                    const tradeId = getTradeId(trade);
+                    
+                    // Determine button text based on user role
+                    let buttonText = 'View Trade';
+                    if (userRole === 'buyer') {
+                      buttonText = 'Go to Buyer Page';
+                    } else if (userRole === 'seller') {
+                      buttonText = 'Go to Seller Page';
+                    }
+                    
+                    return (
+                      <div
+                        key={notification.id || `notif-${index}`}
+                        className={`bg-[#1A1B1E] p-4 sm:p-5 rounded-xl shadow-md border transition-colors duration-200 ${
+                          notification.isRead 
+                            ? 'border-[#2A2B2F] opacity-70' 
+                            : 'border-[#4DF2BE] border-opacity-30'
+                        }`}
+                      >
+                        <div className="flex items-start gap-3">
+                          <div className={`w-3 h-3 rounded-full mt-1 ${
+                            notification.isRead ? 'bg-gray-500' :
+                            trade?.status === 'completed' ? 'bg-green-500' :
+                            trade?.status === 'cancelled' ? 'bg-red-500' :
+                            trade?.status === 'disputed' ? 'bg-yellow-500' :
+                            'bg-[#4DF2BE]'
+                          }`} />
 
-                  <div className="flex-1">
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <p className="font-semibold text-sm sm:text-base">
-                          {safeToString(notification.title)}
-                          {notification.isRead && (
-                            <span className="ml-2 text-xs text-gray-500">(read)</span>
-                          )}
-                        </p>
+                          <div className="flex-1">
+                            <div className="flex justify-between items-start">
+                              <div>
+                                <p className="font-semibold text-sm sm:text-base">
+                                  {safeToString(notification.title)}
+                                  {notification.isRead && (
+                                    <span className="ml-2 text-xs text-gray-500">(read)</span>
+                                  )}
+                                </p>
+                              </div>
+                              <div className="flex gap-2">
+                                <button 
+                                  onClick={() => handleViewNotification(notification)}
+                                  className="text-[#4DF2BE] text-xs sm:text-sm font-medium hover:underline hover:text-[#3DD2A5] transition-colors duration-200"
+                                >
+                                  {buttonText}
+                                </button>
+                                <button 
+                                  onClick={() => dismissNotification(notification.id)}
+                                  className="text-gray-400 text-xs hover:text-red-400 transition-colors"
+                                  title="Dismiss"
+                                >
+                                  ×
+                                </button>
+                              </div>
+                            </div>
+                            
+                            <p className="text-xs sm:text-sm text-gray-300 leading-relaxed mt-1">
+                              {safeToString(notification.message)}
+                            </p>
+                            
+                            {/* Show matched trade details */}
+                            {trade && (
+                              <div className="mt-2 flex flex-wrap items-center gap-2">
+                                <span className="text-[10px] px-2 py-0.5 bg-[#2A2B2F] rounded">
+                                  Status: {trade.status}
+                                </span>
+                                {trade.amount && (
+                                  <span className="text-[10px] px-2 py-0.5 bg-[#2A2B2F] rounded">
+                                    ${trade.amount}
+                                  </span>
+                                )}
+                                {tradeId && (
+                                  <span className="text-[8px] px-2 py-0.5 bg-purple-500/10 text-purple-300 rounded truncate max-w-[80px]">
+                                    ID: {tradeId.substring(0, Math.min(8, tradeId.length))}...
+                                  </span>
+                                )}
+                                <span className="text-[10px] px-2 py-0.5 bg-blue-500/10 text-blue-300 rounded">
+                                  {userRole.toUpperCase()}
+                                </span>
+                              </div>
+                            )}
+                            
+                            {/* Show if no trade matched */}
+                            {!trade && notification.originalTradeId && (
+                              <div className="mt-2">
+                                <span className="text-[10px] px-2 py-0.5 bg-yellow-500/20 text-yellow-400 rounded">
+                                  ⚠ Using original trade ID
+                                </span>
+                                <span className="text-[8px] px-2 py-0.5 bg-purple-500/10 text-purple-300 rounded truncate max-w-[80px] ml-2">
+                                  ID: {notification.originalTradeId.substring(0, Math.min(8, notification.originalTradeId.length))}...
+                                </span>
+                              </div>
+                            )}
+                            
+                            {/* Show detailed timestamp */}
+                            <div className="flex justify-between items-center mt-2">
+                              <p className="text-[10px] sm:text-xs text-gray-500">
+                                {formatDateTime(notification.createdAt)}
+                              </p>
+                              <span className="text-[10px] text-gray-600">
+                                {notification.timeAgo}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
                       </div>
-                      <div className="flex gap-2">
-                        <button 
-                          onClick={() => handleViewNotification(notification)}
-                          className="text-[#4DF2BE] text-xs sm:text-sm font-medium hover:underline hover:text-[#3DD2A5] transition-colors duration-200"
-                        >
-                          {buttonText}
-                        </button>
-                        <button 
-                          onClick={() => dismissNotification(notification.id)}
-                          className="text-gray-400 text-xs hover:text-red-400 transition-colors"
-                          title="Dismiss"
-                        >
-                          ×
-                        </button>
-                      </div>
-                    </div>
-                    
-                    <p className="text-xs sm:text-sm text-gray-300 leading-relaxed mt-1">
-                      {safeToString(notification.message)}
-                    </p>
-                    
-                    {/* Show matched trade details */}
-                    {trade && (
-                      <div className="mt-2 flex flex-wrap items-center gap-2">
-                        <span className="text-[10px] px-2 py-0.5 bg-[#2A2B2F] rounded">
-                          Status: {trade.status}
-                        </span>
-                        {trade.amount && (
-                          <span className="text-[10px] px-2 py-0.5 bg-[#2A2B2F] rounded">
-                            ${trade.amount}
-                          </span>
-                        )}
-                        {tradeId && (
-                          <span className="text-[8px] px-2 py-0.5 bg-purple-500/10 text-purple-300 rounded truncate max-w-[80px]">
-                            ID: {tradeId.substring(0, Math.min(8, tradeId.length))}...
-                          </span>
-                        )}
-                      </div>
-                    )}
-                    
-                    {/* Show if no trade matched */}
-                    {!trade && (
-                      <div className="mt-2">
-                        <span className="text-[10px] px-2 py-0.5 bg-yellow-500/20 text-yellow-400 rounded">
-                          ⚠ No trade match
-                        </span>
-                      </div>
-                    )}
-                    
-                    <p className="text-[10px] sm:text-xs text-gray-500 mt-2">
-                      {safeToString(notification.timeAgo)}
-                    </p>
-                  </div>
+                    );
+                  })}
                 </div>
               </div>
-            );
-          })}
-        </div>
+            ))}
+          </div>
+        )}
 
         <div className="w-[100%] h-[1px] bg-[#fff] mt-[50%] opacity-20 my-8"></div>
               

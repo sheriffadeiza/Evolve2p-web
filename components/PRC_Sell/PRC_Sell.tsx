@@ -8,18 +8,11 @@ import Timer from "../../public/Assets/Evolve2p_time/P2P Marketplace/elements.sv
 import Ochat from "../../public/Assets/Evolve2p_Ochat/P2P Marketplace/elements.svg";
 import GreatT from "../../public/Assets/Evolve2p_Larrow/arrow-right-01.svg";
 
-
 // Crypto icons - import all available
 import BTC from "../../public/Assets/Evolve2p_BTC/Bitcoin (BTC).svg";
 import ETH from "../../public/Assets/Evolve2p_ETH/Ethereum (ETH).svg";
 import USDT from "../../public/Assets/Evolve2p_USDT/Tether (USDT).svg";
 import USDC from "../../public/Assets/Evolve2p_USDC/USD Coin (USDC).svg";
-// Import more crypto icons as needed:
-// import BNB from "../../public/Assets/Evolve2p_BNB/Binance Coin (BNB).svg";
-// import SOL from "../../public/Assets/Evolve2p_SOL/Solana (SOL).svg";
-// import XRP from "../../public/Assets/Evolve2p_XRP/Ripple (XRP).svg";
-// import ADA from "../../public/Assets/Evolve2p_ADA/Cardano (ADA).svg";
-// import DOGE from "../../public/Assets/Evolve2p_DOGE/Dogecoin (DOGE).svg";
 
 import Yellow_i from "../../public/Assets/Evolve2p_yellowi/elements.svg";
 import UPa from "../../public/Assets/Evolve2p_upA/Makretplace/elements.svg";
@@ -42,7 +35,7 @@ interface TradeData {
   cryptoType: string;
   amountFiat: number;
   fiatCurrency: string;
-  buyer: { // In console, this contains SELLER data
+  buyer: {
     id: string;
     username: string;
     email?: string;
@@ -53,10 +46,16 @@ interface TradeData {
       accountName?: string;
     };
   };
-  seller: { // In console, this contains BUYER data
+  seller: {
     id: string;
     username: string;
     email?: string;
+    phone?: string;
+    bankDetails?: {
+      bankName?: string;
+      accountNumber?: string;
+      accountName?: string;
+    };
   };
   offer: {
     id: string;
@@ -159,12 +158,12 @@ interface ReleaseTradeResponse {
 }
 
 interface DisplayData {
-  currentUser: any; // The seller (current user)
-  counterparty: any; // The buyer
-  currentUserRole: "seller";
-  counterpartyRole: "buyer";
-  buyerUsername: string; // Counterparty username
-  sellerUsername: string; // Current user username
+  currentUser: any;
+  counterparty: any;
+  currentUserRole: "buyer" | "seller";
+  counterpartyRole: "buyer" | "seller";
+  buyerUsername: string;
+  sellerUsername: string;
 }
 
 const PRC_Sell = () => {
@@ -188,7 +187,6 @@ const PRC_Sell = () => {
   const [socket, setSocket] = useState<Socket | null>(null);
   const [isSocketConnected, setIsSocketConnected] = useState(false);
   
-  // Dispute modal state
   const [showDisputeModal, setShowDisputeModal] = useState(false);
   const [disputeReason, setDisputeReason] = useState("");
   const [disputeDescription, setDisputeDescription] = useState("");
@@ -254,26 +252,7 @@ const PRC_Sell = () => {
       case 'USDC':
       case 'USD COIN':
         return USDC;
-      // Add more cases as needed when you import more icons
-      /*
-      case 'BNB':
-      case 'BINANCE COIN':
-        return BNB;
-      case 'SOL':
-      case 'SOLANA':
-        return SOL;
-      case 'XRP':
-      case 'RIPPLE':
-        return XRP;
-      case 'ADA':
-      case 'CARDANO':
-        return ADA;
-      case 'DOGE':
-      case 'DOGECOIN':
-        return DOGE;
-      */
       default:
-        // Fallback for unknown cryptocurrencies
         return BTC;
     }
   }, []);
@@ -281,7 +260,7 @@ const PRC_Sell = () => {
   // Get current user data
   const currentUser = useMemo(() => getCurrentUser(), [getCurrentUser]);
 
-  // CORRECTED: Memoized display data based on reversed console data
+  // CORRECT: Identify user roles based on actual user ID matching
   const displayData = useMemo((): DisplayData => {
     if (!tradeData) {
       return {
@@ -294,48 +273,55 @@ const PRC_Sell = () => {
       };
     }
 
-    // In console: buyer data contains SELLER info, seller data contains BUYER info
-    const consoleBuyer = tradeData.buyer; // Contains SELLER data
-    const consoleSeller = tradeData.seller; // Contains BUYER data
+    const currentUserId = currentUser?.id;
     
-    // Since this is a seller page, the current user should be the seller
-    // Check which one matches the current user ID
-    if (currentUser?.id === consoleBuyer?.id) {
-      // Current user is the seller (consoleBuyer contains seller data)
+    // Check if current user is the buyer
+    if (currentUserId === tradeData.buyer?.id) {
+      // Current user is the BUYER
       return {
-        currentUser: consoleBuyer,
-        counterparty: consoleSeller,
-        currentUserRole: "seller",
-        counterpartyRole: "buyer",
-        buyerUsername: consoleSeller?.username || "Buyer123",
-        sellerUsername: consoleBuyer?.username || "You"
+        currentUser: tradeData.buyer,
+        counterparty: tradeData.seller,
+        currentUserRole: "buyer",
+        counterpartyRole: "seller",
+        buyerUsername: tradeData.buyer?.username || "Buyer",
+        sellerUsername: tradeData.seller?.username || "Seller"
       };
-    } else if (currentUser?.id === consoleSeller?.id) {
-      // Current user is the seller (consoleSeller contains seller data)
+    } 
+    // Check if current user is the seller
+    else if (currentUserId === tradeData.seller?.id) {
+      // Current user is the SELLER
       return {
-        currentUser: consoleSeller,
-        counterparty: consoleBuyer,
+        currentUser: tradeData.seller,
+        counterparty: tradeData.buyer,
         currentUserRole: "seller",
         counterpartyRole: "buyer",
-        buyerUsername: consoleBuyer?.username || "Buyer123",
-        sellerUsername: consoleSeller?.username || "You"
+        buyerUsername: tradeData.buyer?.username || "Buyer",
+        sellerUsername: tradeData.seller?.username || "You"
       };
-    } else {
-      // Fallback: assume consoleBuyer is seller (most common case)
+    } 
+    // No match found - this shouldn't happen if user is authenticated
+    else {
+      // Since this is PRC_Sell (seller page), assume current user is seller
       return {
-        currentUser: consoleBuyer,
-        counterparty: consoleSeller,
+        currentUser: tradeData.seller || { username: "You" },
+        counterparty: tradeData.buyer || { username: "Buyer123" },
         currentUserRole: "seller",
         counterpartyRole: "buyer",
-        buyerUsername: consoleSeller?.username || "Buyer123",
-        sellerUsername: consoleBuyer?.username || "You"
+        buyerUsername: tradeData.buyer?.username || "Buyer123",
+        sellerUsername: tradeData.seller?.username || "You"
       };
     }
   }, [tradeData, currentUser]);
 
-  // Memoize derived values
-  const buyerUsername = useMemo(() => displayData.buyerUsername, [displayData]);
-  const sellerUsername = useMemo(() => displayData.sellerUsername, [displayData]);
+  // CORRECT: Derive values from displayData
+  const buyerUsername = useMemo(() => displayData.counterpartyRole === "buyer" 
+    ? displayData.counterparty?.username || "Buyer123" 
+    : displayData.currentUser?.username || "Buyer123", [displayData]);
+  
+  const sellerUsername = useMemo(() => displayData.currentUserRole === "seller" 
+    ? displayData.currentUser?.username || "You" 
+    : displayData.counterparty?.username || "Seller", [displayData]);
+
   const isCurrentUserSeller = useMemo(() => displayData.currentUserRole === "seller", [displayData]);
 
   // Format time as MM:SS
@@ -543,18 +529,14 @@ const PRC_Sell = () => {
         const messages = await response.json();
         
         if (Array.isArray(messages)) {
-          // Sort by date (ascending = oldest first)
           const sortedMessages = messages.sort((a: any, b: any) => {
             return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
           });
           
-          // Format messages with correct sender names based on display data
           const formattedMessages: ChatMessage[] = sortedMessages.map((msg: any) => {
-            // Determine if sender is current user (seller) or counterparty (buyer)
             const isCurrentUser = msg.senderId === displayData.currentUser?.id;
-            const senderName = isCurrentUser 
-              ? displayData.sellerUsername 
-              : displayData.buyerUsername;
+            const senderName = msg.sender?.username || msg.sender?.name || 
+                              (isCurrentUser ? sellerUsername : buyerUsername);
             
             return {
               id: msg.id,
@@ -567,7 +549,7 @@ const PRC_Sell = () => {
                 id: msg.sender?.id || msg.senderId,
                 name: senderName,
                 email: msg.sender?.email,
-                role: isCurrentUser ? 'seller' : 'buyer'
+                username: msg.sender?.username
               }
             };
           });
@@ -578,7 +560,7 @@ const PRC_Sell = () => {
     } catch (err) {
       console.error("❌ Error fetching chat messages:", err);
     }
-  }, [tradeData?.chat?.id, displayData, getAuthToken]);
+  }, [tradeData?.chat?.id, displayData, getAuthToken, buyerUsername, sellerUsername]);
 
   // Fetch offer details
   const fetchOfferDetails = useCallback(async (offerId: string, authToken: string | null) => {
@@ -614,12 +596,23 @@ const PRC_Sell = () => {
     
     return {
       id: tradeId,
-      status: "PENDING", // Initial status
+      status: "PENDING",
       amountCrypto: 0.00417,
       cryptoType: "BTC",
       amountFiat: 200.00,
       fiatCurrency: "USD",
-      buyer: { // Contains SELLER data in console
+      buyer: {
+        id: "user_buyer_456",
+        username: "CryptoBuyer123",
+        email: "buyer@example.com",
+        phone: "+1234567890",
+        bankDetails: {
+          bankName: "Bank of America",
+          accountNumber: "****5678",
+          accountName: "Jane Buyer"
+        }
+      },
+      seller: {
         id: user?.id || "user_seller_123",
         username: user?.username || "CryptoSeller123",
         email: user?.email || "seller@example.com",
@@ -629,11 +622,6 @@ const PRC_Sell = () => {
           accountNumber: "****1234",
           accountName: "John Seller"
         }
-      },
-      seller: { // Contains BUYER data in console
-        id: "user_buyer_456",
-        username: "CryptoBuyer123",
-        email: "buyer@example.com"
       },
       offer: {
         id: "offer_789",
@@ -672,11 +660,10 @@ const PRC_Sell = () => {
         throw new Error('Authentication required');
       }
 
-      // Current user is the seller in this component
       const senderId = displayData.currentUser?.id || '';
       const senderName = sellerUsername;
 
-      // 1. OPTIMISTIC UPDATE - Show message immediately
+      // 1. OPTIMISTIC UPDATE
       const tempId = `temp_${Date.now()}`;
       const optimisticMessage: ChatMessage = {
         id: tempId,
@@ -685,11 +672,11 @@ const PRC_Sell = () => {
         createdAt: new Date().toISOString(),
         sender: {
           id: senderId,
-          name: senderName
+          name: senderName,
+          username: displayData.currentUser?.username
         }
       };
 
-      // Add to chat immediately
       setChatMessages(prev => {
         const newMessages = [...prev, optimisticMessage];
         return newMessages.sort((a, b) => 
@@ -705,7 +692,6 @@ const PRC_Sell = () => {
       formData.append('chatId', tradeData?.chat.id || '');
       formData.append('content', savedInput);
       
-      // Add attachment as binary if exists
       if (selectedFile) {
         setUploadingFile(true);
         formData.append('attachment', selectedFile);
@@ -725,14 +711,13 @@ const PRC_Sell = () => {
 
       if (!response.ok) {
         const errorText = await response.text();
-        // Remove optimistic message if API fails
         setChatMessages(prev => prev.filter(msg => msg.id !== tempId));
         throw new Error(`Failed to send: ${response.status}`);
       }
 
       const result = await response.json();
       
-      // 4. Replace temp message with real one from API
+      // 4. Replace temp message with real one
       if (result && result.id) {
         setChatMessages(prev => prev.map(msg => 
           msg.id === tempId 
@@ -745,17 +730,17 @@ const PRC_Sell = () => {
                 createdAt: result.createdAt || new Date().toISOString(),
                 sender: {
                   id: result.sender?.id || result.senderId,
-                  name: result.sender?.name || senderName
+                  name: result.sender?.name || senderName,
+                  username: result.sender?.username
                 }
               }
             : msg
         ));
       }
       
-      // 5. Clear selected file
       setSelectedFile(null);
       
-      // 6. Emit via Socket.IO for real-time
+      // 5. Emit via Socket.IO
       if (socket && socket.connected && tradeData?.chat.id) {
         const finalMessage = result && result.id ? result : optimisticMessage;
         socket.emit('send-message', {
@@ -804,9 +789,7 @@ const PRC_Sell = () => {
       const result: ReleaseTradeResponse = await response.json();
       
       if (result.success) {
-        // Update trade data with the returned trade object
         setTradeData(result.trade);
-        
         alert('Trade released successfully! The crypto has been sent to the buyer and the trade is complete.');
         setShowReleaseModal(false);
         
@@ -838,7 +821,6 @@ const PRC_Sell = () => {
 
   // Submit dispute
   const handleSubmitDispute = useCallback(async () => {
-    // Validation
     if (!disputeReason) {
       alert("Please select a reason for the dispute.");
       return;
@@ -856,7 +838,6 @@ const PRC_Sell = () => {
         throw new Error('Authentication required');
       }
 
-      // Prepare FormData with correct field names
       const formData = new FormData();
       formData.append('tradeId', tradeId);
       formData.append('reason', disputeReason === "other" ? otherReason : disputeReason);
@@ -869,7 +850,6 @@ const PRC_Sell = () => {
         formData.append('evidence', disputeFile);
       }
 
-      // API call
       const response = await fetch('https://evolve2p-backend.onrender.com/api/open-dispute', {
         method: 'POST',
         headers: {
@@ -884,12 +864,9 @@ const PRC_Sell = () => {
         throw new Error(result.message || `Failed to submit dispute: ${response.status}`);
       }
 
-      // Success handling
       if (result.success) {
-        // Show success modal instead of alert
         setShowDisputeSuccessModal(true);
         
-        // Update trade status
         if (tradeData) {
           setTradeData({
             ...tradeData,
@@ -903,12 +880,10 @@ const PRC_Sell = () => {
           });
         }
         
-        // Reset and close dispute form modal
         setShowDisputeModal(false);
         resetDisputeForm();
         setShowDispute(false);
         
-        // Socket notification
         if (socket?.connected) {
           socket.emit('trade-dispute-opened', { tradeId, status: "DISPUTED" });
         }
@@ -925,11 +900,9 @@ const PRC_Sell = () => {
   // Handle back to trade chat button
   const handleBackToTradeChat = useCallback(() => {
     setShowDisputeSuccessModal(false);
-    // Ensure chat is open
     if (!showChat) {
       setShowChat(true);
     }
-    // Scroll to bottom of chat
     if (chatContainerRef.current) {
       setTimeout(() => {
         chatContainerRef.current!.scrollTop = chatContainerRef.current!.scrollHeight;
@@ -964,8 +937,8 @@ const PRC_Sell = () => {
 
   // Check if release button should be shown
   const shouldShowReleaseButton = useMemo(() => 
-    isAwaitingRelease && !isReleased && !isDisputed && tradeData?.status !== 'CANCELLED',
-    [isAwaitingRelease, isReleased, isDisputed, tradeData?.status]
+    isCurrentUserSeller && isAwaitingRelease && !isReleased && !isDisputed && tradeData?.status !== 'CANCELLED',
+    [isCurrentUserSeller, isAwaitingRelease, isReleased, isDisputed, tradeData?.status]
   );
 
   // Get dispute reason for display
@@ -1037,10 +1010,12 @@ const PRC_Sell = () => {
         
         const apiResponse: ApiResponse = await response.json();
         
-        console.log("🔍 Raw Trade Data from API:");
-        console.log("API Buyer (should be seller data):", apiResponse.data?.buyer);
-        console.log("API Seller (should be buyer data):", apiResponse.data?.seller);
+        console.log("🔍 Trade Data from API:");
+        console.log("Buyer (correctly contains buyer info):", apiResponse.data?.buyer);
+        console.log("Seller (correctly contains seller info):", apiResponse.data?.seller);
         console.log("Current User ID:", currentUser?.id);
+        console.log("Is Current User Buyer?", currentUser?.id === apiResponse.data?.buyer?.id);
+        console.log("Is Current User Seller?", currentUser?.id === apiResponse.data?.seller?.id);
         
         if (apiResponse.success && apiResponse.data) {
           const trade = apiResponse.data;
@@ -1081,7 +1056,6 @@ const PRC_Sell = () => {
       return;
     }
 
-    // Initialize socket connection
     const socketUrl = process.env.NEXT_PUBLIC_SOCKET_URL || "https://evolve2p-backend.onrender.com";
     const newSocket = io(socketUrl, {
       query: {
@@ -1109,28 +1083,22 @@ const PRC_Sell = () => {
     newSocket.on('new-message', (message: ChatMessage) => {
       console.log("📨 New message received via Socket.IO:", message);
       
-      // Check if message already exists
       const messageExists = chatMessages.some(msg => msg.id === message.id);
       if (messageExists) return;
       
-      // Determine sender display name based on display data
       const isCurrentUser = message.senderId === displayData.currentUser?.id;
-      const senderName = isCurrentUser 
-        ? displayData.sellerUsername 
-        : displayData.buyerUsername;
+      const senderName = isCurrentUser ? sellerUsername : buyerUsername;
       
-      // Add message to chat
       setChatMessages(prev => {
         const formattedMessage = {
           ...message,
           sender: {
             id: message.senderId,
             name: senderName,
-            role: isCurrentUser ? 'seller' : 'buyer'
+            username: message.sender?.username
           }
         };
         const newMessages = [...prev, formattedMessage];
-        // Sort by date (ascending)
         return newMessages.sort((a, b) => 
           new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
         );
@@ -1151,7 +1119,7 @@ const PRC_Sell = () => {
         console.log("🧹 Socket.IO disconnected on cleanup");
       }
     };
-  }, [tradeData?.chat?.id, getAuthToken, displayData, chatMessages]);
+  }, [tradeData?.chat?.id, getAuthToken, displayData, chatMessages, buyerUsername, sellerUsername]);
 
   // Scroll to bottom when new messages arrive
   useEffect(() => {
@@ -1378,7 +1346,7 @@ const PRC_Sell = () => {
                   </button>
                 </div>
 
-                {/* Trade Summary - CORRECT: Current user is SELLER */}
+                {/* Trade Summary */}
                 <div className="mt-6 lg:mt-8 max-w-2xl">
                   <p className="text-sm font-bold text-white mb-4">Trade Summary</p>
                   <div className="bg-[#2D2D2D] rounded-xl overflow-hidden">
@@ -1466,7 +1434,7 @@ const PRC_Sell = () => {
                     ))}
                   </div>
 
-                  {/* Action Buttons - SIMPLIFIED: Only Release Crypto when awaiting release */}
+                  {/* Action Buttons */}
                   {tradeData?.status === 'CANCELLED' ? (
                     <div className="mt-6">
                       <div className="w-full max-w-2xl h-12 bg-[#342827] border border-[#FE857D] text-[#FE857D] font-bold rounded-full flex items-center justify-center gap-2">
@@ -1525,7 +1493,7 @@ const PRC_Sell = () => {
                     </div>
                   ) : null}
 
-                  {/* Dispute Container - Only show if not already disputed and not awaiting release */}
+                  {/* Dispute Container */}
                   {showDispute && !isDisputed && !isReleased && !isAwaitingRelease && (
                     <div className="mt-6 p-4 bg-[#342827] rounded-lg border-l-2 border-l-[#FE857D]" style={{ maxWidth: '800px' }}>
                       <div className="flex items-start gap-3">
@@ -1814,14 +1782,16 @@ const PRC_Sell = () => {
                       </div>
                     </div>
                     
-                    {/* SELLER/BUYER CHAT MESSAGES - CORRECT: Current user is SELLER */}
+                    {/* SELLER/BUYER CHAT MESSAGES */}
                     <div className="space-y-4">
                       {chatMessages.length > 0 ? (
                         chatMessages
                           .filter(msg => msg.senderId !== "system" && msg.senderId !== "service")
                           .map((message) => {
                             const isCurrentUser = message.senderId === displayData.currentUser?.id;
-                            const displayName = message.sender?.name || (isCurrentUser ? sellerUsername : buyerUsername);
+                            const displayName = message.sender?.username || message.sender?.name || 
+                                              (isCurrentUser ? sellerUsername : buyerUsername);
+                            const role = isCurrentUser ? displayData.currentUserRole : displayData.counterpartyRole;
                             
                             return (
                               <div
@@ -2011,7 +1981,7 @@ const PRC_Sell = () => {
                             <Footer />
                         </div>
 
-          {/* Release Modal - SIMPLIFIED */}
+          {/* Release Modal */}
           {showReleaseModal && (
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
               <div className="bg-[#0F1012] rounded-xl w-full max-w-md">
@@ -2077,12 +2047,11 @@ const PRC_Sell = () => {
             </div>
           )}
 
-          {/* DISPUTE MODAL - Responsive */}
+          {/* DISPUTE MODAL */}
           {showDisputeModal && (
             <div className="fixed inset-0 z-[60] flex items-start md:items-center justify-center bg-black/80 p-4 overflow-y-auto">
               <div className="bg-[#0F1012] rounded-xl w-full max-w-md border border-[#3A3A3A] my-auto md:my-0">
                 <div className="p-4 sm:p-6">
-                  {/* Modal Header */}
                   <div className="flex justify-between items-center mb-4">
                     <h3 className="text-lg sm:text-xl font-bold text-white">Open a Dispute</h3>
                     <button 
@@ -2094,13 +2063,11 @@ const PRC_Sell = () => {
                     </button>
                   </div>
 
-                  {/* Help Text */}
                   <div className="mb-4 text-xs sm:text-sm text-[#C7C7C7]">
                     <p className="mb-2">Disputes help protect you when something goes wrong during a trade.</p>
                     <p>Please provide clear details and supporting documents.</p>
                   </div>
 
-                  {/* Reason Dropdown */}
                   <div className="mb-4">
                     <label className="block text-sm font-medium text-white mb-2">
                       Reason for dispute *
@@ -2134,7 +2101,6 @@ const PRC_Sell = () => {
                     )}
                   </div>
 
-                  {/* Description */}
                   <div className="mb-4">
                     <label className="block text-sm font-medium text-white mb-2">
                       Explain the issue (optional)
@@ -2149,7 +2115,6 @@ const PRC_Sell = () => {
                     />
                   </div>
 
-                  {/* File Upload */}
                   <div className="mb-4">
                     <label className="block text-sm font-medium text-white mb-2">
                       Upload evidence (optional)
@@ -2205,7 +2170,6 @@ const PRC_Sell = () => {
                     )}
                   </div>
 
-                  {/* Warning Message */}
                   <div className="mb-6 p-3 bg-[#352E21] rounded-lg border-l-2 border-l-[#FFC051]">
                     <div className="flex items-start gap-2">
                       <svg className="w-5 h-5 text-[#FFC051] mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
@@ -2218,7 +2182,6 @@ const PRC_Sell = () => {
                     </div>
                   </div>
 
-                  {/* Action Buttons - Responsive */}
                   <div className="flex flex-col sm:flex-row gap-3">
                     <button
                       onClick={() => !submittingDispute && setShowDisputeModal(false)}
@@ -2251,12 +2214,11 @@ const PRC_Sell = () => {
             </div>
           )}
 
-          {/* DISPUTE SUCCESS MODAL - Responsive */}
+          {/* DISPUTE SUCCESS MODAL */}
           {showDisputeSuccessModal && (
             <div className="fixed inset-0 z-[70] flex items-start md:items-center justify-center bg-black/80 p-4 overflow-y-auto">
               <div className="bg-[#0F1012] rounded-xl w-full max-w-md border border-[#1ECB84] my-auto md:my-0">
                 <div className="p-4 sm:p-6">
-                  {/* Success Icon */}
                   <div className="flex justify-center mb-6">
                     <div className="w-16 h-16 sm:w-20 sm:h-20 bg-[#1B362B] rounded-full flex items-center justify-center border-4 border-[#1ECB84]">
                       <svg className="w-8 h-8 sm:w-10 sm:h-10 text-[#1ECB84]" fill="currentColor" viewBox="0 0 20 20">
@@ -2265,7 +2227,6 @@ const PRC_Sell = () => {
                     </div>
                   </div>
 
-                  {/* Success Message */}
                   <div className="text-center mb-6">
                     <h3 className="text-xl sm:text-2xl font-bold text-white mb-3">Dispute Submitted!</h3>
                     <div className="space-y-3 text-sm text-[#C7C7C7]">
@@ -2275,7 +2236,6 @@ const PRC_Sell = () => {
                     </div>
                   </div>
 
-                  {/* Trade Info Box */}
                   <div className="mb-6 p-4 bg-[#1B362B] rounded-lg border border-[#1ECB84]">
                     <div className="flex items-center justify-between mb-2">
                       <span className="text-sm text-[#8F8F8F]">Trade ID:</span>
@@ -2291,14 +2251,12 @@ const PRC_Sell = () => {
                     </div>
                   </div>
 
-                  {/* Note */}
                   <div className="mb-6 p-3 bg-[#352E21] rounded-lg border-l-2 border-l-[#FFC051]">
                     <p className="text-xs text-[#FFC051] text-center">
                       ⚠️ Please keep an eye on your chat for updates from our support team.
                     </p>
                   </div>
 
-                  {/* Action Button */}
                   <button
                     onClick={handleBackToTradeChat}
                     className="w-full h-12 bg-[#4DF2BE] text-[#0F1012] font-bold rounded-full hover:bg-[#3DD2A5] transition-colors flex items-center justify-center gap-2 text-sm sm:text-base"
@@ -2322,4 +2280,3 @@ const PRC_Sell = () => {
 };
 
 export default PRC_Sell;
-
