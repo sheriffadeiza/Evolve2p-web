@@ -629,9 +629,9 @@ const Bell_Notify = () => {
           </div>
         )}
 
-        <div className="w-[150%] h-[1px] ml-[-25%] bg-[#fff] mt-[50%] opacity-20 my-8"></div>
+        <div className="w-[100%] h-[1px] bg-[#fff] mt-[50%] opacity-20 my-8"></div>
               
-        <div className="mb-[80px] gap-[50%] whitespace-nowrap mt-[10%]">
+        <div className="mb-[80px]  mt-[10%]">
           <Footer />
         </div>
       </div>
