@@ -63,157 +63,73 @@ const safeToString = (value: any): string => {
   return String(value);
 };
 
-// Define status mapping interface
-interface StatusMapping {
-  [key: string]: string;
-}
-
-// Get correct status based on user role
-const getCorrectStatus = (trade: Trade, userRole: 'buyer' | 'seller' | 'unknown'): string => {
-  // First check if there's a tradingStatus field
-  const tradingStatus = (trade as any).tradingStatus || 
-                       (trade as any).transactionStatus || 
-                       (trade as any).exchangeStatus;
-  
-  // If trading status exists, use it
-  if (tradingStatus) {
-    return String(tradingStatus).toLowerCase();
-  }
-  
-  // Get base status
-  const baseStatus = trade.status.toLowerCase();
-  
-  // Define status mappings
-  const statusMappings: { buyer: StatusMapping; seller: StatusMapping } = {
-    buyer: {
-      // Buyer-specific statuses
-      'pending': 'pending',
-      'inreview': 'inreview',
-      'in_review': 'inreview',
-      'review': 'inreview',
-      'completed': 'completed',
-      'complete': 'completed',
-      'finished': 'completed',
-      'done': 'completed',
-      
-      // Map seller statuses to buyer equivalents
-      'awaiting': 'pending',
-      'awaiting_payment': 'pending',
-      'awaiting_confirmation': 'inreview',
-      'released': 'completed',
-      'released_to_buyer': 'completed',
-      'disbursed': 'completed',
-      
-      // Default fallbacks
-      'active': 'inreview',
-      'in_progress': 'inreview',
-      'processing': 'inreview',
-      'cancelled': 'cancelled',
-      'failed': 'cancelled',
-      'rejected': 'cancelled',
-      'disputed': 'inreview',
-      'refunded': 'cancelled'
-    },
-    seller: {
-      // Seller-specific statuses
-      'awaiting': 'awaiting',
-      'awaiting_payment': 'awaiting',
-      'pending_payment': 'awaiting',
-      'released': 'released',
-      'completed': 'completed',
-      'complete': 'completed',
-      
-      // Map buyer statuses to seller equivalents
-      'pending': 'awaiting',
-      'inreview': 'awaiting',
-      'in_review': 'awaiting',
-      
-      // Default fallbacks
-      'active': 'awaiting',
-      'in_progress': 'awaiting',
-      'processing': 'awaiting',
-      'cancelled': 'cancelled',
-      'failed': 'cancelled',
-      'rejected': 'cancelled',
-      'disputed': 'awaiting',
-      'refunded': 'cancelled',
-      'finished': 'completed',
-      'done': 'completed'
-    }
-  };
-  
-  // Use appropriate mapping based on role
-  if (userRole === 'buyer') {
-    return statusMappings.buyer[baseStatus] || baseStatus;
-  } else if (userRole === 'seller') {
-    return statusMappings.seller[baseStatus] || baseStatus;
-  }
-  
-  // Unknown role, return base status
-  return baseStatus;
-};
-
-// Get status display properties (color, label)
-const getStatusDisplay = (status: string, userRole: 'buyer' | 'seller' | 'unknown') => {
+// Get status display properties (color, label) based on actual trade status
+const getStatusDisplay = (status: string) => {
   const statusLower = status.toLowerCase();
   
-  // Common statuses
-  if (statusLower === 'completed' || statusLower === 'complete' || statusLower === 'released') {
+  // Check for completed status
+  if (statusLower.includes('complete') || statusLower.includes('completed') || 
+      statusLower.includes('finished') || statusLower.includes('done') || 
+      statusLower.includes('released') || statusLower.includes('disbursed')) {
     return {
-      label: userRole === 'seller' && statusLower === 'released' ? 'RELEASED' : 'COMPLETED',
+      label: status.toUpperCase(),
       bgColor: 'bg-green-500/20',
       textColor: 'text-green-400',
       borderColor: 'border-green-500/30'
     };
   }
   
-  if (statusLower === 'cancelled' || statusLower === 'failed' || statusLower === 'rejected' || statusLower === 'refunded') {
+  // Check for cancelled status
+  if (statusLower.includes('cancel') || statusLower.includes('failed') || 
+      statusLower.includes('rejected') || statusLower.includes('refunded')) {
     return {
-      label: 'CANCELLED',
+      label: status.toUpperCase(),
       bgColor: 'bg-red-500/20',
       textColor: 'text-red-400',
       borderColor: 'border-red-500/30'
     };
   }
   
-  if (statusLower === 'disputed') {
+  // Check for disputed status
+  if (statusLower.includes('dispute')) {
     return {
-      label: 'DISPUTED',
+      label: status.toUpperCase(),
       bgColor: 'bg-yellow-500/20',
       textColor: 'text-yellow-400',
       borderColor: 'border-yellow-500/30'
     };
   }
   
-  // Role-specific statuses
-  if (userRole === 'buyer') {
-    if (statusLower === 'pending') {
-      return {
-        label: 'PENDING',
-        bgColor: 'bg-blue-500/20',
-        textColor: 'text-blue-400',
-        borderColor: 'border-blue-500/30'
-      };
-    }
-    if (statusLower === 'inreview') {
-      return {
-        label: 'IN REVIEW',
-        bgColor: 'bg-purple-500/20',
-        textColor: 'text-purple-400',
-        borderColor: 'border-purple-500/30'
-      };
-    }
+  // Check for pending/in review status (buyer side)
+  if (statusLower.includes('pending') || statusLower.includes('awaiting') || 
+      statusLower === 'pending') {
+    return {
+      label: 'PENDING',
+      bgColor: 'bg-blue-500/20',
+      textColor: 'text-blue-400',
+      borderColor: 'border-blue-500/30'
+    };
   }
   
-  if (userRole === 'seller') {
-    if (statusLower === 'awaiting') {
-      return {
-        label: 'AWAITING PAYMENT',
-        bgColor: 'bg-orange-500/20',
-        textColor: 'text-orange-400',
-        borderColor: 'border-orange-500/30'
-      };
-    }
+  // Check for in review status
+  if (statusLower.includes('review') || statusLower === 'inreview' || 
+      statusLower === 'in_review') {
+    return {
+      label: 'IN REVIEW',
+      bgColor: 'bg-purple-500/20',
+      textColor: 'text-purple-400',
+      borderColor: 'border-purple-500/30'
+    };
+  }
+  
+  // Check for seller awaiting payment status
+  if (statusLower.includes('awaiting_payment') || statusLower === 'awaiting') {
+    return {
+      label: 'AWAITING PAYMENT',
+      bgColor: 'bg-orange-500/20',
+      textColor: 'text-orange-400',
+      borderColor: 'border-orange-500/30'
+    };
   }
   
   // Default for unknown/other statuses
@@ -378,14 +294,11 @@ const findMatchingTrade = (notification: any, allTrades: Trade[], userId: string
       
       // Check if status indicates an active/ongoing trade
       const status = t.status.toLowerCase();
-      const isRelevantStatus = status === 'pending' || 
-                               status === 'inreview' ||
-                               status === 'in_review' ||
-                               status === 'awaiting' ||
-                               status === 'awaiting_payment' ||
-                               status === 'active' ||
-                               status === 'processing' ||
-                               status === 'in_progress';
+      const isRelevantStatus = status.includes('pending') || 
+                               status.includes('review') ||
+                               status.includes('awaiting') ||
+                               status.includes('active') ||
+                               status.includes('processing');
       
       return isUserInvolved && isRelevantStatus;
     });
@@ -426,10 +339,10 @@ const findMatchingTrade = (notification: any, allTrades: Trade[], userId: string
   // 5. FOURTH PRIORITY: Return most recent active trade
   const activeTrades = allTrades.filter(t => {
     const status = t.status.toLowerCase();
-    return status === 'pending' || 
-           status === 'inreview' ||
-           status === 'awaiting' ||
-           status === 'active';
+    return status.includes('pending') || 
+           status.includes('review') ||
+           status.includes('awaiting') ||
+           status.includes('active');
   });
   
   if (activeTrades.length > 0) {
@@ -580,7 +493,7 @@ const Bell_Notify = () => {
             sampleTrades: combinedTrades.slice(0, 3).map(t => ({
               id: t.id,
               tradeId: t.tradeId,
-              status: t.status,
+              status: t.status, // This is where the actual status comes from
               tradingStatus: (t as any).tradingStatus,
               buyerId: t.buyerId,
               sellerId: t.sellerId,
@@ -634,7 +547,7 @@ const Bell_Notify = () => {
                 originalTradeId,
                 userRole,
                 hasMatchedTrade: !!matchedTrade,
-                matchedTradeStatus: matchedTrade?.status,
+                matchedTradeStatus: matchedTrade?.status, // Using actual status from trade object
                 matchedTradeTradingStatus: matchedTrade ? (matchedTrade as any).tradingStatus : null,
                 matchedTradeType: matchedTrade?.type
               });
@@ -912,9 +825,8 @@ const Bell_Notify = () => {
                     const userRole = notification.userRole || 'unknown';
                     const tradeId = getTradeId(trade);
                     
-                    // Get correct status based on user role
-                    const correctStatus = trade ? getCorrectStatus(trade, userRole) : 'unknown';
-                    const statusDisplay = getStatusDisplay(correctStatus, userRole);
+                    // Get status display using actual trade status
+                    const statusDisplay = trade ? getStatusDisplay(trade.status) : getStatusDisplay('unknown');
                     
                     // Determine button text based on user role
                     let buttonText = 'View Trade';
@@ -973,7 +885,7 @@ const Bell_Notify = () => {
                             {/* Show matched trade details */}
                             {trade && (
                               <div className="mt-2 flex flex-wrap items-center gap-2">
-                                {/* Status badge with role-appropriate label */}
+                                {/* Status badge using actual trade status */}
                                 <span className={`text-[10px] px-2 py-0.5 rounded ${statusDisplay.bgColor} ${statusDisplay.textColor}`}>
                                   {statusDisplay.label}
                                 </span>
@@ -1001,12 +913,10 @@ const Bell_Notify = () => {
                                   {userRole.toUpperCase()}
                                 </span>
                                 
-                                {/* Show original trade status if different */}
-                                {trade.status.toLowerCase() !== correctStatus && (
-                                  <span className="text-[8px] px-2 py-0.5 bg-gray-500/10 text-gray-400 rounded">
-                                    Was: {trade.status.toUpperCase()}
-                                  </span>
-                                )}
+                                {/* Show status info */}
+                                <span className="text-[8px] px-2 py-0.5 bg-gray-500/10 text-gray-400 rounded">
+                                  Status: {trade.status.toUpperCase()}
+                                </span>
                               </div>
                             )}
                             
