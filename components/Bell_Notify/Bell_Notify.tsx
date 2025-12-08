@@ -63,6 +63,168 @@ const safeToString = (value: any): string => {
   return String(value);
 };
 
+// Define status mapping interface
+interface StatusMapping {
+  [key: string]: string;
+}
+
+// Get correct status based on user role
+const getCorrectStatus = (trade: Trade, userRole: 'buyer' | 'seller' | 'unknown'): string => {
+  // First check if there's a tradingStatus field
+  const tradingStatus = (trade as any).tradingStatus || 
+                       (trade as any).transactionStatus || 
+                       (trade as any).exchangeStatus;
+  
+  // If trading status exists, use it
+  if (tradingStatus) {
+    return String(tradingStatus).toLowerCase();
+  }
+  
+  // Get base status
+  const baseStatus = trade.status.toLowerCase();
+  
+  // Define status mappings
+  const statusMappings: { buyer: StatusMapping; seller: StatusMapping } = {
+    buyer: {
+      // Buyer-specific statuses
+      'pending': 'pending',
+      'inreview': 'inreview',
+      'in_review': 'inreview',
+      'review': 'inreview',
+      'completed': 'completed',
+      'complete': 'completed',
+      'finished': 'completed',
+      'done': 'completed',
+      
+      // Map seller statuses to buyer equivalents
+      'awaiting': 'pending',
+      'awaiting_payment': 'pending',
+      'awaiting_confirmation': 'inreview',
+      'released': 'completed',
+      'released_to_buyer': 'completed',
+      'disbursed': 'completed',
+      
+      // Default fallbacks
+      'active': 'inreview',
+      'in_progress': 'inreview',
+      'processing': 'inreview',
+      'cancelled': 'cancelled',
+      'failed': 'cancelled',
+      'rejected': 'cancelled',
+      'disputed': 'inreview',
+      'refunded': 'cancelled'
+    },
+    seller: {
+      // Seller-specific statuses
+      'awaiting': 'awaiting',
+      'awaiting_payment': 'awaiting',
+      'pending_payment': 'awaiting',
+      'released': 'released',
+      'completed': 'completed',
+      'complete': 'completed',
+      
+      // Map buyer statuses to seller equivalents
+      'pending': 'awaiting',
+      'inreview': 'awaiting',
+      'in_review': 'awaiting',
+      
+      // Default fallbacks
+      'active': 'awaiting',
+      'in_progress': 'awaiting',
+      'processing': 'awaiting',
+      'cancelled': 'cancelled',
+      'failed': 'cancelled',
+      'rejected': 'cancelled',
+      'disputed': 'awaiting',
+      'refunded': 'cancelled',
+      'finished': 'completed',
+      'done': 'completed'
+    }
+  };
+  
+  // Use appropriate mapping based on role
+  if (userRole === 'buyer') {
+    return statusMappings.buyer[baseStatus] || baseStatus;
+  } else if (userRole === 'seller') {
+    return statusMappings.seller[baseStatus] || baseStatus;
+  }
+  
+  // Unknown role, return base status
+  return baseStatus;
+};
+
+// Get status display properties (color, label)
+const getStatusDisplay = (status: string, userRole: 'buyer' | 'seller' | 'unknown') => {
+  const statusLower = status.toLowerCase();
+  
+  // Common statuses
+  if (statusLower === 'completed' || statusLower === 'complete' || statusLower === 'released') {
+    return {
+      label: userRole === 'seller' && statusLower === 'released' ? 'RELEASED' : 'COMPLETED',
+      bgColor: 'bg-green-500/20',
+      textColor: 'text-green-400',
+      borderColor: 'border-green-500/30'
+    };
+  }
+  
+  if (statusLower === 'cancelled' || statusLower === 'failed' || statusLower === 'rejected' || statusLower === 'refunded') {
+    return {
+      label: 'CANCELLED',
+      bgColor: 'bg-red-500/20',
+      textColor: 'text-red-400',
+      borderColor: 'border-red-500/30'
+    };
+  }
+  
+  if (statusLower === 'disputed') {
+    return {
+      label: 'DISPUTED',
+      bgColor: 'bg-yellow-500/20',
+      textColor: 'text-yellow-400',
+      borderColor: 'border-yellow-500/30'
+    };
+  }
+  
+  // Role-specific statuses
+  if (userRole === 'buyer') {
+    if (statusLower === 'pending') {
+      return {
+        label: 'PENDING',
+        bgColor: 'bg-blue-500/20',
+        textColor: 'text-blue-400',
+        borderColor: 'border-blue-500/30'
+      };
+    }
+    if (statusLower === 'inreview') {
+      return {
+        label: 'IN REVIEW',
+        bgColor: 'bg-purple-500/20',
+        textColor: 'text-purple-400',
+        borderColor: 'border-purple-500/30'
+      };
+    }
+  }
+  
+  if (userRole === 'seller') {
+    if (statusLower === 'awaiting') {
+      return {
+        label: 'AWAITING PAYMENT',
+        bgColor: 'bg-orange-500/20',
+        textColor: 'text-orange-400',
+        borderColor: 'border-orange-500/30'
+      };
+    }
+  }
+  
+  // Default for unknown/other statuses
+  return {
+    label: status.toUpperCase(),
+    bgColor: 'bg-gray-500/20',
+    textColor: 'text-gray-300',
+    borderColor: 'border-gray-500/30'
+  };
+};
+
 // Format date to show only time for today, date for older
 const formatNotificationTime = (dateString: string | Date | undefined): string => {
   if (!dateString) return '';
@@ -159,7 +321,7 @@ const groupNotificationsByDate = (notifications: Notification[]): Record<string,
   return groups;
 };
 
-// IMPROVED: Find the exact matching trade
+// Find the exact matching trade
 const findMatchingTrade = (notification: any, allTrades: Trade[], userId: string): Trade | null => {
   if (!notification || allTrades.length === 0) return null;
   
@@ -206,27 +368,39 @@ const findMatchingTrade = (notification: any, allTrades: Trade[], userId: string
     }
   }
   
-  // 3. SECOND PRIORITY: Match by user involvement and pending status
+  // 3. SECOND PRIORITY: Match by user involvement and relevant status
   if (userId) {
-    // Find trades where current user is involved AND trade is pending
-    const userPendingTrades = allTrades.filter(t => {
+    // Find trades where current user is involved AND trade is in relevant status
+    const userRelevantTrades = allTrades.filter(t => {
       const buyerId = safeToString(t.buyerId || t.buyer);
       const sellerId = safeToString(t.sellerId || t.seller);
       const isUserInvolved = buyerId === userId || sellerId === userId;
-      return isUserInvolved && t.status === 'pending';
+      
+      // Check if status indicates an active/ongoing trade
+      const status = t.status.toLowerCase();
+      const isRelevantStatus = status === 'pending' || 
+                               status === 'inreview' ||
+                               status === 'in_review' ||
+                               status === 'awaiting' ||
+                               status === 'awaiting_payment' ||
+                               status === 'active' ||
+                               status === 'processing' ||
+                               status === 'in_progress';
+      
+      return isUserInvolved && isRelevantStatus;
     });
     
-    if (userPendingTrades.length === 1) {
-      console.log('Found single pending trade for user:', userPendingTrades[0].id);
-      return userPendingTrades[0];
+    if (userRelevantTrades.length === 1) {
+      console.log('Found single relevant trade for user:', userRelevantTrades[0].id);
+      return userRelevantTrades[0];
     }
     
-    // If multiple pending trades, return most recent
-    if (userPendingTrades.length > 0) {
-      const mostRecent = userPendingTrades.sort((a, b) => 
+    // If multiple relevant trades, return most recent
+    if (userRelevantTrades.length > 0) {
+      const mostRecent = userRelevantTrades.sort((a, b) => 
         new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
       )[0];
-      console.log('Found multiple pending trades, using most recent:', mostRecent.id);
+      console.log('Found multiple relevant trades, using most recent:', mostRecent.id);
       return mostRecent;
     }
   }
@@ -249,14 +423,21 @@ const findMatchingTrade = (notification: any, allTrades: Trade[], userId: string
     }
   }
   
-  // 5. FOURTH PRIORITY: Return most recent pending trade
-  const pendingTrades = allTrades.filter(t => t.status === 'pending');
-  if (pendingTrades.length > 0) {
-    const mostRecentPending = pendingTrades.sort((a, b) => 
+  // 5. FOURTH PRIORITY: Return most recent active trade
+  const activeTrades = allTrades.filter(t => {
+    const status = t.status.toLowerCase();
+    return status === 'pending' || 
+           status === 'inreview' ||
+           status === 'awaiting' ||
+           status === 'active';
+  });
+  
+  if (activeTrades.length > 0) {
+    const mostRecentActive = activeTrades.sort((a, b) => 
       new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
     )[0];
-    console.log('Using most recent pending trade:', mostRecentPending.id);
-    return mostRecentPending;
+    console.log('Using most recent active trade:', mostRecentActive.id);
+    return mostRecentActive;
   }
   
   // 6. LAST RESORT: Return most recent trade
@@ -280,7 +461,7 @@ const getTradeId = (trade: Trade | null | undefined): string | null => {
   return trade.id || trade.tradeId || trade._id || null;
 };
 
-// IMPROVED: Get redirect page with better debugging
+// Get redirect page
 const getRedirectPage = (
   trade: Trade, 
   currentUserId: string,
@@ -400,6 +581,7 @@ const Bell_Notify = () => {
               id: t.id,
               tradeId: t.tradeId,
               status: t.status,
+              tradingStatus: (t as any).tradingStatus,
               buyerId: t.buyerId,
               sellerId: t.sellerId,
               amount: t.amount,
@@ -453,6 +635,7 @@ const Bell_Notify = () => {
                 userRole,
                 hasMatchedTrade: !!matchedTrade,
                 matchedTradeStatus: matchedTrade?.status,
+                matchedTradeTradingStatus: matchedTrade ? (matchedTrade as any).tradingStatus : null,
                 matchedTradeType: matchedTrade?.type
               });
               
@@ -460,7 +643,7 @@ const Bell_Notify = () => {
                 id: safeToString(n.id) || `notif-${index}-${Date.now()}`,
                 title: safeToString(n.title),
                 message: safeToString(n.message),
-                timeAgo: formattedTime, // Use formatted time only
+                timeAgo: formattedTime,
                 type: n.type ? safeToString(n.type) : undefined,
                 tradeId: tradeId || undefined,
                 metadata: n.metadata,
@@ -729,6 +912,10 @@ const Bell_Notify = () => {
                     const userRole = notification.userRole || 'unknown';
                     const tradeId = getTradeId(trade);
                     
+                    // Get correct status based on user role
+                    const correctStatus = trade ? getCorrectStatus(trade, userRole) : 'unknown';
+                    const statusDisplay = getStatusDisplay(correctStatus, userRole);
+                    
                     // Determine button text based on user role
                     let buttonText = 'View Trade';
                     if (userRole === 'buyer') {
@@ -749,10 +936,7 @@ const Bell_Notify = () => {
                         <div className="flex items-start gap-3">
                           <div className={`w-3 h-3 rounded-full mt-1 ${
                             notification.isRead ? 'bg-gray-500' :
-                            trade?.status === 'completed' ? 'bg-green-500' :
-                            trade?.status === 'cancelled' ? 'bg-red-500' :
-                            trade?.status === 'disputed' ? 'bg-yellow-500' :
-                            'bg-[#4DF2BE]'
+                            statusDisplay.bgColor.replace('bg-', 'bg-').split('/')[0]
                           }`} />
 
                           <div className="flex-1">
@@ -789,24 +973,26 @@ const Bell_Notify = () => {
                             {/* Show matched trade details */}
                             {trade && (
                               <div className="mt-2 flex flex-wrap items-center gap-2">
-                                <span className={`text-[10px] px-2 py-0.5 rounded ${
-                                  trade.status === 'pending' ? 'bg-yellow-500/20 text-yellow-400' :
-                                  trade.status === 'completed' ? 'bg-green-500/20 text-green-400' :
-                                  trade.status === 'cancelled' ? 'bg-red-500/20 text-red-400' :
-                                  'bg-[#2A2B2F] text-gray-300'
-                                }`}>
-                                  {trade.status.toUpperCase()}
+                                {/* Status badge with role-appropriate label */}
+                                <span className={`text-[10px] px-2 py-0.5 rounded ${statusDisplay.bgColor} ${statusDisplay.textColor}`}>
+                                  {statusDisplay.label}
                                 </span>
+                                
+                                {/* Trade amount */}
                                 {trade.amount && (
                                   <span className="text-[10px] px-2 py-0.5 bg-[#4DF2BE]/10 text-[#4DF2BE] rounded">
                                     ${trade.amount}
                                   </span>
                                 )}
+                                
+                                {/* Trade ID */}
                                 {tradeId && (
                                   <span className="text-[8px] px-2 py-0.5 bg-purple-500/10 text-purple-300 rounded truncate max-w-[80px]">
                                     ID: {tradeId.substring(0, Math.min(6, tradeId.length))}...
                                   </span>
                                 )}
+                                
+                                {/* User role badge */}
                                 <span className={`text-[10px] px-2 py-0.5 rounded ${
                                   userRole === 'buyer' ? 'bg-blue-500/10 text-blue-300' :
                                   userRole === 'seller' ? 'bg-green-500/10 text-green-300' :
@@ -814,10 +1000,17 @@ const Bell_Notify = () => {
                                 }`}>
                                   {userRole.toUpperCase()}
                                 </span>
+                                
+                                {/* Show original trade status if different */}
+                                {trade.status.toLowerCase() !== correctStatus && (
+                                  <span className="text-[8px] px-2 py-0.5 bg-gray-500/10 text-gray-400 rounded">
+                                    Was: {trade.status.toUpperCase()}
+                                  </span>
+                                )}
                               </div>
                             )}
                             
-                            {/* Show timestamp - ONLY ONCE */}
+                            {/* Show timestamp */}
                             <div className="mt-2">
                               <p className="text-[10px] sm:text-xs text-gray-500">
                                 {notification.timeAgo}
