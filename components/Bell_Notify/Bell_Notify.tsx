@@ -111,6 +111,15 @@ const getStatusDisplay = (status: string | undefined) => {
     };
   }
   
+  // Released status (for sellers)
+  if (statusLower.includes('released') || statusLower === 'released') {
+    return {
+      label: 'RELEASED',
+      bgColor: 'bg-teal-500/20',
+      textColor: 'text-teal-400'
+    };
+  }
+  
   // Default for other statuses
   return {
     label: status.toUpperCase(),
@@ -207,9 +216,82 @@ const groupNotificationsByDate = (notifications: Notification[]): Record<string,
   return groups;
 };
 
+// Helper function to extract all trades from userData
+const extractAllTradesFromUserData = (userData: any): Trade[] => {
+  const trades: Trade[] = [];
+  
+  if (!userData) return trades;
+  
+  console.log('📊 Extracting trades from userData...');
+  console.log('📊 userData structure:', Object.keys(userData));
+  
+  // Check for trades array
+  if (Array.isArray(userData.trades)) {
+    console.log('📊 Found trades array:', userData.trades.length, 'trades');
+    trades.push(...userData.trades);
+  } 
+  // Check for single trade object
+  else if (userData.trades && typeof userData.trades === 'object') {
+    console.log('📊 Found single trade object');
+    // Check if it has trade properties
+    if (userData.trades.id || userData.trades.tradeId || userData.trades._id) {
+      trades.push(userData.trades as Trade);
+    }
+  }
+  
+  // Also check for tradesAsBuyer and tradesAsSeller
+  if (Array.isArray(userData.tradesAsBuyer)) {
+    console.log('📊 Found tradesAsBuyer array:', userData.tradesAsBuyer.length, 'trades');
+    trades.push(...userData.tradesAsBuyer);
+  }
+  
+  if (Array.isArray(userData.tradesAsSeller)) {
+    console.log('📊 Found tradesAsSeller array:', userData.tradesAsSeller.length, 'trades');
+    trades.push(...userData.tradesAsSeller);
+  }
+  
+  // Check for other possible trade fields
+  const possibleTradeFields = ['trade', 'currentTrade', 'activeTrade', 'pendingTrade'];
+  possibleTradeFields.forEach(field => {
+    if (userData[field] && typeof userData[field] === 'object') {
+      const tradeObj = userData[field];
+      if (tradeObj.id || tradeObj.tradeId || tradeObj._id) {
+        console.log(`📊 Found trade in ${field} field`);
+        trades.push(tradeObj as Trade);
+      }
+    }
+  });
+  
+  // Remove duplicates based on id/tradeId/_id
+  const uniqueTrades = trades.filter((trade, index, self) => {
+    const tradeId = trade.id || trade.tradeId || trade._id;
+    return index === self.findIndex(t => 
+      (t.id === tradeId) || 
+      (t.tradeId === tradeId) || 
+      (t._id === tradeId)
+    );
+  });
+  
+  console.log('📊 Total unique trades found:', uniqueTrades.length);
+  uniqueTrades.forEach((trade, index) => {
+    console.log(`📊 Trade ${index}:`, {
+      id: trade.id,
+      tradeId: trade.tradeId,
+      _id: trade._id,
+      status: trade.status,
+      amount: trade.amount,
+      type: trade.type
+    });
+  });
+  
+  return uniqueTrades;
+};
+
 // Find matching trade
 const findMatchingTrade = (notification: any, allTrades: Trade[], userId: string): Trade | null => {
   if (!notification || allTrades.length === 0) return null;
+  
+  console.log('🔍 Looking for matching trade among', allTrades.length, 'trades');
   
   // Try to match by trade ID from notification
   let potentialTradeId: string | null = null;
@@ -228,6 +310,10 @@ const findMatchingTrade = (notification: any, allTrades: Trade[], userId: string
     });
     
     if (directMatch) {
+      console.log('✅ Found direct match by ID:', {
+        tradeId: directMatch.id,
+        status: directMatch.status
+      });
       return directMatch;
     }
   }
@@ -240,24 +326,32 @@ const findMatchingTrade = (notification: any, allTrades: Trade[], userId: string
       return buyerId === userId || sellerId === userId;
     });
     
+    console.log('🔍 Found', userTrades.length, 'trades involving user');
+    
     if (userTrades.length === 1) {
+      console.log('✅ Found single trade for user:', userTrades[0].id);
       return userTrades[0];
     }
     
     if (userTrades.length > 0) {
-      return userTrades.sort((a, b) => 
+      const mostRecent = userTrades.sort((a, b) => 
         new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
       )[0];
+      console.log('✅ Using most recent of', userTrades.length, 'trades:', mostRecent.id);
+      return mostRecent;
     }
   }
   
   // Return most recent trade
   if (allTrades.length > 0) {
-    return allTrades.sort((a, b) => 
+    const mostRecent = allTrades.sort((a, b) => 
       new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
     )[0];
+    console.log('⚠ Using most recent trade:', mostRecent.id);
+    return mostRecent;
   }
   
+  console.log('❌ No match found');
   return null;
 };
 
@@ -298,7 +392,10 @@ const Bell_Notify = () => {
     const loadUserData = () => {
       try {
         const raw = localStorage.getItem("UserData");
-        if (!raw) return;
+        if (!raw) {
+          console.log('❌ No UserData found in localStorage');
+          return;
+        }
 
         const parsed = JSON.parse(raw);
         
@@ -307,20 +404,17 @@ const Bell_Notify = () => {
           setUserData(userDataObj);
           const userId = userDataObj.id || userDataObj.userId || userDataObj._id;
 
-          // Load trades from user data
-          const buyerTrades: Trade[] = Array.isArray(userDataObj.tradesAsBuyer) 
-            ? userDataObj.tradesAsBuyer 
-            : [];
-          
-          const sellerTrades: Trade[] = Array.isArray(userDataObj.tradesAsSeller) 
-            ? userDataObj.tradesAsSeller 
-            : [];
-          
-          const combinedTrades = [...buyerTrades, ...sellerTrades];
+          console.log('🔥 USERDATA OBJECT:', userDataObj);
+          console.log('🔥 Available keys:', Object.keys(userDataObj));
+
+          // Extract all trades from userData (handles both array and single object)
+          const combinedTrades = extractAllTradesFromUserData(userDataObj);
           setAllTrades(combinedTrades);
 
           // Load and match notifications
           if (Array.isArray(userDataObj.notifications)) {
+            console.log('📢 Found notifications:', userDataObj.notifications.length);
+            
             const enhancedNotifications = userDataObj.notifications.map((n: any, index: number) => {
               const matchedTrade = findMatchingTrade(n, combinedTrades, userId);
               
@@ -345,6 +439,13 @@ const Bell_Notify = () => {
               // Get trade ID
               const tradeId = matchedTrade ? getTradeId(matchedTrade) : null;
               const originalTradeId = n.tradeId || n.metadata?.tradeId;
+              
+              console.log(`📢 Notification ${index} details:`, {
+                title: n.title,
+                hasMatchedTrade: !!matchedTrade,
+                matchedTradeStatus: matchedTrade?.status,
+                userRole: userRole
+              });
               
               return {
                 id: safeToString(n.id) || `notif-${index}-${Date.now()}`,
@@ -374,10 +475,15 @@ const Bell_Notify = () => {
             });
             
             setNotifications(sortedNotifications);
+            console.log('✅ Loaded', sortedNotifications.length, 'notifications');
+          } else {
+            console.log('⚠ No notifications array found in userData');
           }
+        } else {
+          console.log('❌ No userData found in parsed data');
         }
       } catch (err) {
-        console.error("Error loading UserData", err);
+        console.error("❌ Error loading UserData", err);
       }
     };
 
@@ -419,8 +525,15 @@ const Bell_Notify = () => {
     const currentUserId = getCurrentUserId();
     const trade = notification.matchedTrade;
     
+    console.log('👁 Viewing notification:', {
+      notificationId: notification.id,
+      hasMatchedTrade: !!trade,
+      matchedTradeStatus: trade?.status
+    });
+    
     if (!trade) {
       if (notification.originalTradeId) {
+        console.log('⚠ No matched trade, trying with original trade ID:', notification.originalTradeId);
         const redirectUrl = `/prc_buy?tradeId=${notification.originalTradeId}`;
         markNotificationAsRead(notification.id);
         router.push(redirectUrl);
@@ -433,6 +546,7 @@ const Bell_Notify = () => {
 
     const redirectUrl = getRedirectPage(trade, currentUserId || '');
     markNotificationAsRead(notification.id);
+    console.log('➡ Redirecting to:', redirectUrl);
     router.push(redirectUrl);
   }, [router, markNotificationAsRead, getCurrentUserId]);
 
@@ -697,7 +811,7 @@ const Bell_Notify = () => {
                                 {/* Show the actual trade status text */}
                                 {trade.status && (
                                   <span className="text-[8px] px-2 py-0.5 bg-gray-500/10 text-gray-400 rounded">
-                                    {trade.status.toUpperCase()}
+                                    Status: {trade.status.toUpperCase()}
                                   </span>
                                 )}
                               </div>
