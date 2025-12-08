@@ -7,19 +7,7 @@ import Nav from "../../components/NAV/Nav";
 import Timer from "../../public/Assets/Evolve2p_time/P2P Marketplace/elements.svg";
 import Ochat from "../../public/Assets/Evolve2p_Ochat/P2P Marketplace/elements.svg";
 import GreatT from "../../public/Assets/Evolve2p_Larrow/arrow-right-01.svg";
-
-// Crypto icons - import all available
 import BTC from "../../public/Assets/Evolve2p_BTC/Bitcoin (BTC).svg";
-import ETH from "../../public/Assets/Evolve2p_ETH/Ethereum (ETH).svg";
-import USDT from "../../public/Assets/Evolve2p_USDT/Tether (USDT).svg";
-import USDC from "../../public/Assets/Evolve2p_USDC/USD Coin (USDC).svg";
-// Import more crypto icons as needed:
-// import BNB from "../../public/Assets/Evolve2p_BNB/Binance Coin (BNB).svg";
-// import SOL from "../../public/Assets/Evolve2p_SOL/Solana (SOL).svg";
-// import XRP from "../../public/Assets/Evolve2p_XRP/Ripple (XRP).svg";
-// import ADA from "../../public/Assets/Evolve2p_ADA/Cardano (ADA).svg";
-// import DOGE from "../../public/Assets/Evolve2p_DOGE/Dogecoin (DOGE).svg";
-
 import Yellow_i from "../../public/Assets/Evolve2p_yellowi/elements.svg";
 import UPa from "../../public/Assets/Evolve2p_upA/Makretplace/elements.svg";
 import Book from "../../public/Assets/Evolve2p_book/P2P Marketplace/book-open-02.svg";
@@ -65,6 +53,7 @@ interface TradeData {
     id: string;
     amount: number;
     status: string;
+    releasedAt?: string;
   };
   chat: {
     id: string;
@@ -72,6 +61,7 @@ interface TradeData {
   updatedAt?: string;
   createdAt?: string;
   markedPaidAt?: string;
+  releasedAt?: string;
   dispute?: {
     id: string;
     status: string;
@@ -179,6 +169,12 @@ const PRC_Buy = () => {
   const [otherReason, setOtherReason] = useState("");
   const [showDisputeSuccessModal, setShowDisputeSuccessModal] = useState(false);
   
+  // Crypto release state
+  const [isCryptoReleased, setIsCryptoReleased] = useState(false);
+  const [releaseTime, setReleaseTime] = useState<Date | null>(null);
+  const [checkingRelease, setCheckingRelease] = useState(false);
+  const [releaseMessageSent, setReleaseMessageSent] = useState(false);
+  
   const chatContainerRef = useRef<HTMLDivElement>(null);
 
   // Get current user data from localStorage
@@ -219,47 +215,6 @@ const PRC_Buy = () => {
     return '📎';
   }, []);
 
-  // Helper function to get crypto icon based on crypto type
-  const getCryptoIcon = useCallback((crypto: string) => {
-    const cryptoUpper = crypto.toUpperCase();
-    
-    switch(cryptoUpper) {
-      case 'BTC':
-      case 'BITCOIN':
-        return BTC;
-      case 'ETH':
-      case 'ETHEREUM':
-        return ETH;
-      case 'USDT':
-      case 'TETHER':
-        return USDT;
-      case 'USDC':
-      case 'USD COIN':
-        return USDC;
-      // Add more cases as needed when you import more icons
-      /*
-      case 'BNB':
-      case 'BINANCE COIN':
-        return BNB;
-      case 'SOL':
-      case 'SOLANA':
-        return SOL;
-      case 'XRP':
-      case 'RIPPLE':
-        return XRP;
-      case 'ADA':
-      case 'CARDANO':
-        return ADA;
-      case 'DOGE':
-      case 'DOGECOIN':
-        return DOGE;
-      */
-      default:
-        // Fallback for unknown cryptocurrencies
-        return BTC;
-    }
-  }, []);
-
   // Get current user data
   const currentUser = useMemo(() => getCurrentUser(), [getCurrentUser]);
 
@@ -291,6 +246,23 @@ const PRC_Buy = () => {
     fiatCurrency: tradeData?.fiatCurrency || tradeData?.offer?.currency || "USD",
     cryptoType: tradeData?.cryptoType || tradeData?.offer?.crypto || "BTC"
   }), [tradeData, currentUser]);
+
+  // Check if trade is disputed
+  const isTradeDisputed = useMemo(() => {
+    return tradeData?.status === "DISPUTED" || tradeData?.dispute !== undefined;
+  }, [tradeData?.status, tradeData?.dispute]);
+
+  // Check if trade is completed (crypto released)
+  const isTradeCompleted = useMemo(() => {
+    return tradeData?.status === "COMPLETED" || tradeData?.status === "RELEASED" || 
+           tradeData?.escrow?.status === "RELEASED" || isCryptoReleased;
+  }, [tradeData?.status, tradeData?.escrow?.status, isCryptoReleased]);
+
+  // Check if trade is in review (paid but not released)
+  const isTradeInReview = useMemo(() => {
+    return (tradeData?.status === "IN_REVIEW" || tradeData?.status === "PAID") && 
+           !isTradeCompleted && !isTradeDisputed;
+  }, [tradeData?.status, isTradeCompleted, isTradeDisputed]);
 
   // Initialize Socket.IO connection
   useEffect(() => {
@@ -366,12 +338,41 @@ const PRC_Buy = () => {
 
     const handleTradeUpdated = (updatedTrade: TradeData) => {
       console.log("🔄 Trade updated via Socket.IO:", updatedTrade);
-      setTradeData(updatedTrade);
       
+      // Check for crypto release
+      if ((updatedTrade.status === "COMPLETED" || updatedTrade.status === "RELEASED" || 
+           updatedTrade.escrow?.status === "RELEASED") && !isCryptoReleased) {
+        setIsCryptoReleased(true);
+        setReleaseTime(new Date(updatedTrade.releasedAt || updatedTrade.updatedAt || new Date()));
+        sendCryptoReleasedMessage();
+      }
+      
+      // Check for paid status
       if ((updatedTrade.status === "PAID" || updatedTrade.status === "IN_REVIEW") && !paidConfirmed) {
         setPaidConfirmed(true);
         const paidTimeFromApi = updatedTrade.updatedAt || updatedTrade.markedPaidAt || updatedTrade.createdAt;
         setPaidTime(paidTimeFromApi ? new Date(paidTimeFromApi) : new Date());
+      }
+      
+      setTradeData(updatedTrade);
+    };
+
+    const handleCryptoReleased = (data: { tradeId: string; releasedAt: string }) => {
+      if (data.tradeId === tradeData.id) {
+        console.log("🎉 Crypto released notification received:", data);
+        setIsCryptoReleased(true);
+        setReleaseTime(new Date(data.releasedAt));
+        setTradeData(prev => prev ? {
+          ...prev,
+          status: "COMPLETED",
+          escrow: {
+            ...prev.escrow,
+            status: "RELEASED",
+            releasedAt: data.releasedAt
+          },
+          releasedAt: data.releasedAt
+        } : prev);
+        sendCryptoReleasedMessage();
       }
     };
 
@@ -380,6 +381,7 @@ const PRC_Buy = () => {
     newSocket.on('error', handleError);
     newSocket.on('new-message', handleNewMessage);
     newSocket.on('trade-updated', handleTradeUpdated);
+    newSocket.on('crypto-released', handleCryptoReleased);
 
     setSocket(newSocket);
 
@@ -390,6 +392,7 @@ const PRC_Buy = () => {
         newSocket.off('error', handleError);
         newSocket.off('new-message', handleNewMessage);
         newSocket.off('trade-updated', handleTradeUpdated);
+        newSocket.off('crypto-released', handleCryptoReleased);
         newSocket.emit('leave-chat', tradeData.chat.id);
         newSocket.disconnect();
         console.log("🧹 Socket.IO disconnected on cleanup");
@@ -419,19 +422,9 @@ const PRC_Buy = () => {
     return () => clearInterval(timerId);
   }, [timeLeft]);
 
-  // Check if trade is already paid
-  const isTradePaid = useMemo(() => {
-    return tradeData?.status === "PAID" || tradeData?.status === "IN_REVIEW" || paidConfirmed;
-  }, [tradeData?.status, paidConfirmed]);
-
-  // Check if trade is disputed
-  const isTradeDisputed = useMemo(() => {
-    return tradeData?.status === "DISPUTED" || tradeData?.dispute !== undefined;
-  }, [tradeData?.status, tradeData?.dispute]);
-
   // Check for dispute after 10 minutes of being paid
   useEffect(() => {
-    if (!paidTime || !isTradePaid) return;
+    if (!paidTime || !isTradeInReview) return;
 
     const checkDispute = () => {
       const now = new Date();
@@ -447,7 +440,130 @@ const PRC_Buy = () => {
     const interval = setInterval(checkDispute, 60000);
     
     return () => clearInterval(interval);
-  }, [paidTime, isTradePaid, isTradeDisputed]);
+  }, [paidTime, isTradeInReview, isTradeDisputed]);
+
+  // Check for crypto release periodically when in review
+  useEffect(() => {
+    if (!tradeData || !isTradeInReview) return;
+
+    const checkForCryptoRelease = async () => {
+      try {
+        setCheckingRelease(true);
+        const authToken = getAuthToken();
+        
+        if (!authToken) return;
+
+        const response = await fetch(
+          `https://evolve2p-backend.onrender.com/api/get-trade/${tradeId}`,
+          {
+            method: 'GET',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${authToken}`
+            }
+          }
+        );
+
+        if (response.ok) {
+          const result = await response.json();
+          const updatedTrade = result.data;
+          
+          // Check if crypto has been released
+          if (updatedTrade.escrow?.status === "RELEASED" || 
+              updatedTrade.status === "COMPLETED" ||
+              updatedTrade.status === "RELEASED") {
+            
+            setIsCryptoReleased(true);
+            setReleaseTime(new Date(updatedTrade.releasedAt || updatedTrade.updatedAt || new Date()));
+            
+            // Update local trade data
+            setTradeData(prev => prev ? {
+              ...prev,
+              status: "COMPLETED",
+              escrow: {
+                ...prev.escrow,
+                status: "RELEASED",
+                releasedAt: updatedTrade.releasedAt || updatedTrade.updatedAt
+              },
+              releasedAt: updatedTrade.releasedAt || updatedTrade.updatedAt
+            } : prev);
+            
+            // Send success notification via chat
+            if (!releaseMessageSent) {
+              sendCryptoReleasedMessage();
+            }
+          }
+        }
+      } catch (error) {
+        console.error("Error checking crypto release:", error);
+      } finally {
+        setCheckingRelease(false);
+      }
+    };
+
+    // Check immediately when component mounts
+    checkForCryptoRelease();
+    
+    // Then check every 30 seconds
+    const interval = setInterval(checkForCryptoRelease, 30000);
+    
+    return () => clearInterval(interval);
+  }, [tradeData?.id, isTradeInReview, tradeId, getAuthToken, releaseMessageSent]);
+
+  // Send crypto released message to chat
+  const sendCryptoReleasedMessage = useCallback(async () => {
+    if (releaseMessageSent) return;
+    
+    try {
+      const authToken = getAuthToken();
+      if (!authToken || !tradeData?.chat?.id) return;
+
+      const messageContent = `✅ ${cryptoType} RELEASED!\n\nYour ${quantity.toFixed(5)} ${cryptoType} has been released from escrow and is now in your wallet! Trade completed successfully.`;
+
+      // Send message via API
+      const response = await fetch('https://evolve2p-backend.onrender.com/api/send-chat', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${authToken}`
+        },
+        body: JSON.stringify({
+          chatId: tradeData.chat.id,
+          content: messageContent,
+          type: 'SYSTEM'
+        })
+      });
+
+      if (response.ok) {
+        setReleaseMessageSent(true);
+        
+        // Add to local chat
+        const systemMessage: ChatMessage = {
+          id: `release_${Date.now()}`,
+          senderId: "system",
+          content: messageContent,
+          createdAt: new Date().toISOString(),
+          type: "SYSTEM",
+          sender: {
+            id: "system",
+            name: "Evolve2p System",
+            role: "System"
+          }
+        };
+        
+        setChatMessages(prev => [...prev, systemMessage]);
+        
+        // Emit via socket
+        if (socket?.connected) {
+          socket.emit('send-message', {
+            chatId: tradeData.chat.id,
+            message: systemMessage
+          });
+        }
+      }
+    } catch (error) {
+      console.error("Error sending crypto released message:", error);
+    }
+  }, [tradeData?.chat?.id, cryptoType, quantity, getAuthToken, socket, releaseMessageSent]);
 
   // Format time as MM:SS
   const formatTime = useCallback((seconds: number) => {
@@ -458,10 +574,27 @@ const PRC_Buy = () => {
 
   // Get service message based on trade status
   const serviceMessage = useMemo(() => {
-    const isPaid = isTradePaid;
+    const isPaid = isTradeInReview || paidConfirmed;
     const isDisputed = isTradeDisputed;
+    const isCompleted = isTradeCompleted;
     
-    if (isDisputed) {
+    if (isCompleted) {
+      return {
+        title: "Trade Completed",
+        message: `Your ${quantity.toFixed(5)} ${cryptoType} has been released from escrow and is now in your wallet! The trade is now complete.`,
+        timestamp: releaseTime ? releaseTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        bgColor: "bg-[#1B362B]",
+        borderColor: "border-[#1ECB84]",
+        textColor: "text-[#1ECB84]",
+        listItems: [
+          `${cryptoType} successfully transferred to your wallet`,
+          "Trade marked as complete",
+          "Escrow funds released to seller",
+          "Transaction history updated",
+          "You can leave a review for the seller"
+        ]
+      };
+    } else if (isDisputed) {
       return {
         title: "Trade in Dispute",
         message: `A dispute has been opened for this trade. The ${fiatAmount.toFixed(2)} ${fiatCurrency} payment for ${quantity.toFixed(5)} ${cryptoType} is under review by Evolve2p support team.`,
@@ -509,14 +642,24 @@ const PRC_Buy = () => {
         ]
       };
     }
-  }, [isTradePaid, isTradeDisputed, fiatAmount, fiatCurrency, quantity, cryptoType, paymentMethod]);
+  }, [isTradeInReview, isTradeDisputed, isTradeCompleted, fiatAmount, fiatCurrency, quantity, cryptoType, paymentMethod, releaseTime, paidConfirmed]);
 
-  // Get the second service message for paid state
+  // Get the second service message
   const secondServiceMessage = useMemo(() => {
-    const isPaid = isTradePaid;
+    const isPaid = isTradeInReview || paidConfirmed;
     const isDisputed = isTradeDisputed;
+    const isCompleted = isTradeCompleted;
     
-    if (isDisputed) {
+    if (isCompleted) {
+      return {
+        title: "Transaction Complete",
+        message: "The trade has been successfully completed. You can view the transaction in your wallet history.",
+        timestamp: releaseTime ? releaseTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        bgColor: "bg-[#1B362B]",
+        borderColor: "border-[#1ECB84]",
+        textColor: "text-[#1ECB84]"
+      };
+    } else if (isDisputed) {
       return {
         title: "Dispute Status",
         message: "The dispute has been submitted to Evolve2p support. A support agent will contact you shortly for additional information if needed.",
@@ -536,7 +679,7 @@ const PRC_Buy = () => {
       };
     }
     return null;
-  }, [isTradePaid, isTradeDisputed, cryptoType]);
+  }, [isTradeInReview, isTradeDisputed, isTradeCompleted, cryptoType, releaseTime, paidConfirmed]);
 
   // Handle file upload selection
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -693,6 +836,15 @@ const PRC_Buy = () => {
           
           setTradeData(trade);
           
+          // Check if crypto has been released
+          if (trade.escrow?.status === "RELEASED" || 
+              trade.status === "COMPLETED" ||
+              trade.status === "RELEASED") {
+            setIsCryptoReleased(true);
+            setReleaseTime(new Date(trade.releasedAt || trade.updatedAt || new Date()));
+          }
+          
+          // Check if trade is paid/in review
           if (trade.status === "PAID" || trade.status === "IN_REVIEW") {
             setPaidConfirmed(true);
             const paidTimeFromApi = trade.updatedAt || trade.markedPaidAt || trade.createdAt;
@@ -973,7 +1125,7 @@ const PRC_Buy = () => {
   // Cancel trade with updated API response handling
   const handleCancelTrade = async () => {
     try {
-      if (isTradePaid) {
+      if (isTradeInReview || isTradeCompleted) {
         alert('Cannot cancel trade after marking as paid. Please contact support if you have an issue.');
         setShowCancelModal(false);
         return;
@@ -1162,7 +1314,6 @@ const PRC_Buy = () => {
   // Calculate derived values
   const status = tradeData?.status || "PENDING";
   const orderId = tradeData?.id ? `E2P-${tradeData.id.slice(0, 8).toUpperCase()}` : "E2P-2453019273001180";
-  const isDisputed = isTradeDisputed;
 
   // Format payment terms from offer
   const formatPaymentTerms = useCallback((terms: string): string[] => {
@@ -1179,7 +1330,10 @@ const PRC_Buy = () => {
   const paymentTerms = offerDetails?.paymentTerms || tradeData?.offer?.paymentTerms || "• Only first-party payments.\n• Bank-to-bank transfers only\n• May request extra KYC";
 
   // Check if cancel button should be shown
-  const shouldShowCancelButton = !isTradePaid && tradeData?.status !== 'CANCELLED' && !isDisputed;
+  const shouldShowCancelButton = !isTradeInReview && !isTradeCompleted && tradeData?.status !== 'CANCELLED' && !isTradeDisputed;
+
+  // Check if paid button should be shown
+  const shouldShowPaidButton = !isTradeInReview && !isTradeCompleted && !isTradeDisputed && tradeData?.status === 'PENDING';
 
   // Get dispute reason for display
   const getDisplayDisputeReason = useCallback(() => {
@@ -1270,22 +1424,22 @@ const PRC_Buy = () => {
             {/* Progress steps */}
             <div className="flex items-center justify-between max-w-2xl">
               <div className="flex flex-col items-center">
-                <div className={`w-full border-b-2 ${!isTradePaid ? 'border-[#4DF2BE]' : 'border-[#4A4A4A]'} pb-2 px-4`}>
-                  <p className={`text-base font-medium ${!isTradePaid ? 'text-[#4DF2BE]' : 'text-[#5C5C5C]'} text-center`}>
+                <div className={`w-full border-b-2 ${!isTradeInReview && !isTradeCompleted ? 'border-[#4DF2BE]' : 'border-[#4A4A4A]'} pb-2 px-4`}>
+                  <p className={`text-base font-medium ${!isTradeInReview && !isTradeCompleted ? 'text-[#4DF2BE]' : 'text-[#5C5C5C]'} text-center`}>
                     Pay
                   </p>
                 </div>
               </div>
               <div className="flex flex-col items-center">
-                <div className={`w-full border-b-2 ${isTradePaid && !isDisputed ? 'border-[#4DF2BE]' : 'border-[#4A4A4A]'} pb-2 px-4`}>
-                  <p className={`text-base font-medium ${isTradePaid && !isDisputed ? 'text-[#4DF2BE]' : 'text-[#5C5C5C]'} text-center`}>
+                <div className={`w-full border-b-2 ${isTradeInReview ? 'border-[#4DF2BE]' : 'border-[#4A4A4A]'} pb-2 px-4`}>
+                  <p className={`text-base font-medium ${isTradeInReview ? 'text-[#4DF2BE]' : 'text-[#5C5C5C]'} text-center`}>
                     In Review
                   </p>
                 </div>
               </div>
               <div className="flex flex-col items-center">
-                <div className="w-full border-b-2 border-[#4A4A4A] pb-2 px-4">
-                  <p className="text-base font-medium text-[#5C5C5C] text-center">
+                <div className={`w-full border-b-2 ${isTradeCompleted ? 'border-[#4DF2BE]' : 'border-[#4A4A4A]'} pb-2 px-4`}>
+                  <p className={`text-base font-medium ${isTradeCompleted ? 'text-[#4DF2BE]' : 'text-[#5C5C5C]'} text-center`}>
                     Complete
                   </p>
                 </div>
@@ -1297,18 +1451,24 @@ const PRC_Buy = () => {
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                 <div>
                   <p className="text-2xl font-normal text-white">
-                    {isDisputed ? 'Trade in Dispute' : 
-                     isTradePaid ? 'Payment in Review' : 'Order Created'}
+                    {isTradeCompleted ? 'Trade Completed' : 
+                     isTradeDisputed ? 'Trade in Dispute' : 
+                     isTradeInReview ? 'Payment in Review' : 'Order Created'}
                   </p>
                   <p className="text-sm font-medium text-[#C7C7C7] mt-1">
                     Order ID: {orderId}
                   </p>
-                  {isDisputed ? (
+                  {isTradeCompleted ? (
+                    <p className="text-sm font-normal text-[#DBDBDB] mt-2">
+                      Your {cryptoType} has been released from escrow and is now in your wallet! Trade completed successfully.
+                      {releaseTime && ` Completed at ${releaseTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`}
+                    </p>
+                  ) : isTradeDisputed ? (
                     <p className="text-sm font-normal text-[#DBDBDB] mt-2">
                       This trade is currently under dispute. Evolve2p support team is reviewing the case.
                       {tradeData?.dispute?.reason && ` Reason: ${getDisplayDisputeReason()}`}
                     </p>
-                  ) : isTradePaid ? (
+                  ) : isTradeInReview ? (
                     <p className="text-sm font-normal text-[#DBDBDB] mt-2">
                       Your payment is being reviewed. The {cryptoType} is securely held in escrow and will be released to you once the seller confirms receipt of payment.
                     </p>
@@ -1318,19 +1478,22 @@ const PRC_Buy = () => {
                     </p>
                   )}
                 </div>
-                <div className="flex items-center gap-2 px-3 py-1 bg-[#3A3A3A] rounded-2xl w-[100px]">
-                  <Image src={Timer} alt="time" className="w-4 h-4" />
-                  <p className={`text-sm font-medium ${timeLeft < 300 ? 'text-red-400' : 'text-[#DBDBDB]'}`}>
-                    {formatTime(timeLeft)}
-                  </p>
-                </div>
+                {!isTradeCompleted && (
+                  <div className="flex items-center gap-2 px-3 py-1 bg-[#3A3A3A] rounded-2xl w-[100px]">
+                    <Image src={Timer} alt="time" className="w-4 h-4" />
+                    <p className={`text-sm font-medium ${timeLeft < 300 ? 'text-red-400' : 'text-[#DBDBDB]'}`}>
+                      {formatTime(timeLeft)}
+                    </p>
+                  </div>
+                )}
               </div>
 
               {/* Chat button and escrow info */}
               <div className="mt-6 lg:mt-8 max-w-2xl">
                 <p className="text-base font-normal text-[#DBDBDB] mb-4">
-                  {isDisputed ? "Trade is under dispute. You can communicate with the seller and support team in the chat." :
-                   isTradePaid 
+                  {isTradeCompleted ? "Trade completed successfully. You can review the transaction in your wallet history." :
+                   isTradeDisputed ? "Trade is under dispute. You can communicate with the seller and support team in the chat." :
+                   isTradeInReview 
                     ? `Your ${cryptoType} is held in escrow by Evolve2p. It will be released once the seller confirms your payment.` 
                     : "Open chat to get payment details and pay the seller. Once done, mark as paid to continue."
                   }
@@ -1338,23 +1501,32 @@ const PRC_Buy = () => {
                 <button 
                   onClick={() => setShowChat(!showChat)}
                   className={`w-full max-w-2xl h-12 flex items-center justify-center gap-2 rounded-full transition-colors ${
-                    isDisputed 
+                    isTradeCompleted
+                      ? "bg-[#1B362B] border border-[#1ECB84] cursor-pointer hover:bg-[#1A4030]" 
+                      : isTradeDisputed 
                       ? "bg-[#342827] border border-[#FE857D] cursor-pointer hover:bg-[#3D2C2C]" 
-                      : isTradePaid 
+                      : isTradeInReview 
                       ? "bg-[#1B362B] border border-[#1ECB84] cursor-pointer hover:bg-[#1A4030]" 
                       : "bg-[#2D2D2D] hover:bg-[#3A3A3A]"
                   }`}
                 >
                   <Image src={Ochat} alt="chat" className="w-5 h-5" />
-                  <p className={`text-sm font-bold ${isDisputed ? 'text-[#FE857D]' : isTradePaid ? 'text-[#1ECB84]' : 'text-white'}`}>
+                  <p className={`text-sm font-bold ${
+                    isTradeCompleted ? 'text-[#1ECB84]' :
+                    isTradeDisputed ? 'text-[#FE857D]' : 
+                    isTradeInReview ? 'text-[#1ECB84]' : 'text-white'
+                  }`}>
                     {showChat ? 'Close Chat' : 'Open Chat'}
                   </p>
                   <Image 
                     src={GreatT} 
                     alt="arrow" 
                     className={`w-5 h-5 transition-transform ${showChat ? 'rotate-180' : ''}`}
-                    style={isDisputed ? { filter: 'invert(58%) sepia(19%) saturate(3785%) hue-rotate(334deg) brightness(105%) contrast(96%)' } : 
-                            isTradePaid ? { filter: 'invert(58%) sepia(93%) saturate(372%) hue-rotate(100deg) brightness(94%) contrast(94%)' } : {}}
+                    style={{
+                      ...(isTradeCompleted ? { filter: 'invert(58%) sepia(93%) saturate(372%) hue-rotate(100deg) brightness(94%) contrast(94%)' } : 
+                          isTradeDisputed ? { filter: 'invert(58%) sepia(19%) saturate(3785%) hue-rotate(334deg) brightness(105%) contrast(96%)' } : 
+                          isTradeInReview ? { filter: 'invert(58%) sepia(93%) saturate(372%) hue-rotate(100deg) brightness(94%) contrast(94%)' } : {})
+                    }}
                   />
                 </button>
               </div>
@@ -1363,15 +1535,11 @@ const PRC_Buy = () => {
               <div className="mt-6 lg:mt-8 max-w-2xl">
                 <p className="text-sm font-bold text-white mb-4">Trade Summary</p>
                 <div className="bg-[#2D2D2D] rounded-xl overflow-hidden">
-                  {/* Buying - Updated with dynamic crypto icon */}
+                  {/* Buying */}
                   <div className="flex items-center justify-between p-3 sm:p-4">
                     <p className="text-sm font-medium text-[#DBDBDB]">Buying</p>
                     <div className="flex items-center gap-2 px-2 py-1 rounded-2xl bg-[#3A3A3A]">
-                      <Image 
-                        src={getCryptoIcon(cryptoType)} 
-                        alt={cryptoType} 
-                        className="w-4 h-4" 
-                      />
+                      <Image src={BTC} alt="btc" className="w-4 h-4" />
                       <p className="text-xs font-medium text-[#DBDBDB]">
                         {cryptoType}
                       </p>
@@ -1421,15 +1589,23 @@ const PRC_Buy = () => {
                     </p>
                   </div>
 
-                  {/* Status - Updated to show DISPUTED */}
+                  {/* Status */}
                   <div className="flex items-center justify-between p-3 sm:p-4 border-t border-[#3A3A3A]">
                     <p className="text-sm font-medium text-[#DBDBDB]">Status</p>
                     <div className={`flex items-center gap-1 px-2 py-1 rounded-2xl ${
-                      isDisputed ? 'bg-[#342827]' :
-                      isTradePaid ? 'bg-[#1B362B]' : 
+                      isTradeCompleted ? 'bg-[#1B362B]' :
+                      isTradeDisputed ? 'bg-[#342827]' :
+                      isTradeInReview ? 'bg-[#1B362B]' : 
                       tradeData?.status === 'CANCELLED' ? 'bg-[#342827]' : 'bg-[#352E21]'
                     }`}>
-                      {isDisputed ? (
+                      {isTradeCompleted ? (
+                        <>
+                          <Image src={Check} alt="check" className="w-3 h-3" />
+                          <p className="text-xs font-medium text-[#1ECB84]">
+                            COMPLETED
+                          </p>
+                        </>
+                      ) : isTradeDisputed ? (
                         <>
                           <svg className="w-3 h-3 text-[#FE857D]" fill="currentColor" viewBox="0 0 20 20">
                             <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd"></path>
@@ -1438,11 +1614,11 @@ const PRC_Buy = () => {
                             DISPUTED
                           </p>
                         </>
-                      ) : isTradePaid ? (
+                      ) : isTradeInReview ? (
                         <>
                           <Image src={Check} alt="check" className="w-3 h-3" />
                           <p className="text-xs font-medium text-[#1ECB84]">
-                            IN ESCROW
+                            IN REVIEW
                           </p>
                         </>
                       ) : tradeData?.status === 'CANCELLED' ? (
@@ -1463,8 +1639,20 @@ const PRC_Buy = () => {
                     </div>
                   </div>
 
+                  {/* Escrow Status (only show when in review or completed) */}
+                  {(isTradeInReview || isTradeCompleted) && (
+                    <div className="flex items-center justify-between p-3 sm:p-4 border-t border-[#3A3A3A]">
+                      <p className="text-sm font-medium text-[#DBDBDB]">Escrow Status</p>
+                      <p className={`text-sm font-medium ${
+                        isTradeCompleted ? 'text-[#1ECB84]' : 'text-[#1ECB84]'
+                      }`}>
+                        {isTradeCompleted ? 'RELEASED' : 'HELD'}
+                      </p>
+                    </div>
+                  )}
+
                   {/* Dispute Reason (only show when disputed) */}
-                  {isDisputed && tradeData?.dispute?.reason && (
+                  {isTradeDisputed && tradeData?.dispute?.reason && (
                     <div className="flex items-center justify-between p-3 sm:p-4 border-t border-[#3A3A3A]">
                       <p className="text-sm font-medium text-[#DBDBDB]">Dispute Reason</p>
                       <p className="text-sm font-medium text-[#FE857D] text-right max-w-[200px]">
@@ -1474,7 +1662,7 @@ const PRC_Buy = () => {
                   )}
                 </div>
 
-                {/* Action Buttons - Updated for disputed status */}
+                {/* Action Buttons */}
                 {tradeData?.status === 'CANCELLED' ? (
                   <div className="mt-6">
                     <div className="w-full max-w-2xl h-12 bg-[#342827] border border-[#FE857D] text-[#FE857D] font-bold rounded-full flex items-center justify-center gap-2">
@@ -1491,7 +1679,31 @@ const PRC_Buy = () => {
                       Return to Marketplace
                     </button>
                   </div>
-                ) : isDisputed ? (
+                ) : isTradeCompleted ? (
+                  <div className="mt-6">
+                    <div className="w-full max-w-2xl h-12 bg-[#1B362B] border border-[#1ECB84] text-[#1ECB84] font-bold rounded-full flex items-center justify-center gap-2">
+                      <Image src={Check} alt="check" className="w-5 h-5" />
+                      <span>Trade Completed - {cryptoType} Received!</span>
+                    </div>
+                    <p className="text-center text-sm text-[#8F8F8F] mt-2">
+                      Your {cryptoType} has been released from escrow and is now in your wallet.
+                    </p>
+                    <div className="flex gap-3 mt-4">
+                      <button
+                        onClick={() => router.push('/market_place')}
+                        className="flex-1 h-12 bg-[#3A3A3A] text-white font-bold rounded-full hover:bg-[#4A4A4A] transition-colors"
+                      >
+                        Back to Marketplace
+                      </button>
+                      <button
+                        onClick={() => router.push('/wallet')}
+                        className="flex-1 h-12 bg-[#4DF2BE] text-[#0F1012] font-bold rounded-full hover:bg-[#3DD2A5] transition-colors"
+                      >
+                        View Wallet
+                      </button>
+                    </div>
+                  </div>
+                ) : isTradeDisputed ? (
                   <div className="mt-6">
                     <div className="w-full max-w-2xl h-12 bg-[#342827] border border-[#FE857D] text-[#FE857D] font-bold rounded-full flex items-center justify-center gap-2">
                       <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
@@ -1503,7 +1715,7 @@ const PRC_Buy = () => {
                       The support team will contact you in the chat if additional information is needed.
                     </p>
                   </div>
-                ) : shouldShowCancelButton ? (
+                ) : shouldShowPaidButton ? (
                   <div className="mt-6 flex flex-col gap-3">
                     <button
                       onClick={() => setShowPaidModal(true)}
@@ -1519,7 +1731,7 @@ const PRC_Buy = () => {
                       <span>Cancel Trade</span>
                     </button>
                   </div>
-                ) : isTradePaid ? (
+                ) : isTradeInReview ? (
                   <div className="mt-6">
                     <div className="w-full max-w-2xl h-12 bg-[#1B362B] border border-[#1ECB84] text-[#1ECB84] font-bold rounded-full flex items-center justify-center gap-2">
                       <Image src={Check} alt="check" className="w-5 h-5" />
@@ -1527,12 +1739,13 @@ const PRC_Buy = () => {
                     </div>
                     <p className="text-center text-sm text-[#8F8F8F] mt-2">
                       Waiting for seller to confirm payment and release {cryptoType} from escrow
+                      {checkingRelease && ' (Checking for release...)'}
                     </p>
                   </div>
                 ) : null}
 
                 {/* Dispute Container - Only show if not already disputed */}
-                {showDispute && isTradePaid && !isDisputed && (
+                {showDispute && isTradeInReview && !isTradeDisputed && (
                   <div className="mt-6 p-4 bg-[#342827] rounded-lg border-l-2 border-l-[#FE857D]" style={{ maxWidth: '800px' }}>
                     <div className="flex items-start gap-3">
                       <Image src={Yellow_i} alt="alert" className="w-5 h-5 mt-0.5" />
@@ -1638,46 +1851,59 @@ const PRC_Buy = () => {
                       </p>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2 px-3 py-1 bg-[#3A3A3A] rounded-2xl">
-                    <Image src={Timer} alt="time" className="w-4 h-4" />
-                    <p className={`text-sm font-medium ${timeLeft < 300 ? 'text-red-400' : 'text-[#DBDBDB]'}`}>
-                      {formatTime(timeLeft)}
-                    </p>
-                  </div>
+                  {!isTradeCompleted && (
+                    <div className="flex items-center gap-2 px-3 py-1 bg-[#3A3A3A] rounded-2xl">
+                      <Image src={Timer} alt="time" className="w-4 h-4" />
+                      <p className={`text-sm font-medium ${timeLeft < 300 ? 'text-red-400' : 'text-[#DBDBDB]'}`}>
+                        {formatTime(timeLeft)}
+                      </p>
+                    </div>
+                  )}
                 </div>
 
                 {/* Chat content */}
                 <div ref={chatContainerRef} className="flex-1 p-4 sm:p-6 overflow-y-auto">
                   <div className="flex items-center justify-between mb-6">
                     <div className={`flex items-center gap-2 px-3 py-1 rounded-2xl ${
-                      isDisputed ? 'bg-[#342827]' : isTradePaid ? 'bg-[#1B362B]' : 'bg-[#1B362B]'
+                      isTradeCompleted ? 'bg-[#1B362B]' :
+                      isTradeDisputed ? 'bg-[#342827]' : 
+                      isTradeInReview ? 'bg-[#1B362B]' : 'bg-[#1B362B]'
                     }`}>
                       <Image src={Gtime} alt="gtime" className="w-4 h-4" />
                       <p className={`text-sm font-medium ${
-                        isDisputed ? 'text-[#FE857D]' : isTradePaid ? 'text-[#1ECB84]' : 'text-[#1ECB84]'
+                        isTradeCompleted ? 'text-[#1ECB84]' :
+                        isTradeDisputed ? 'text-[#FE857D]' : 
+                        isTradeInReview ? 'text-[#1ECB84]' : 'text-[#1ECB84]'
                       }`}>
-                        {isDisputed ? 'In Dispute' : isTradePaid ? 'In Escrow' : 'Active'}
+                        {isTradeCompleted ? 'Completed' : 
+                         isTradeDisputed ? 'In Dispute' : 
+                         isTradeInReview ? 'In Escrow' : 'Active'}
                       </p>
                     </div>
-                    {!isTradePaid && !isDisputed ? (
-                      <button 
-                        onClick={() => setShowPaidModal(true)}
-                        className="px-6 py-3 bg-[#4DF2BE] text-[#0F1012] font-medium rounded-full hover:bg-[#3DD2A5] transition-colors"
-                      >
-                        Paid
-                      </button>
-                    ) : isDisputed ? (
+                    {isTradeCompleted ? (
+                      <div className="px-6 py-3 bg-[#1B362B] border border-[#1ECB84] text-[#1ECB84] font-medium rounded-full flex items-center gap-2">
+                        <Image src={Check} alt="check" className="w-5 h-5" />
+                        <span>Completed</span>
+                      </div>
+                    ) : isTradeDisputed ? (
                       <div className="px-6 py-3 bg-[#342827] border border-[#FE857D] text-[#FE857D] font-medium rounded-full flex items-center gap-2">
                         <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
                           <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd"></path>
                         </svg>
                         <span>Disputed</span>
                       </div>
-                    ) : (
+                    ) : isTradeInReview ? (
                       <div className="px-6 py-3 bg-[#1B362B] border border-[#1ECB84] text-[#1ECB84] font-medium rounded-full flex items-center gap-2">
                         <Image src={Check} alt="check" className="w-5 h-5" />
-                        <span>Paid</span>
+                        <span>In Review</span>
                       </div>
+                    ) : (
+                      <button 
+                        onClick={() => setShowPaidModal(true)}
+                        className="px-6 py-3 bg-[#4DF2BE] text-[#0F1012] font-medium rounded-full hover:bg-[#3DD2A5] transition-colors"
+                      >
+                        Paid
+                      </button>
                     )}
                   </div>
 
@@ -1694,13 +1920,21 @@ const PRC_Buy = () => {
                       </span>
                     </div>
                     <div className={`rounded-2xl p-5 border shadow-lg ${
-                      isDisputed 
+                      isTradeCompleted
+                        ? 'bg-gradient-to-r from-[#1B362B] to-[#143026] border-[#1ECB84]' 
+                        : isTradeDisputed 
                         ? 'bg-gradient-to-r from-[#342827] to-[#2A1F1F] border-[#FE857D]' 
                         : 'bg-gradient-to-r from-[#1B362B] to-[#143026] border-[#1ECB84]'
                     }`}>
                       <div className="flex items-start gap-3 mb-3">
-                        <div className={`w-10 h-10 ${isDisputed ? 'bg-[#0F1012]/30' : 'bg-[#0F1012]/30'} rounded-full flex items-center justify-center flex-shrink-0`}>
-                          <svg className={`w-5 h-5 ${isDisputed ? 'text-[#FE857D]' : 'text-[#1ECB84]'}`} fill="currentColor" viewBox="0 0 20 20">
+                        <div className={`w-10 h-10 ${
+                          isTradeCompleted ? 'bg-[#0F1012]/30' : 
+                          isTradeDisputed ? 'bg-[#0F1012]/30' : 'bg-[#0F1012]/30'
+                        } rounded-full flex items-center justify-center flex-shrink-0`}>
+                          <svg className={`w-5 h-5 ${
+                            isTradeCompleted ? 'text-[#1ECB84]' : 
+                            isTradeDisputed ? 'text-[#FE857D]' : 'text-[#1ECB84]'
+                          }`} fill="currentColor" viewBox="0 0 20 20">
                             <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd"></path>
                           </svg>
                         </div>
@@ -1711,7 +1945,7 @@ const PRC_Buy = () => {
                           </p>
                           
                           {/* Warning box inside service message */}
-                          {!isDisputed && (
+                          {!isTradeCompleted && !isTradeDisputed && (
                             <div className="mt-4 p-4 bg-[#352E21]/80 rounded-xl border border-[#FFC051]/30">
                               <div className="flex items-start gap-2">
                                 <svg className="w-4 h-4 text-[#FFC051] mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
@@ -1729,9 +1963,13 @@ const PRC_Buy = () => {
                             {serviceMessage.listItems.map((item, index) => (
                               <li key={index} className="flex items-start gap-3">
                                 <div className={`w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5 ${
-                                  isDisputed ? 'bg-[#FE857D]/20' : 'bg-[#1ECB84]/20'
+                                  isTradeCompleted ? 'bg-[#1ECB84]/20' :
+                                  isTradeDisputed ? 'bg-[#FE857D]/20' : 'bg-[#1ECB84]/20'
                                 }`}>
-                                  <span className={`text-xs font-bold ${isDisputed ? 'text-[#FE857D]' : 'text-[#1ECB84]'}`}>
+                                  <span className={`text-xs font-bold ${
+                                    isTradeCompleted ? 'text-[#1ECB84]' :
+                                    isTradeDisputed ? 'text-[#FE857D]' : 'text-[#1ECB84]'
+                                  }`}>
                                     {index + 1}
                                   </span>
                                 </div>
@@ -1749,20 +1987,29 @@ const PRC_Buy = () => {
                     <div className="mb-6">
                       <div className="flex items-center justify-between mb-2">
                         <span className="text-xs font-semibold text-[#4DF2BE] uppercase tracking-wide">
-                          {isDisputed ? 'Evolve2p Dispute Service' : 'Evolve2p Escrow Service'}
+                          {isTradeCompleted ? 'Evolve2p Transaction Service' :
+                           isTradeDisputed ? 'Evolve2p Dispute Service' : 'Evolve2p Escrow Service'}
                         </span>
                         <span className="text-xs text-[#8F8F8F]">
                           {secondServiceMessage.timestamp}
                         </span>
                       </div>
                       <div className={`rounded-2xl p-5 border shadow-lg ${
-                        isDisputed 
+                        isTradeCompleted
+                          ? 'bg-gradient-to-r from-[#1B362B] to-[#143026] border-[#1ECB84]' 
+                          : isTradeDisputed 
                           ? 'bg-gradient-to-r from-[#342827] to-[#2A1F1F] border-[#FE857D]' 
                           : 'bg-gradient-to-r from-[#1B362B] to-[#143026] border-[#1ECB84]'
                       }`}>
                         <div className="flex items-start gap-3">
-                          <div className={`w-10 h-10 ${isDisputed ? 'bg-[#0F1012]/30' : 'bg-[#0F1012]/30'} rounded-full flex items-center justify-center flex-shrink-0`}>
-                            <svg className={`w-5 h-5 ${isDisputed ? 'text-[#FE857D]' : 'text-[#1ECB84]'}`} fill="currentColor" viewBox="0 0 20 20">
+                          <div className={`w-10 h-10 ${
+                            isTradeCompleted ? 'bg-[#0F1012]/30' : 
+                            isTradeDisputed ? 'bg-[#0F1012]/30' : 'bg-[#0F1012]/30'
+                          } rounded-full flex items-center justify-center flex-shrink-0`}>
+                            <svg className={`w-5 h-5 ${
+                              isTradeCompleted ? 'text-[#1ECB84]' : 
+                              isTradeDisputed ? 'text-[#FE857D]' : 'text-[#1ECB84]'
+                            }`} fill="currentColor" viewBox="0 0 20 20">
                               <path fillRule="evenodd" d="M2.166 4.999A11.954 11.954 0 0010 1.944 11.954 11.954 0 0017.834 5c.11.65.166 1.32.166 2.001 0 5.225-3.34 9.67-8 11.317C5.34 16.67 2 12.225 2 7c0-.682.057-1.35.166-2.001zm11.541 3.708a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd"></path>
                             </svg>
                           </div>
@@ -1789,7 +2036,7 @@ const PRC_Buy = () => {
                     </div>
                   </div>
                   
-                  {/* BUYER/SELLER CHAT MESSAGES - FIXED: Buyer messages on right side */}
+                  {/* BUYER/SELLER CHAT MESSAGES */}
                   <div className="space-y-4">
                     {chatMessages.length > 0 ? (
                       chatMessages
@@ -1910,48 +2157,60 @@ const PRC_Buy = () => {
 
                 {/* Message input with file upload */}
                 <div className="p-4 border-t border-[#3A3A3A]">
-                  <form onSubmit={handleSendMessage} className="flex items-center gap-3">
-                    <input
-                      type="file"
-                      id="file-upload"
-                      className="hidden"
-                      accept="image/*,.pdf,.doc,.docx"
-                      onChange={handleFileUpload}
-                      disabled={sendingMessage || uploadingFile || isDisputed}
-                    />
-                    
-                    <div className="flex-1 relative">
-                      <input
-                        value={messageInput}
-                        onChange={(e) => setMessageInput(e.target.value)}
-                        disabled={sendingMessage || uploadingFile || isDisputed}
-                        className="w-full h-12 bg-[#222222] border-none px-4 pr-12 text-sm font-normal text-[#C7C7C7] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4DF2BE] disabled:opacity-50"
-                        placeholder={isDisputed ? "Chat disabled during dispute" : uploadingFile ? "Uploading file..." : "Type a message"}
-                      />
-                      <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
-                        <label htmlFor="file-upload" className={`cursor-pointer ${uploadingFile || isDisputed ? 'opacity-50' : ''}`}>
-                          <Image 
-                            src={Mink} 
-                            alt="upload" 
-                            className="w-5 h-5 hover:opacity-80 transition-opacity" 
-                            title={isDisputed ? "Chat disabled" : uploadingFile ? "Uploading..." : "Upload file"}
-                          />
-                        </label>
-                      </div>
+                  {isTradeCompleted ? (
+                    <div className="text-center p-4 bg-[#1B362B] rounded-lg border border-[#1ECB84]">
+                      <p className="text-sm text-[#1ECB84] font-medium">
+                        Trade completed. Chat is now read-only.
+                      </p>
                     </div>
-                    
-                    <button 
-                      type="submit"
-                      disabled={sendingMessage || uploadingFile || (!messageInput.trim() && !selectedFile) || isDisputed}
-                      className="w-12 h-12 bg-[#4DF2BE] flex items-center justify-center rounded-lg hover:bg-[#3DD2A5] transition-colors disabled:opacity-50 disabled:cursor-not-allowed min-w-12"
-                    >
-                      {sendingMessage || uploadingFile ? (
-                        <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-[#0F1012]"></div>
-                      ) : (
-                        <Image src={Message} alt="message" className="w-5 h-5" />
-                      )}
-                    </button>
-                  </form>
+                  ) : (
+                    <form onSubmit={handleSendMessage} className="flex items-center gap-3">
+                      <input
+                        type="file"
+                        id="file-upload"
+                        className="hidden"
+                        accept="image/*,.pdf,.doc,.docx"
+                        onChange={handleFileUpload}
+                        disabled={sendingMessage || uploadingFile || isTradeDisputed || isTradeCompleted}
+                      />
+                      
+                      <div className="flex-1 relative">
+                        <input
+                          value={messageInput}
+                          onChange={(e) => setMessageInput(e.target.value)}
+                          disabled={sendingMessage || uploadingFile || isTradeDisputed || isTradeCompleted}
+                          className="w-full h-12 bg-[#222222] border-none px-4 pr-12 text-sm font-normal text-[#C7C7C7] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4DF2BE] disabled:opacity-50"
+                          placeholder={isTradeCompleted ? "Chat closed - Trade completed" : 
+                                    isTradeDisputed ? "Chat disabled during dispute" : 
+                                    uploadingFile ? "Uploading file..." : "Type a message"}
+                        />
+                        {!isTradeCompleted && !isTradeDisputed && (
+                          <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                            <label htmlFor="file-upload" className={`cursor-pointer ${uploadingFile ? 'opacity-50' : ''}`}>
+                              <Image 
+                                src={Mink} 
+                                alt="upload" 
+                                className="w-5 h-5 hover:opacity-80 transition-opacity" 
+                                title={uploadingFile ? "Uploading..." : "Upload file"}
+                              />
+                            </label>
+                          </div>
+                        )}
+                      </div>
+                      
+                      <button 
+                        type="submit"
+                        disabled={sendingMessage || uploadingFile || (!messageInput.trim() && !selectedFile) || isTradeDisputed || isTradeCompleted}
+                        className="w-12 h-12 bg-[#4DF2BE] flex items-center justify-center rounded-lg hover:bg-[#3DD2A5] transition-colors disabled:opacity-50 disabled:cursor-not-allowed min-w-12"
+                      >
+                        {sendingMessage || uploadingFile ? (
+                          <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-[#0F1012]"></div>
+                        ) : (
+                          <Image src={Message} alt="message" className="w-5 h-5" />
+                        )}
+                      </button>
+                    </form>
+                  )}
                   
                   {/* Show selected file preview */}
                   {selectedFile && !uploadingFile && (
@@ -2262,7 +2521,7 @@ const PRC_Buy = () => {
                       <div className="flex items-center justify-center gap-2">
                         <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-[#0F1012]"></div>
                         <span>Submitting...</span>
-                    </div>
+                      </div>
                     ) : (
                       'Submit Dispute'
                     )}
