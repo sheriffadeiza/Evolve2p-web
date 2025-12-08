@@ -629,11 +629,11 @@ const Bell_Notify = () => {
           </div>
         )}
         {/* Add proper spacing before footer */}
-        <div className="mt-16 mb-8">
+        <div className="mt-[50%] mb-8">
           <div className="w-full h-[1px] bg-white opacity-20"></div>
         </div>
               
-        <div className="mb-16">
+        <div className="mb-16 whitespace-nowrap mt-[20%]">
           <Footer />
         </div>
       </div>
