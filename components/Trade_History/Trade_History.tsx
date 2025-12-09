@@ -20,6 +20,7 @@ interface UserData {
     tradesAsBuyer?: any[];
     tradesAsSeller?: any[];
     tradeHistory?: any[];
+    wallets?: any[];
     [key: string]: any;
   };
   [key: string]: any;
@@ -52,7 +53,8 @@ interface FormattedTrade {
   counterpart: string;
   date: string;
   status: string;
-  originalTrade: Trade;
+  originalTrade?: Trade;
+  isSample?: boolean;
 }
 
 const getTradeIcon = (type: string) => {
@@ -162,12 +164,54 @@ const getStatusDisplay = (status: string) => {
   };
 };
 
+// Sample data for testing/demo purposes
+const getSampleTrades = (): FormattedTrade[] => {
+  const sampleActive = [
+    {
+      type: "Buy BTC",
+      method: "Bank Transfer",
+      youPay: "$500.00",
+      youReceive: "0.012345 BTC",
+      counterpart: "@CryptoTrader",
+      date: formatDate(new Date().toISOString()),
+      status: "Pending",
+      isSample: true
+    },
+    {
+      type: "Sell ETH",
+      method: "Credit Card",
+      youPay: "0.5 ETH",
+      youReceive: "$1,500.00",
+      counterpart: "@ETHBuyer",
+      date: formatDate(new Date(Date.now() - 86400000).toISOString()), // Yesterday
+      status: "In Review",
+      isSample: true
+    }
+  ];
+
+  const sampleCompleted = [
+    {
+      type: "Buy USDT",
+      method: "PayPal",
+      youPay: "$100.00",
+      youReceive: "100 USDT",
+      counterpart: "@CoinExpert",
+      date: formatDate(new Date(Date.now() - 172800000).toISOString()), // 2 days ago
+      status: "Completed",
+      isSample: true
+    }
+  ];
+
+  return [...sampleActive, ...sampleCompleted];
+};
+
 const Trade_History: React.FC = () => {
   const [activeTab, setActiveTab] = useState<"active" | "completed">("active");
   const [activeTrades, setActiveTrades] = useState<FormattedTrade[]>([]);
   const [completedTrades, setCompletedTrades] = useState<FormattedTrade[]>([]);
   const [loading, setLoading] = useState(true);
   const [userData, setUserData] = useState<UserData | null>(null);
+  const [showSampleData, setShowSampleData] = useState(false);
 
   useEffect(() => {
     const loadUserData = () => {
@@ -179,6 +223,13 @@ const Trade_History: React.FC = () => {
         if (!userDataRaw) {
           console.log("❌ No UserData found in localStorage");
           setLoading(false);
+          // Show sample data for demo
+          const sampleTrades = getSampleTrades();
+          const active = sampleTrades.filter(t => t.status !== "Completed");
+          const completed = sampleTrades.filter(t => t.status === "Completed");
+          setActiveTrades(active);
+          setCompletedTrades(completed);
+          setShowSampleData(true);
           return;
         }
 
@@ -203,22 +254,16 @@ const Trade_History: React.FC = () => {
         const userDataObj = parsedData.userData;
         console.log("🔥 USERDATA OBJECT:", userDataObj);
         console.log("🔥 Available keys in userDataObj:", Object.keys(userDataObj));
+        console.log("📊 tradesAsBuyer:", userDataObj.tradesAsBuyer);
+        console.log("📊 tradesAsSeller:", userDataObj.tradesAsSeller);
         
         // Extract all trades from userData
         const allTrades: Trade[] = [];
         
         // Check for tradesAsBuyer (most common)
-        if (Array.isArray(userDataObj.tradesAsBuyer)) {
+        if (Array.isArray(userDataObj.tradesAsBuyer) && userDataObj.tradesAsBuyer.length > 0) {
           console.log(`✅ Found ${userDataObj.tradesAsBuyer.length} trades in tradesAsBuyer`);
           userDataObj.tradesAsBuyer.forEach((trade: any, index: number) => {
-            console.log(`📝 Buyer Trade ${index}:`, {
-              id: trade.id,
-              type: trade.type,
-              status: trade.status,
-              amount: trade.amount,
-              currency: trade.currency,
-              createdAt: trade.createdAt
-            });
             allTrades.push({
               ...trade,
               type: 'buy' as const
@@ -227,17 +272,9 @@ const Trade_History: React.FC = () => {
         }
         
         // Check for tradesAsSeller
-        if (Array.isArray(userDataObj.tradesAsSeller)) {
+        if (Array.isArray(userDataObj.tradesAsSeller) && userDataObj.tradesAsSeller.length > 0) {
           console.log(`✅ Found ${userDataObj.tradesAsSeller.length} trades in tradesAsSeller`);
           userDataObj.tradesAsSeller.forEach((trade: any, index: number) => {
-            console.log(`📝 Seller Trade ${index}:`, {
-              id: trade.id,
-              type: trade.type,
-              status: trade.status,
-              amount: trade.amount,
-              currency: trade.currency,
-              createdAt: trade.createdAt
-            });
             allTrades.push({
               ...trade,
               type: 'sell' as const
@@ -246,89 +283,89 @@ const Trade_History: React.FC = () => {
         }
         
         // Check for direct trades array
-        if (Array.isArray(userDataObj.trades)) {
+        if (Array.isArray(userDataObj.trades) && userDataObj.trades.length > 0) {
           console.log(`✅ Found ${userDataObj.trades.length} trades in trades array`);
           allTrades.push(...userDataObj.trades);
         }
         
-        console.log("📈 Total trades loaded:", allTrades.length);
-        
-        if (allTrades.length === 0) {
-          console.log("⚠ No trades found. Here's the full userDataObj structure:");
-          console.log("Full userDataObj:", userDataObj);
-          
-          // Try to find any array that might contain trades
-          Object.keys(userDataObj).forEach(key => {
-            if (Array.isArray(userDataObj[key])) {
-              console.log(`Found array in ${key} with ${userDataObj[key].length} items`);
-              if (userDataObj[key].length > 0) {
-                console.log(`First item in ${key}:`, userDataObj[key][0]);
-              }
-            }
-          });
-        }
+        console.log("📈 Total trades loaded from userData:", allTrades.length);
         
         // Process and format trades
         const formattedActive: FormattedTrade[] = [];
         const formattedCompleted: FormattedTrade[] = [];
         
-        allTrades.forEach((trade, index) => {
-          // Determine if trade is completed
-          const status = trade.status?.toLowerCase() || 'pending';
-          const isCompleted = status.includes('complete') || 
-                             status === 'completed' ||
-                             status === 'released' ||
-                             status === 'finished' ||
-                             status === 'done';
+        if (allTrades.length > 0) {
+          // Process real trades
+          allTrades.forEach((trade) => {
+            // Determine if trade is completed
+            const status = trade.status?.toLowerCase() || 'pending';
+            const isCompleted = status.includes('complete') || 
+                               status === 'completed' ||
+                               status === 'released' ||
+                               status === 'finished' ||
+                               status === 'done';
+            
+            // Determine trade type display
+            const currency = trade.currency || 'BTC';
+            const tradeType = trade.type === 'buy' ? `Buy ${currency}` : `Sell ${currency}`;
+            
+            // Determine what user pays and receives
+            let youPay = '';
+            let youReceive = '';
+            
+            if (trade.type === 'buy') {
+              // Buyer pays USD, receives crypto
+              const cryptoAmount = trade.amount / (trade.price || 1);
+              youPay = formatAmount(trade.amount, 'USD');
+              youReceive = formatAmount(cryptoAmount, currency);
+            } else {
+              // Seller pays crypto, receives USD
+              const usdAmount = trade.amount * (trade.price || 1);
+              youPay = formatAmount(trade.amount, currency);
+              youReceive = formatAmount(usdAmount, 'USD');
+            }
+            
+            // Get counterpart
+            let counterpart = 'Unknown User';
+            if (trade.type === 'buy' && (trade.seller || trade.sellerId)) {
+              counterpart = `@${trade.seller || trade.sellerId}`;
+            } else if (trade.type === 'sell' && (trade.buyer || trade.buyerId)) {
+              counterpart = `@${trade.buyer || trade.buyerId}`;
+            }
+            
+            // Get payment method
+            const method = trade.paymentMethod || 'Bank Transfer';
+            
+            const formattedTrade: FormattedTrade = {
+              type: tradeType,
+              method: method,
+              youPay,
+              youReceive,
+              counterpart,
+              date: formatDate(trade.createdAt),
+              status: getStatusDisplay(trade.status || 'pending').text,
+              originalTrade: trade,
+              isSample: false
+            };
+            
+            if (isCompleted) {
+              formattedCompleted.push(formattedTrade);
+            } else {
+              formattedActive.push(formattedTrade);
+            }
+          });
           
-          // Determine trade type display
-          const currency = trade.currency || 'BTC';
-          const tradeType = trade.type === 'buy' ? `Buy ${currency}` : `Sell ${currency}`;
-          
-          // Determine what user pays and receives
-          let youPay = '';
-          let youReceive = '';
-          
-          if (trade.type === 'buy') {
-            // Buyer pays USD, receives crypto
-            const cryptoAmount = trade.amount / (trade.price || 1);
-            youPay = formatAmount(trade.amount, 'USD');
-            youReceive = formatAmount(cryptoAmount, currency);
-          } else {
-            // Seller pays crypto, receives USD
-            const usdAmount = trade.amount * (trade.price || 1);
-            youPay = formatAmount(trade.amount, currency);
-            youReceive = formatAmount(usdAmount, 'USD');
-          }
-          
-          // Get counterpart
-          let counterpart = 'Unknown User';
-          if (trade.type === 'buy' && (trade.seller || trade.sellerId)) {
-            counterpart = `@${trade.seller || trade.sellerId}`;
-          } else if (trade.type === 'sell' && (trade.buyer || trade.buyerId)) {
-            counterpart = `@${trade.buyer || trade.buyerId}`;
-          }
-          
-          // Get payment method
-          const method = trade.paymentMethod || 'Bank Transfer';
-          
-          const formattedTrade: FormattedTrade = {
-            type: tradeType,
-            method: method,
-            youPay,
-            youReceive,
-            counterpart,
-            date: formatDate(trade.createdAt),
-            status: getStatusDisplay(trade.status || 'pending').text,
-            originalTrade: trade
-          };
-          
-          if (isCompleted) {
-            formattedCompleted.push(formattedTrade);
-          } else {
-            formattedActive.push(formattedTrade);
-          }
-        });
+          setShowSampleData(false);
+        } else {
+          console.log("⚠ No real trades found. Showing sample data for demo.");
+          // Show sample data for demo
+          const sampleTrades = getSampleTrades();
+          const active = sampleTrades.filter(t => t.status !== "Completed");
+          const completed = sampleTrades.filter(t => t.status === "Completed");
+          setActiveTrades(active);
+          setCompletedTrades(completed);
+          setShowSampleData(true);
+        }
         
         console.log("✅ Active trades count:", formattedActive.length);
         console.log("✅ Completed trades count:", formattedCompleted.length);
@@ -336,7 +373,7 @@ const Trade_History: React.FC = () => {
         // Sort by date (most recent first)
         formattedActive.sort((a, b) => {
           try {
-            return new Date(b.originalTrade.createdAt).getTime() - new Date(a.originalTrade.createdAt).getTime();
+            return new Date(b.date).getTime() - new Date(a.date).getTime();
           } catch {
             return 0;
           }
@@ -344,7 +381,7 @@ const Trade_History: React.FC = () => {
         
         formattedCompleted.sort((a, b) => {
           try {
-            return new Date(b.originalTrade.createdAt).getTime() - new Date(a.originalTrade.createdAt).getTime();
+            return new Date(b.date).getTime() - new Date(a.date).getTime();
           } catch {
             return 0;
           }
@@ -372,7 +409,12 @@ const Trade_History: React.FC = () => {
   }, []);
 
   const handleViewTrade = (trade: FormattedTrade) => {
-    const tradeId = trade.originalTrade.id || trade.originalTrade.tradeId || trade.originalTrade._id;
+    if (trade.isSample) {
+      alert("This is sample data. Create a real trade to use this feature.");
+      return;
+    }
+    
+    const tradeId = trade.originalTrade?.id || trade.originalTrade?.tradeId || trade.originalTrade?._id;
     if (!tradeId) {
       alert("No trade ID found");
       return;
@@ -380,8 +422,8 @@ const Trade_History: React.FC = () => {
     
     // Determine which page to redirect to based on user role in the trade
     const userId = userData?.userData?.id || userData?.userData?.userId || userData?.userData?._id;
-    const buyerId = trade.originalTrade.buyerId || trade.originalTrade.buyer;
-    const sellerId = trade.originalTrade.sellerId || trade.originalTrade.seller;
+    const buyerId = trade.originalTrade?.buyerId || trade.originalTrade?.buyer;
+    const sellerId = trade.originalTrade?.sellerId || trade.originalTrade?.seller;
     
     if (userId && buyerId === userId) {
       // User is buyer
@@ -401,9 +443,22 @@ const Trade_History: React.FC = () => {
 
       <div className="max-w-7xl mx-auto mt-[40px]">
         {/* Debug info */}
-        <div className="mb-4 p-2 bg-gray-800 rounded text-sm">
-          <p>Found {activeTrades.length} active trades and {completedTrades.length} completed trades</p>
-          <p className="text-xs text-gray-400">Check browser console (F12) for detailed logs</p>
+        <div className="mb-4 p-3 bg-gray-800 rounded text-sm">
+          <div className="flex justify-between items-center">
+            <div>
+              <p className="font-semibold">Trade History Status</p>
+              <p>Found {activeTrades.length} active trades and {completedTrades.length} completed trades</p>
+              <p className="text-xs text-gray-400 mt-1">
+                {showSampleData ? "Showing sample data (no real trades found)" : "Showing real user trades"}
+              </p>
+            </div>
+            <button 
+              onClick={() => window.location.reload()}
+              className="px-3 py-1 bg-gray-700 hover:bg-gray-600 rounded text-xs"
+            >
+              Refresh Data
+            </button>
+          </div>
         </div>
 
         {/* ======= Tabs Section ======= */}
@@ -451,6 +506,17 @@ const Trade_History: React.FC = () => {
           </div>
         </div>
 
+        {/* Show warning if using sample data */}
+        {showSampleData && (
+          <div className="mb-4 p-3 bg-yellow-900/30 border border-yellow-700 rounded">
+            <p className="text-yellow-300 font-medium">Demo Mode</p>
+            <p className="text-yellow-200 text-sm">No real trades found in your account. Showing sample data for demonstration.</p>
+            <p className="text-yellow-200 text-xs mt-1">
+              Create a trade on the platform to see your real trade history here.
+            </p>
+          </div>
+        )}
+
         {/* ======= ACTIVE TAB ======= */}
         {activeTab === "active" && (
           <>
@@ -460,12 +526,18 @@ const Trade_History: React.FC = () => {
               <div className="flex flex-col items-center justify-center h-[400px] bg-[#1A1A1A] rounded-[12px]">
                 <Image src={G19} alt="group19" width={120} height={120} />
                 <p className="text-[16px] text-[#C7C7C7] mt-[16px]">No Active Trades</p>
-                <p className="text-[14px] text-gray-500 mt-2">
-                  Check browser console for data structure
+                <p className="text-[14px] text-gray-500 mt-2 text-center max-w-md">
+                  You don't have any active trades yet. <br />
+                  Start trading on the platform to see your trade history here.
                 </p>
               </div>
             ) : (
               <div className="overflow-x-auto bg-[#1A1A1A] p-6 rounded-[12px] shadow-lg w-full max-w-[1224px]">
+                {showSampleData && (
+                  <div className="mb-4 p-2 bg-gray-800 rounded text-sm text-center">
+                    <span className="text-yellow-300">⚠ Sample Data</span>
+                  </div>
+                )}
                 <table className="min-w-full text-left border-collapse">
                   <thead>
                     <tr className="text-[#C7C7C7] h-[35px] text-[14px] font-[500] border-b border-[#2D2D2D]">
@@ -481,11 +553,13 @@ const Trade_History: React.FC = () => {
                   </thead>
                   <tbody>
                     {activeTrades.map((trade, index) => {
-                      const statusDisplay = getStatusDisplay(trade.originalTrade.status || 'pending');
+                      const statusDisplay = getStatusDisplay(trade.status || 'pending');
                       return (
                         <tr
                           key={index}
-                          className="h-[64px] border-[#2D2D2D] text-[16px] font-[500] text-[#DBDBDB] hover:bg-[#242424] transition"
+                          className={`h-[64px] border-[#2D2D2D] text-[16px] font-[500] text-[#DBDBDB] hover:bg-[#242424] transition ${
+                            trade.isSample ? 'opacity-80' : ''
+                          }`}
                         >
                           <td className="py-[20px] pl-[15px] flex items-center gap-[10px]">
                             {getTradeIcon(trade.type) && (
@@ -513,7 +587,9 @@ const Trade_History: React.FC = () => {
                           <td>
                             <button 
                               onClick={() => handleViewTrade(trade)}
-                              className="bg-[#2D2D2D] w-[61px] h-[36px] border-none text-[#FFFFFF] px-4 py-1 rounded-full text-[13px] hover:opacity-80 transition"
+                              className={`bg-[#2D2D2D] w-[61px] h-[36px] border-none text-[#FFFFFF] px-4 py-1 rounded-full text-[13px] hover:opacity-80 transition ${
+                                trade.isSample ? 'cursor-not-allowed opacity-70' : ''
+                              }`}
                             >
                               View
                             </button>
@@ -537,12 +613,18 @@ const Trade_History: React.FC = () => {
               <div className="flex flex-col items-center justify-center h-[400px] bg-[#1A1A1A] rounded-[12px]">
                 <Image src={G19} alt="group19" width={120} height={120} />
                 <p className="text-[16px] text-[#C7C7C7] mt-[16px]">No Completed Trades</p>
-                <p className="text-[14px] text-gray-500 mt-2">
-                  Check browser console for data structure
+                <p className="text-[14px] text-gray-500 mt-2 text-center max-w-md">
+                  You haven't completed any trades yet. <br />
+                  Complete your first trade to see it here.
                 </p>
               </div>
             ) : (
               <div className="overflow-x-auto bg-[#1A1A1A] p-6 rounded-[12px] shadow-lg w-full max-w-[1224px]">
+                {showSampleData && (
+                  <div className="mb-4 p-2 bg-gray-800 rounded text-sm text-center">
+                    <span className="text-yellow-300">⚠ Sample Data</span>
+                  </div>
+                )}
                 <table className="min-w-full text-left border-collapse">
                   <thead>
                     <tr className="text-[#C7C7C7] h-[35px] text-[14px] font-[500] border-b border-[#2D2D2D]">
@@ -560,7 +642,9 @@ const Trade_History: React.FC = () => {
                     {completedTrades.map((trade, index) => (
                       <tr
                         key={index}
-                        className="h-[64px] border-[#2D2D2D] text-[16px] font-[500] text-[#DBDBDB] hover:bg-[#242424] transition"
+                        className={`h-[64px] border-[#2D2D2D] text-[16px] font-[500] text-[#DBDBDB] hover:bg-[#242424] transition ${
+                          trade.isSample ? 'opacity-80' : ''
+                        }`}
                       >
                         <td className="py-[20px] pl-[15px] flex items-center gap-[10px]">
                           {getTradeIcon(trade.type) && (
@@ -586,7 +670,9 @@ const Trade_History: React.FC = () => {
                         <td>
                           <button 
                             onClick={() => handleViewTrade(trade)}
-                            className="bg-[#2D2D2D] w-[61px] h-[36px] border-none text-[#FFFFFF] px-4 py-1 rounded-full text-[13px] hover:opacity-80 transition"
+                            className={`bg-[#2D2D2D] w-[61px] h-[36px] border-none text-[#FFFFFF] px-4 py-1 rounded-full text-[13px] hover:opacity-80 transition ${
+                              trade.isSample ? 'cursor-not-allowed opacity-70' : ''
+                            }`}
                           >
                             View
                           </button>
