@@ -500,30 +500,128 @@ const Trade_History: React.FC = () => {
     );
   };
 
+  const renderMobileTradeCard = (trade: Trade, index: number) => {
+    const userId = userData?.userData?.id;
+    const statusDisplay = getStatusDisplay(trade?.status || 'pending');
+    const tradeType = getTradeType(trade, userId);
+    const cryptoCurrency = getCryptoCurrency(trade);
+    const displayType = `${tradeType} ${cryptoCurrency}`;
+    const counterpartName = getCounterpartName(trade, userId);
+    const youPay = getYouPay(trade, userId);
+    const youReceive = getYouReceive(trade, userId);
+    const paymentMethod = getPaymentMethod(trade);
+    const date = trade?.createdAt ? formatDate(trade.createdAt) : 'Unknown Date';
+    const tradeIcon = getTradeIcon(cryptoCurrency);
+    
+    return (
+      <div key={trade?.id || index} className="bg-[#1A1A1A] rounded-[12px] p-4 mb-4 border border-[#2D2D2D]">
+        <div className="flex justify-between items-start mb-3">
+          <div className="flex items-center gap-3">
+            {tradeIcon && (
+              <Image
+                src={tradeIcon}
+                alt={cryptoCurrency}
+                width={24}
+                height={24}
+              />
+            )}
+            <div>
+              <h3 className="text-[16px] font-[500] text-white">{displayType}</h3>
+              <p className="text-[12px] text-[#A3A3A3]">{date}</p>
+            </div>
+          </div>
+          <span
+            className={`px-3 py-1 rounded-full text-[12px] ${statusDisplay.bgColor} ${statusDisplay.textColor}`}
+          >
+            {statusDisplay.text}
+          </span>
+        </div>
+        
+        <div className="grid grid-cols-2 gap-3 mb-4">
+          <div>
+            <p className="text-[12px] text-[#A3A3A3] mb-1">You Pay</p>
+            <p className="text-[14px] font-[500] text-white">{youPay}</p>
+          </div>
+          <div>
+            <p className="text-[12px] text-[#A3A3A3] mb-1">You Receive</p>
+            <p className="text-[14px] font-[500] text-white">{youReceive}</p>
+          </div>
+          <div>
+            <p className="text-[12px] text-[#A3A3A3] mb-1">Payment Method</p>
+            <p className="text-[14px] font-[500] text-white">{paymentMethod}</p>
+          </div>
+          <div>
+            <p className="text-[12px] text-[#A3A3A3] mb-1">Counterparty</p>
+            <p className="text-[14px] font-[500] text-[#4DF2BE]">{counterpartName}</p>
+          </div>
+        </div>
+        
+        <button 
+          onClick={() => handleViewTrade(trade)}
+          className="w-full bg-[#2D2D2D] h-[36px] border-none text-[#FFFFFF] px-4 py-1 rounded-full text-[13px] hover:opacity-80 transition"
+        >
+          View Trade Details
+        </button>
+      </div>
+    );
+  };
+
   return (
-    <main className="min-h-screen bg-[#0F1012] text-white p-[20px] md:p-[40px]">
+    <main className="min-h-screen bg-[#0F1012] text-white px-4 sm:px-6 md:px-8 lg:p-[20px] xl:p-[40px]">
       <Nav />
 
-      <div className="max-w-7xl mx-auto mt-[40px]">
-        <div className="mb-4 p-3 bg-gray-800 rounded text-sm">
-          <div className="flex justify-between items-center">
+      <div className="max-w-7xl mx-auto mt-6 md:mt-[40px]">
+        {/* Debug info - Hidden on mobile */}
+        <div className="mb-4 p-3 bg-gray-800 rounded text-sm hidden md:block">
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3">
             <div>
               <p className="font-semibold">Trade History</p>
-              <p>Active: {activeTrades.length} | Completed: {completedTrades.length} | Total: {activeTrades.length + completedTrades.length}</p>
+              <p className="text-sm">Active: {activeTrades.length} | Completed: {completedTrades.length} | Total: {activeTrades.length + completedTrades.length}</p>
             </div>
             <button 
               onClick={() => window.location.reload()}
-              className="px-3 py-1 bg-green-700 hover:bg-green-600 rounded text-xs"
+              className="px-3 py-1 bg-green-700 hover:bg-green-600 rounded text-xs whitespace-nowrap"
             >
-              Refresh
+              Refresh Data
             </button>
           </div>
         </div>
 
-        <div className="flex bg-[#2D2D2D] rounded-[56px] w-[330px] h-[48px] p-1 items-center justify-between mb-[30px]">
+        {/* Mobile Stats */}
+        <div className="mb-6 md:hidden">
+          <div className="bg-[#1A1A1A] rounded-[12px] p-4">
+            <div className="flex justify-between items-center mb-2">
+              <h2 className="text-lg font-semibold">Trade History</h2>
+              <button 
+                onClick={() => window.location.reload()}
+                className="px-3 py-1 bg-green-700 hover:bg-green-600 rounded text-xs"
+              >
+                Refresh
+              </button>
+            </div>
+            <div className="grid grid-cols-3 gap-2 text-center">
+              <div className="bg-[#2D2D2D] rounded p-2">
+                <p className="text-sm text-[#C7C7C7]">Active</p>
+                <p className="text-lg font-bold text-white">{activeTrades.length}</p>
+              </div>
+              <div className="bg-[#2D2D2D] rounded p-2">
+                <p className="text-sm text-[#C7C7C7]">Completed</p>
+                <p className="text-lg font-bold text-white">{completedTrades.length}</p>
+              </div>
+              <div className="bg-[#2D2D2D] rounded p-2">
+                <p className="text-sm text-[#C7C7C7]">Total</p>
+                <p className="text-lg font-bold text-white">{activeTrades.length + completedTrades.length}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* ======= Tabs Section ======= */}
+        <div className="flex bg-[#2D2D2D] rounded-[56px] w-full max-w-[330px] h-[48px] p-1 items-center justify-between mb-6 md:mb-[30px] mx-auto">
+          {/* Active */}
           <div
             onClick={() => setActiveTab("active")}
-            className={`flex items-center justify-center gap-2 rounded-[56px] text-[16px] transition w-[150px] h-[40px] cursor-pointer ${
+            className={`flex items-center justify-center gap-2 rounded-[56px] text-[14px] md:text-[16px] transition w-[150px] h-[40px] cursor-pointer ${
               activeTab === "active"
                 ? "bg-[#4A4A4A] text-[#FCFCFC] font-[500]"
                 : "bg-transparent text-[#DBDBDB] font-[400]"
@@ -541,9 +639,10 @@ const Trade_History: React.FC = () => {
             </span>
           </div>
 
+          {/* Completed */}
           <div
             onClick={() => setActiveTab("completed")}
-            className={`flex items-center justify-center gap-2 rounded-[56px] text-[16px] transition w-[150px] h-[40px] cursor-pointer ${
+            className={`flex items-center justify-center gap-2 rounded-[56px] text-[14px] md:text-[16px] transition w-[150px] h-[40px] cursor-pointer ${
               activeTab === "completed"
                 ? "bg-[#4A4A4A] text-[#FCFCFC] font-[500]"
                 : "bg-transparent text-[#DBDBDB] font-[400]"
@@ -562,73 +661,109 @@ const Trade_History: React.FC = () => {
           </div>
         </div>
 
+        {/* ======= ACTIVE TAB ======= */}
         {activeTab === "active" && (
           <>
             {loading ? (
-              <p className="text-center text-[#8F8F8F] mt-10">Loading trades...</p>
+              <div className="flex justify-center items-center h-[300px]">
+                <div className="text-center">
+                  <div className="inline-block animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-[#4DF2BE] mb-4"></div>
+                  <p className="text-[#8F8F8F]">Loading trades...</p>
+                </div>
+              </div>
             ) : activeTrades.length === 0 ? (
-              <div className="flex flex-col items-center justify-center h-[400px] bg-[#1A1A1A] rounded-[12px]">
-                <Image src={G19} alt="group19" width={120} height={120} />
-                <p className="text-[16px] text-[#C7C7C7] mt-[16px]">No Active Trades</p>
+              <div className="flex flex-col items-center justify-center h-[400px] bg-[#1A1A1A] rounded-[12px] p-6">
+                <Image src={G19} alt="group19" width={120} height={120} className="w-20 h-20 md:w-24 md:h-24" />
+                <p className="text-[16px] md:text-[18px] text-[#C7C7C7] mt-4 md:mt-[16px] text-center">No Active Trades</p>
+                <p className="text-[14px] text-gray-500 mt-2 text-center max-w-md">
+                  You don't have any active trades at the moment.
+                </p>
               </div>
             ) : (
-              <div className="overflow-x-auto bg-[#1A1A1A] p-6 rounded-[12px] shadow-lg w-full max-w-[1224px]">
-                <table className="min-w-full text-left border-collapse">
-                  <thead>
-                    <tr className="text-[#C7C7C7] h-[35px] text-[14px] font-[500] border-b border-[#2D2D2D]">
-                      <th className="pl-[10px]">Trade Type</th>
-                      <th>Payment Method</th>
-                      <th>You Pay</th>
-                      <th>You Receive</th>
-                      <th>Counterparty</th>
-                      <th>Date</th>
-                      <th>Status</th>
-                      <th>Action</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {activeTrades.map(renderTradeRow)}
-                  </tbody>
-                </table>
-              </div>
+              <>
+                {/* Desktop Table View */}
+                <div className="hidden md:block overflow-x-auto bg-[#1A1A1A] p-6 rounded-[12px] shadow-lg w-full">
+                  <table className="min-w-full text-left border-collapse">
+                    <thead>
+                      <tr className="text-[#C7C7C7] h-[35px] text-[14px] font-[500] border-b border-[#2D2D2D]">
+                        <th className="pl-[10px]">Trade Type</th>
+                        <th>Payment Method</th>
+                        <th>You Pay</th>
+                        <th>You Receive</th>
+                        <th>Counterparty</th>
+                        <th>Date</th>
+                        <th>Status</th>
+                        <th>Action</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {activeTrades.map(renderTradeRow)}
+                    </tbody>
+                  </table>
+                </div>
+                
+                {/* Mobile Card View */}
+                <div className="md:hidden space-y-4">
+                  {activeTrades.map(renderMobileTradeCard)}
+                </div>
+              </>
             )}
           </>
         )}
 
+        {/* ======= COMPLETED TAB ======= */}
         {activeTab === "completed" && (
           <>
             {loading ? (
-              <p className="text-center text-[#8F8F8F] mt-10">Loading trades...</p>
+              <div className="flex justify-center items-center h-[300px]">
+                <div className="text-center">
+                  <div className="inline-block animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-[#4DF2BE] mb-4"></div>
+                  <p className="text-[#8F8F8F]">Loading trades...</p>
+                </div>
+              </div>
             ) : completedTrades.length === 0 ? (
-              <div className="flex flex-col items-center justify-center h-[400px] bg-[#1A1A1A] rounded-[12px]">
-                <Image src={G19} alt="group19" width={120} height={120} />
-                <p className="text-[16px] text-[#C7C7C7] mt-[16px]">No Completed Trades</p>
+              <div className="flex flex-col items-center justify-center h-[400px] bg-[#1A1A1A] rounded-[12px] p-6">
+                <Image src={G19} alt="group19" width={120} height={120} className="w-20 h-20 md:w-24 md:h-24" />
+                <p className="text-[16px] md:text-[18px] text-[#C7C7C7] mt-4 md:mt-[16px] text-center">No Completed Trades</p>
+                <p className="text-[14px] text-gray-500 mt-2 text-center max-w-md">
+                  You haven't completed any trades yet.
+                </p>
               </div>
             ) : (
-              <div className="overflow-x-auto bg-[#1A1A1A] p-6 rounded-[12px] shadow-lg w-full max-w-[1224px]">
-                <table className="min-w-full text-left border-collapse">
-                  <thead>
-                    <tr className="text-[#C7C7C7] h-[35px] text-[14px] font-[500] border-b border-[#2D2D2D]">
-                      <th className="pl-[10px]">Trade Type</th>
-                      <th>Payment Method</th>
-                      <th>You Pay</th>
-                      <th>You Receive</th>
-                      <th>Counterparty</th>
-                      <th>Date</th>
-                      <th>Status</th>
-                      <th>Action</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {completedTrades.map(renderTradeRow)}
-                  </tbody>
-                </table>
-              </div>
+              <>
+                {/* Desktop Table View */}
+                <div className="hidden md:block overflow-x-auto bg-[#1A1A1A] p-6 rounded-[12px] shadow-lg w-full">
+                  <table className="min-w-full text-left border-collapse">
+                    <thead>
+                      <tr className="text-[#C7C7C7] h-[35px] text-[14px] font-[500] border-b border-[#2D2D2D]">
+                        <th className="pl-[10px]">Trade Type</th>
+                        <th>Payment Method</th>
+                        <th>You Pay</th>
+                        <th>You Receive</th>
+                        <th>Counterparty</th>
+                        <th>Date</th>
+                        <th>Status</th>
+                        <th>Action</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {completedTrades.map(renderTradeRow)}
+                    </tbody>
+                  </table>
+                </div>
+                
+                {/* Mobile Card View */}
+                <div className="md:hidden space-y-4">
+                  {completedTrades.map(renderMobileTradeCard)}
+                </div>
+              </>
             )}
           </>
         )}
       </div>
-  <div className="w-[100%]  h-[1px] bg-[#fff] mt-[50%] opacity-20 my-8"></div>
+      
+      {/* Divider - Responsive spacing */}
+         <div className="w-[100%]  h-[1px] bg-[#fff] mt-[50%] opacity-20 my-8"></div>
         
                 <div className=" mb-[80px] mt-[10%] ">
                   <Footer />
