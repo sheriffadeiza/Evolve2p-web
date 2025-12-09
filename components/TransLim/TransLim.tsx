@@ -1,7 +1,6 @@
 'use client';
 import Nav from "../NAV/Nav";
 import Settings from "../../components/Settings/Settings";
-import Image from "next/image"; 
 import React, {useState, useEffect} from 'react'
 import Footer from "../../components/Footer/Footer";
 
@@ -9,8 +8,7 @@ const TransLim: React.FC = () => {
   const [activeTab, setActiveTab] = useState<"withdrawal" | "deposit">("withdrawal");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [withdrawalLimits, setWithdrawalLimits] = useState<any>(null);
-  const [depositLimits, setDepositLimits] = useState<any>(null);
+  const [settingsData, setSettingsData] = useState<any>(null);
 
   const tabs = [
     { label: "Withdrawal", key: "withdrawal" },
@@ -18,7 +16,7 @@ const TransLim: React.FC = () => {
   ];
 
   useEffect(() => {
-    const fetchLimits = async () => {
+    const fetchSettings = async () => {
       setLoading(true);
       setError(null);
       try {
@@ -34,62 +32,34 @@ const TransLim: React.FC = () => {
           }
         }
 
-        const [withdrawalRes, depositRes] = await Promise.all([
-          fetch("https://evolve2p-backend.onrender.com/api/admin/settings/withdrawalLimit", {
-            method: "GET",
-            headers: {
-              "Content-Type": "application/json",
-              ...(token && { "Authorization": `Bearer ${token}` })
-            },
-          }),
-          fetch("https://evolve2p-backend.onrender.com/api/admin/settings/depositLimit", {
-            method: "GET",
-            headers: {
-              "Content-Type": "application/json",
-              ...(token && { "Authorization": `Bearer ${token}` })
-            },
-          })
-        ]);
+        const response = await fetch("https://evolve2p-backend.onrender.com/api/admin/settings", {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+            ...(token && { "Authorization": `Bearer ${token}` })
+          },
+        });
 
-        if (!withdrawalRes.ok || !depositRes.ok) {
-          throw new Error("Failed to fetch limits");
+        if (!response.ok) {
+          throw new Error(`Failed to fetch settings: ${response.status}`);
         }
 
-        const withdrawalData = await withdrawalRes.json();
-        const depositData = await depositRes.json();
-
-        setWithdrawalLimits(withdrawalData);
-        setDepositLimits(depositData);
+        const data = await response.json();
+        setSettingsData(data);
+        
       } catch (err) {
-        console.error("Error fetching limits:", err);
-        setError("Failed to load transaction limits. Please try again.");
-        
-        // Fallback data for UI demonstration
-        setWithdrawalLimits({
-          dailyLimit: 148500,
-          dailyRemaining: 1485000,
-          monthlyLimit: 1485000,
-          monthlyRemaining: 1485000,
-          refreshTime: "10 minutes"
-        });
-        
-        setDepositLimits({
-          dailyLimit: 250000,
-          dailyRemaining: 2000000,
-          monthlyLimit: 3000000,
-          monthlyRemaining: 3000000,
-          refreshTime: "10 minutes"
-        });
+        console.error("Error fetching settings:", err);
+        setError("Failed to load transaction limits. Please try again later.");
       } finally {
         setLoading(false);
       }
     };
 
-    fetchLimits();
+    fetchSettings();
   }, []);
 
   const formatCurrency = (amount: number | undefined) => {
-    if (amount === undefined) return "$0";
+    if (amount === undefined || amount === null) return "$0";
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
       currency: 'USD',
@@ -98,11 +68,64 @@ const TransLim: React.FC = () => {
     }).format(amount);
   };
 
-  const calculatePercentage = (remaining: number, total: number) => {
-    if (!total || total === 0) return 0;
+  const calculatePercentage = (remaining: number | undefined, total: number | undefined) => {
+    if (!total || total === 0 || !remaining || remaining === undefined) return 0;
     const used = total - remaining;
     return Math.min((used / total) * 100, 100);
   };
+
+  // Helper function to extract withdrawal limits from settings
+  const getWithdrawalLimits = () => {
+    if (!settingsData) return null;
+    
+    // Try different possible response structures
+    if (settingsData.withdrawalLimits) {
+      return settingsData.withdrawalLimits;
+    } else if (settingsData.withdrawal) {
+      return settingsData.withdrawal;
+    } else if (settingsData.limits?.withdrawal) {
+      return settingsData.limits.withdrawal;
+    } else if (settingsData.data?.withdrawalLimits) {
+      return settingsData.data.withdrawalLimits;
+    }
+    
+    // If API returns directly with property names
+    return {
+      dailyLimit: settingsData.dailyWithdrawalLimit,
+      dailyRemaining: settingsData.dailyWithdrawalRemaining,
+      monthlyLimit: settingsData.monthlyWithdrawalLimit,
+      monthlyRemaining: settingsData.monthlyWithdrawalRemaining,
+      refreshTime: settingsData.refreshTime
+    };
+  };
+
+  // Helper function to extract deposit limits from settings
+  const getDepositLimits = () => {
+    if (!settingsData) return null;
+    
+    // Try different possible response structures
+    if (settingsData.depositLimits) {
+      return settingsData.depositLimits;
+    } else if (settingsData.deposit) {
+      return settingsData.deposit;
+    } else if (settingsData.limits?.deposit) {
+      return settingsData.limits.deposit;
+    } else if (settingsData.data?.depositLimits) {
+      return settingsData.data.depositLimits;
+    }
+    
+    // If API returns directly with property names
+    return {
+      dailyLimit: settingsData.dailyDepositLimit,
+      dailyRemaining: settingsData.dailyDepositRemaining,
+      monthlyLimit: settingsData.monthlyDepositLimit,
+      monthlyRemaining: settingsData.monthlyDepositRemaining,
+      refreshTime: settingsData.refreshTime
+    };
+  };
+
+  const withdrawalLimits = getWithdrawalLimits();
+  const depositLimits = getDepositLimits();
 
   if (loading) {
     return (
@@ -205,8 +228,8 @@ const TransLim: React.FC = () => {
                         className="h-2 bg-[#4DF2BE] rounded-full transition-all duration-500"
                         style={{ 
                           width: `${calculatePercentage(
-                            withdrawalLimits?.dailyRemaining || 1485000, 
-                            withdrawalLimits?.dailyLimit || 148500
+                            withdrawalLimits?.dailyRemaining, 
+                            withdrawalLimits?.dailyLimit
                           )}%` 
                         }}
                       ></div>
@@ -214,7 +237,7 @@ const TransLim: React.FC = () => {
 
                     <div className="flex flex-col sm:flex-row justify-between mt-3 md:mt-[10px] text-xs md:text-[13px] text-[#B5B5B5] gap-2">
                       <span>{formatCurrency(withdrawalLimits?.dailyRemaining)} remaining</span>
-                      <span>Refreshes in {withdrawalLimits?.refreshTime || "10 minutes"}</span>
+                      <span>Refreshes in {withdrawalLimits?.refreshTime || "N/A"}</span>
                     </div>
                   </div>
 
@@ -234,8 +257,8 @@ const TransLim: React.FC = () => {
                         className="h-2 bg-[#4DF2BE] rounded-full transition-all duration-500"
                         style={{ 
                           width: `${calculatePercentage(
-                            withdrawalLimits?.monthlyRemaining || 1485000, 
-                            withdrawalLimits?.monthlyLimit || 1485000
+                            withdrawalLimits?.monthlyRemaining, 
+                            withdrawalLimits?.monthlyLimit
                           )}%` 
                         }}
                       ></div>
@@ -243,7 +266,7 @@ const TransLim: React.FC = () => {
 
                     <div className="flex flex-col sm:flex-row justify-between mt-3 md:mt-[10px] text-xs md:text-[13px] text-[#B5B5B5] gap-2">
                       <span>{formatCurrency(withdrawalLimits?.monthlyRemaining)} remaining</span>
-                      <span>Refreshes in {withdrawalLimits?.refreshTime || "10 minutes"}</span>
+                      <span>Refreshes in {withdrawalLimits?.refreshTime || "N/A"}</span>
                     </div>
                   </div>
                 </div>
@@ -270,8 +293,8 @@ const TransLim: React.FC = () => {
                         className="h-2 bg-[#4DF2BE] rounded-full transition-all duration-500"
                         style={{ 
                           width: `${calculatePercentage(
-                            depositLimits?.dailyRemaining || 2000000, 
-                            depositLimits?.dailyLimit || 250000
+                            depositLimits?.dailyRemaining, 
+                            depositLimits?.dailyLimit
                           )}%` 
                         }}
                       ></div>
@@ -279,7 +302,7 @@ const TransLim: React.FC = () => {
 
                     <div className="flex flex-col sm:flex-row justify-between mt-3 md:mt-[10px] text-xs md:text-[13px] text-[#B5B5B5] gap-2">
                       <span>{formatCurrency(depositLimits?.dailyRemaining)} remaining</span>
-                      <span>Refreshes in {depositLimits?.refreshTime || "10 minutes"}</span>
+                      <span>Refreshes in {depositLimits?.refreshTime || "N/A"}</span>
                     </div>
                   </div>
 
@@ -299,8 +322,8 @@ const TransLim: React.FC = () => {
                         className="h-2 bg-[#4DF2BE] rounded-full transition-all duration-500"
                         style={{ 
                           width: `${calculatePercentage(
-                            depositLimits?.monthlyRemaining || 3000000, 
-                            depositLimits?.monthlyLimit || 3000000
+                            depositLimits?.monthlyRemaining, 
+                            depositLimits?.monthlyLimit
                           )}%` 
                         }}
                       ></div>
@@ -308,7 +331,7 @@ const TransLim: React.FC = () => {
 
                     <div className="flex flex-col sm:flex-row justify-between mt-3 md:mt-[10px] text-xs md:text-[13px] text-[#B5B5B5] gap-2">
                       <span>{formatCurrency(depositLimits?.monthlyRemaining)} remaining</span>
-                      <span>Refreshes in {depositLimits?.refreshTime || "10 minutes"}</span>
+                      <span>Refreshes in {depositLimits?.refreshTime || "N/A"}</span>
                     </div>
                   </div>
                 </div>
@@ -317,14 +340,14 @@ const TransLim: React.FC = () => {
           </div>
         </div>
 
-         <div className="w-[100%]  h-[1px] bg-[#fff] mt-[50%] opacity-20 my-8"></div>
+        <div className="w-[100%]  h-[1px] bg-[#fff] mt-[50%] opacity-20 my-8"></div>
         
-                <div className=" mb-[80px] mt-[10%] ">
-                  <Footer />
-                </div>
+        <div className="mb-[80px] mt-[10%]">
+          <Footer />
+        </div>
       </div>
     </main>
   )
 }
 
-export default TransLim
+export default TransLim;

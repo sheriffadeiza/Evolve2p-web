@@ -1,4 +1,4 @@
-"use client";
+'use client';
 
 import React, { useState, useEffect } from "react";
 import Nav from "../../components/NAV/Nav";
@@ -421,29 +421,28 @@ const Trade_History: React.FC = () => {
     const isBuyer = trade.buyerId === userId || trade.buyer?.id === userId;
     
     if (isBuyer) {
+      // Buyer pays fiat (USD)
       const amount = trade.amountFiat || trade.fiatAmount || trade.price || 0;
-      const currency = getFiatCurrency(trade);
-      return formatAmount(amount, currency);
+      return `$${amount.toFixed(2)}`;
     } else {
-      const amount = trade.amountCrypto || trade.cryptoAmount || trade.amount || 0;
-      const currency = getCryptoCurrency(trade);
-      return formatAmount(amount, currency);
+      // Seller receives fiat (USD) - but in "You Pay" column, we show what they're giving
+      // Actually seller gives crypto, but since "You Receive" shows crypto, let's show fiat here
+      const amount = trade.amountFiat || trade.fiatAmount || trade.price || 0;
+      return `$${amount.toFixed(2)}`;
     }
   };
 
   const getYouReceive = (trade: Trade, userId?: string): string => {
     if (!trade || !userId) return "Unknown";
     
-    const isBuyer = trade.buyerId === userId || trade.buyer?.id === userId;
+    const cryptoCurrency = getCryptoCurrency(trade);
+    const amount = trade.amountCrypto || trade.cryptoAmount || trade.amount || 0;
     
-    if (isBuyer) {
-      const amount = trade.amountCrypto || trade.cryptoAmount || trade.amount || 0;
-      const currency = getCryptoCurrency(trade);
-      return formatAmount(amount, currency);
+    // Always show the crypto amount in "You Receive" column
+    if (cryptoCurrency === 'BTC' || cryptoCurrency === 'ETH') {
+      return `${amount.toFixed(6)} ${cryptoCurrency}`;
     } else {
-      const amount = trade.amountFiat || trade.fiatAmount || trade.price || 0;
-      const currency = getFiatCurrency(trade);
-      return formatAmount(amount, currency);
+      return `${amount.toFixed(2)} ${cryptoCurrency}`;
     }
   };
 

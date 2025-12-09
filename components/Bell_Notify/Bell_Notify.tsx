@@ -629,12 +629,13 @@ const Bell_Notify = () => {
           </div>
         )}
 
-        <div className="w-[100%] h-[1px] bg-[#fff] mt-[50%] opacity-20 my-8"></div>
+        
+      </div>
+      <div className="w-[50%] ml-[30%] h-[1px] bg-[#fff] mt-[50%] opacity-20 my-8"></div>
               
-        <div className="mb-[80px]  mt-[10%]">
+        <div className="mb-[80px] p-[50px] mt-[10%]">
           <Footer />
         </div>
-      </div>
     </main>
   );
 };
