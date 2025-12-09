@@ -7,6 +7,7 @@ import Nav from "../../components/NAV/Nav";
 import Parrow from "../../public/Assets/Evolve2p_pArrow/elements.svg";
 import icon_i from "../../public/Assets/Evolve2p_i/Dashboard/elements.svg";
 import SlashH from "../../public/Assets/Evolve2p_viewslash/view-off-slash.png";
+import ViewIcon from "../../public/Assets/Evolve2p_viewslash/view-off-slash.png";
 import Send from "../../public/Assets/Evolve2p_send/Dashboard/elements.svg";
 import Barrow from "../../public/Assets/Evolve2p_Barrow/arrow-down-01.svg";
 import Rarrowd from "../../public/Assets/Evolve2p_Rarrowd/arrow-down-right-01.svg";
@@ -27,7 +28,6 @@ import Refer from "../../public/Assets/Evolve2p_Refer/elements.svg";
 import Times from "../../public/Assets/Evolve2p_times/Icon container.png";
 import checklistInactive from "../../public/Assets/Evolve2p_checklist2/checklist-inactive.svg";
 import { QRCodeCanvas } from "qrcode.react";
-import Link from "next/link";
 import Yellow_i from "../../public/Assets/Evolve2p_yellowi/elements.svg";
 import Copy from "../../public/Assets/Evolve2p_code/elements.svg";
 import Share from "../../public/Assets/Evolve2p_share/elements.svg";
@@ -79,16 +79,15 @@ const CryptoPriceService = {
 
   async getUSDToNGNRate() {
     try {
-      // Using a free forex API for USD to NGN conversion
       const response = await fetch('https://api.exchangerate-api.com/v4/latest/USD');
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
       const data = await response.json();
-      return data.rates.NGN || 1500; // Fallback to 1500 if API fails
+      return data.rates.NGN || 1500;
     } catch (error) {
       console.error('Error fetching USD to NGN rate:', error);
-      return 1500; // Fallback rate
+      return 1500;
     }
   }
 };
@@ -106,6 +105,7 @@ const Dashboard: React.FC<QRCodeBoxProps> = ({ value }) => {
   const [currentWallet, setCurrentWallet] = useState<Wallet | null>(null);
   const [currentCoin, setCurrentCoin] = useState("");
   const [showBalance, setShowBalance] = useState(true);
+  const [showAllBalances, setShowAllBalances] = useState(true);
   const [isTransOpen, setIsTransOpen] = useState(false);
   const [selectedCurrency, setSelectedCurrency] = useState<Currency>(currencies[0]);
   const [totalBalanceUSD, setTotalBalanceUSD] = useState<number>(0);
@@ -114,19 +114,16 @@ const Dashboard: React.FC<QRCodeBoxProps> = ({ value }) => {
   const [usdToNgnRate, setUsdToNgnRate] = useState<number>(1500);
   const [loadingPrices, setLoadingPrices] = useState(true);
   
-  // Safe number conversion helper
   const safeNumber = (value: any): number => {
     if (value === null || value === undefined) return 0;
     const num = Number(value);
     return isNaN(num) ? 0 : num;
   };
 
-  // Fetch crypto prices and conversion rates
   useEffect(() => {
     const fetchAllPrices = async () => {
       setLoadingPrices(true);
       try {
-        // Fetch crypto prices in USD
         const [cryptoPricesData, ngnRate] = await Promise.all([
           CryptoPriceService.getMultipleCryptoPrices(
             ['bitcoin', 'ethereum', 'tether', 'usd-coin'],
@@ -139,7 +136,6 @@ const Dashboard: React.FC<QRCodeBoxProps> = ({ value }) => {
         setUsdToNgnRate(ngnRate);
       } catch (error) {
         console.error('Error fetching prices:', error);
-        // Set fallback prices in case of API failure
         setCryptoPrices({
           bitcoin: { usd: 50000 },
           ethereum: { usd: 3000 },
@@ -153,11 +149,10 @@ const Dashboard: React.FC<QRCodeBoxProps> = ({ value }) => {
     };
 
     fetchAllPrices();
-    const interval = setInterval(fetchAllPrices, 60000); // Refresh every minute
+    const interval = setInterval(fetchAllPrices, 60000);
     return () => clearInterval(interval);
   }, []);
 
-  // Calculate total balance in USD
   useEffect(() => {
     if (clientUser?.wallets && Object.keys(cryptoPrices).length > 0) {
       let totalUSD = 0;
@@ -190,7 +185,6 @@ const Dashboard: React.FC<QRCodeBoxProps> = ({ value }) => {
     }
   }, [clientUser, cryptoPrices]);
 
-  // Convert balance to selected currency
   useEffect(() => {
     if (totalBalanceUSD > 0) {
       let convertedValue = 0;
@@ -212,7 +206,6 @@ const Dashboard: React.FC<QRCodeBoxProps> = ({ value }) => {
           convertedValue = totalBalanceUSD;
       }
 
-      // Format based on currency type
       if (selectedCurrency.name === 'BTC' || selectedCurrency.name === 'ETH') {
         setConvertedBalance(convertedValue.toFixed(8));
       } else {
@@ -231,7 +224,10 @@ const Dashboard: React.FC<QRCodeBoxProps> = ({ value }) => {
   const toggleVerifyModal = () => setShowVerifyModal(!showVerifyModal);
   const toggleDropdown = () => setOpen((prev) => !prev);
   const toggleReceiveDropdown = () => setIsReceiveOpen((prev) => !prev);
-  const toggleVissibility = () => setShowBalance(!showBalance);
+  const toggleVisibility = () => {
+    setShowBalance(!showBalance);
+    setShowAllBalances(!showAllBalances);
+  };
   const toggleTransDropdown = () => setIsTransOpen((prev) => !prev);
 
   const handleReceiveClick = (symbol: string) => {
@@ -287,7 +283,6 @@ const Dashboard: React.FC<QRCodeBoxProps> = ({ value }) => {
     setMyDate(new Date().toLocaleString());
   }, []);
 
-  // Get wallet balance in USD for individual assets
   const getWalletBalanceUSD = (wallet: Wallet): number => {
     const walletBalance = safeNumber(wallet.balance);
     
@@ -305,7 +300,6 @@ const Dashboard: React.FC<QRCodeBoxProps> = ({ value }) => {
     }
   };
 
-  // Format balance with appropriate decimal places
   const formatBalance = (balance: number, currency: string): string => {
     const safeBalance = safeNumber(balance);
     
@@ -319,7 +313,6 @@ const Dashboard: React.FC<QRCodeBoxProps> = ({ value }) => {
     return safeBalance.toFixed(2);
   };
 
-  // Get current price for display
   const getCurrentPrice = (symbol: string): string => {
     switch (symbol.toLowerCase()) {
       case 'btc':
@@ -411,25 +404,26 @@ const Dashboard: React.FC<QRCodeBoxProps> = ({ value }) => {
 
         {/* Balance Cards Section */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6 mt-6 md:mt-8">
-          {/* Available Balance Card */}
           <div className="bg-[#222222] rounded-[12px] p-4 sm:p-6">
             <div className="flex items-center justify-between mb-4 sm:mb-6">
               <p className="text-[14px] sm:text-[16px] font-[400] text-[#DBDBDB]">
                 Available Balance
               </p>
-              <Image
-                onClick={toggleVissibility}
-                src={SlashH}
-                alt="slash"
-                width={20}
-                height={20}
-                className="cursor-pointer w-5 h-5 sm:w-6 sm:h-6"
-              />
+              <div className="flex items-center cursor-pointer" onClick={toggleVisibility}>
+                <Image
+                  src={showBalance ? SlashH : ViewIcon}
+                  alt={showBalance ? "hide" : "show"}
+                  width={20}
+                  height={20}
+                  className="w-5 h-5 sm:w-6 sm:h-6"
+                />
+                <span className="text-[12px] sm:text-[14px] ml-2 text-[#DBDBDB]">
+                  {showBalance ? "Hide Balances" : "Show Balances"}
+                </span>
+              </div>
             </div>
             
-            {/* Balance and Currency Selector - Responsive Layout */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
-              {/* Balance Display */}
               <div className="flex items-baseline space-x-2">
                 <span className="text-[24px] sm:text-[28px] font-[700] text-[#FCFCFC]">
                   {selectedCurrency.symbol}
@@ -439,7 +433,6 @@ const Dashboard: React.FC<QRCodeBoxProps> = ({ value }) => {
                 </span>
               </div>
               
-              {/* Currency Dropdown */}
               <div className="relative self-start sm:self-auto">
                 <div 
                   className="flex items-center bg-[#2D2D2D] px-3 py-2 sm:px-4 sm:py-2 rounded-full cursor-pointer min-w-[90px] sm:min-w-[100px]"
@@ -478,7 +471,6 @@ const Dashboard: React.FC<QRCodeBoxProps> = ({ value }) => {
               </div>
             </div>
 
-            {/* Action Buttons - Responsive Layout */}
             <div className="flex flex-col xs:flex-row gap-3">
               <div className="relative">
                 <button 
@@ -552,11 +544,12 @@ const Dashboard: React.FC<QRCodeBoxProps> = ({ value }) => {
             </div>
           </div>
 
-          {/* Daily Limit Card */}
           <div className="bg-[#222222] rounded-[12px] p-4 sm:p-6">
             <div className="mb-4">
               <p className="text-[14px] sm:text-[16px] font-[400] text-[#DBDBDB]">Daily Limit</p>
-              <p className="text-[16px] sm:text-[18px] font-[500] text-[#FCFCFC]">$14,850,000</p>
+              <p className="text-[16px] sm:text-[18px] font-[500] text-[#FCFCFC]">
+                {showAllBalances ? "$14,850,000" : "****"}
+              </p>
             </div>
 
             <div className="w-full bg-[#4A4A4A] rounded-[4px] h-2 mb-2">
@@ -564,7 +557,9 @@ const Dashboard: React.FC<QRCodeBoxProps> = ({ value }) => {
             </div>
 
             <div className="flex flex-col xs:flex-row xs:justify-between text-[12px] sm:text-[14px] font-[400] text-[#DBDBDB] mb-4 gap-1">
-              <p>$14,850,000 remaining</p>
+              <p>
+                {showAllBalances ? "$14,850,000 remaining" : "**** remaining"}
+              </p>
               <p>Refreshes in 10 minutes</p>
             </div>
 
@@ -574,138 +569,121 @@ const Dashboard: React.FC<QRCodeBoxProps> = ({ value }) => {
           </div>
         </div>
 
-        {/* Main Content Grid - Assets with Todo List on the side */}
-        <div className="flex flex-col xl:flex-row gap-6 sm:gap-8 mt-8 md:mt-12">
-          {/* Left Column - Assets Section */}
-          <div className="flex-1">
-            {/* My Assets Header with Todo List title */}
-            <div className="flex flex-col xl:flex-row xl:items-center justify-between mb-4 md:mb-6 gap-4">
-              <div className="flex justify-between items-center">
+        {/* My Assets Section with Todo List on the side */}
+        <div className="mt-8 md:mt-12">
+          <div className="flex flex-col lg:flex-row lg:items-start gap-6">
+            {/* My Assets - Main content (takes 2/3 width on large screens) */}
+            <div className="lg:flex-1">
+              <div className="flex justify-between items-center mb-4 md:mb-6">
                 <p className="text-[14px] sm:text-[16px] font-[500] text-[#8F8F8F]">My Assets</p>
-                <button className="flex xl:hidden items-center text-[12px] sm:text-[14px] font-[700] text-[#FCFCFC]">
+                <button className="flex items-center text-[12px] sm:text-[14px] font-[700] text-[#FCFCFC]">
                   See all
                   <Image src={R_arrow} alt="arrow" width={14} height={14} className="ml-1 sm:ml-2 w-3 h-3 sm:w-4 sm:h-4" />
                 </button>
               </div>
-              
-              {/* Todo List title for desktop view */}
-              <p className="text-[14px] sm:text-[16px] font-[500] text-[#8F8F8F] hidden xl:block">
-                Todo list
-              </p>
-              
-              <button className="hidden xl:flex items-center text-[12px] sm:text-[14px] font-[700] text-[#FCFCFC]">
-                See all
-                <Image src={R_arrow} alt="arrow" width={14} height={14} className="ml-1 sm:ml-2 w-3 h-3 sm:w-4 sm:h-4" />
-              </button>
-            </div>
 
-            {/* Assets and Todo List side by side */}
-            <div className="flex flex-col xl:flex-row gap-6 sm:gap-8">
-              {/* Assets Grid - Takes 2/3 width on large screens */}
-              <div className="xl:flex-1">
-                <div className="grid grid-cols-1 gap-3 md:gap-4">
-                  {cryptoAssets.map((asset) => {
-                    const wallet = clientUser?.wallets?.find((w: any) => 
-                      w.currency?.toUpperCase() === asset.symbol.toUpperCase()
-                    );
-                    const walletBalance = safeNumber(wallet?.balance);
-                    const usdValue = getWalletBalanceUSD(wallet || { currency: asset.symbol, balance: 0 } as Wallet);
+              <div className="grid grid-cols-1 gap-3 md:gap-4">
+                {cryptoAssets.map((asset) => {
+                  const wallet = clientUser?.wallets?.find((w: any) => 
+                    w.currency?.toUpperCase() === asset.symbol.toUpperCase()
+                  );
+                  const walletBalance = safeNumber(wallet?.balance);
+                  const usdValue = getWalletBalanceUSD(wallet || { currency: asset.symbol, balance: 0 } as Wallet);
 
-                    return (
-                      <div key={asset.symbol} className="bg-[#222222] rounded-[12px] p-3 md:p-4">
-                        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 md:gap-4">
-                          <div className="flex items-center space-x-3 md:space-x-4 flex-1">
-                            <Image src={asset.icon} alt={asset.name} width={32} height={32} className="w-8 h-8 md:w-10 md:h-10" />
-                            <div className="min-w-0 flex-1">
-                              <p className="text-[14px] md:text-[16px] font-[700] text-[#FCFCFC] truncate">{asset.name}</p>
-                              <p className="text-[12px] md:text-[14px] font-[400] text-[#8F8F8F] truncate">
-                                {getCurrentPrice(asset.symbol)}
-                              </p>
-                            </div>
-                          </div>
-
-                          <div className="flex items-center md:space-x-8 flex-1 justify-start md:justify-center">
-                            <div className="text-right md:text-center">
-                              <p className="text-[12px] md:text-[14px] font-[500] text-[#FCFCFC]">
-                                {formatBalance(walletBalance, asset.symbol)}
-                              </p>
-                              <p className="text-[10px] md:text-[12px] font-[500] text-[#DBDBDB]">
-                                {asset.symbol}
-                              </p>
-                            </div>
-                          </div>
-
-                          <div className="flex items-center md:space-x-8 flex-1 justify-start md:justify-end">
-                            <div className="text-right">
-                              <div className="flex items-baseline space-x-1">
-                                <span className="text-[10px] md:text-[12px] font-[500] text-[#DBDBDB]">$</span>
-                                <span className="text-[12px] md:text-[14px] font-[500] text-[#FCFCFC]">
-                                  {usdValue.toFixed(2)}
-                                </span>
-                              </div>
-                            </div>
-                          </div>
-
-                          <div className="flex items-center space-x-2 flex-wrap gap-2">
-                            <button 
-                              className="bg-[#2D2D2D] text-[#DBDBDB] px-2 py-1 md:px-3 md:py-2 rounded-full text-[10px] md:text-[14px] font-[500] min-w-[70px] md:min-w-[85px] flex items-center justify-center"
-                              onClick={() => handleSendClick(asset.symbol)}
-                            >
-                              <Image src={Send} alt="send" width={10} height={10} className="mr-1 md:mr-2 w-2 h-2 md:w-3 md:h-3" />
-                              Send
-                            </button>
-                            <button 
-                              className="bg-[#2D2D2D] text-[#DBDBDB] px-2 py-1 md:px-3 md:py-2 rounded-full text-[10px] md:text-[14px] font-[500] min-w-[80px] md:min-w-[101px] flex items-center justify-center"
-                              onClick={() => handleReceiveClick(asset.symbol)}
-                            >
-                              <Image src={Rarrowd} alt="receive" width={10} height={10} className="mr-1 md:mr-2 w-2 h-2 md:w-3 md:h-3" />
-                              Receive
-                            </button>
-                            <button 
-                              className="bg-[#2D2D2D] text-[#DBDBDB] px-2 py-1 md:px-3 md:py-2 rounded-full text-[10px] md:text-[14px] font-[500] min-w-[70px] md:min-w-[87px] flex items-center justify-center"
-                              onClick={() => handleSwapClick(asset.symbol)}
-                            >
-                              <Image src={Swap} alt="swap" width={10} height={10} className="mr-1 md:mr-2 w-2 h-2 md:w-3 md:h-3" />
-                              Swap
-                            </button>
+                  return (
+                    <div key={asset.symbol} className="bg-[#222222] rounded-[12px] p-3 md:p-4">
+                      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 md:gap-4">
+                        <div className="flex items-center space-x-3 md:space-x-4 flex-1">
+                          <Image src={asset.icon} alt={asset.name} width={32} height={32} className="w-8 h-8 md:w-10 md:h-10" />
+                          <div className="min-w-0 flex-1">
+                            <p className="text-[14px] md:text-[16px] font-[700] text-[#FCFCFC] truncate">{asset.name}</p>
+                            <p className="text-[12px] md:text-[14px] font-[400] text-[#8F8F8F] truncate">
+                              {getCurrentPrice(asset.symbol)}
+                            </p>
                           </div>
                         </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
 
-              {/* Todo List - Takes 1/3 width on large screens */}
-              <div className="xl:w-96">
-                {/* Todo List title for mobile/tablet view */}
-                <p className="text-[14px] sm:text-[16px] font-[500] text-[#8F8F8F] mb-3 sm:mb-4 xl:hidden">
-                  Todo list
-                </p>
-                
-                <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-1 gap-2 sm:gap-3">
-                  {todoItems.map((item, index) => (
-                    <div key={index} className="bg-[#222222] rounded-lg p-2 sm:p-3 flex items-center gap-2 sm:gap-3 cursor-pointer hover:bg-[#2A2A2A] transition-colors">
-                      <div className="relative w-8 h-8 sm:w-10 sm:h-10 flex items-center justify-center flex-shrink-0">
-                        <Image src={Eclipse} alt="background" width={32} height={32} className="w-8 h-8 sm:w-10 sm:h-10" />
-                        <Image 
-                          src={item.icon} 
-                          alt={item.title} 
-                          width={16}
-                          height={16}
-                          className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-4 h-4 sm:w-5 sm:h-5"
-                        />
+                        <div className="flex items-center md:space-x-8 flex-1 justify-start md:justify-center">
+                          <div className="text-right md:text-center">
+                            <p className="text-[12px] md:text-[14px] font-[500] text-[#FCFCFC]">
+                              {showAllBalances ? formatBalance(walletBalance, asset.symbol) : "****"}
+                            </p>
+                            <p className="text-[10px] md:text-[12px] font-[500] text-[#DBDBDB]">
+                              {asset.symbol}
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center md:space-x-8 flex-1 justify-start md:justify-end">
+                          <div className="text-right">
+                            <div className="flex items-baseline space-x-1">
+                              <span className="text-[10px] md:text-[12px] font-[500] text-[#DBDBDB]">$</span>
+                              <span className="text-[12px] md:text-[14px] font-[500] text-[#FCFCFC]">
+                                {showAllBalances ? usdValue.toFixed(2) : "****"}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center space-x-2 flex-wrap gap-2">
+                          <button 
+                            className="bg-[#2D2D2D] text-[#DBDBDB] px-2 py-1 md:px-3 md:py-2 rounded-full text-[10px] md:text-[14px] font-[500] min-w-[70px] md:min-w-[85px] flex items-center justify-center"
+                            onClick={() => handleSendClick(asset.symbol)}
+                          >
+                            <Image src={Send} alt="send" width={10} height={10} className="mr-1 md:mr-2 w-2 h-2 md:w-3 md:h-3" />
+                            Send
+                          </button>
+                          <button 
+                            className="bg-[#2D2D2D] text-[#DBDBDB] px-2 py-1 md:px-3 md:py-2 rounded-full text-[10px] md:text-[14px] font-[500] min-w-[80px] md:min-w-[101px] flex items-center justify-center"
+                            onClick={() => handleReceiveClick(asset.symbol)}
+                          >
+                            <Image src={Rarrowd} alt="receive" width={10} height={10} className="mr-1 md:mr-2 w-2 h-2 md:w-3 md:h-3" />
+                            Receive
+                          </button>
+                          <button 
+                            className="bg-[#2D2D2D] text-[#DBDBDB] px-2 py-1 md:px-3 md:py-2 rounded-full text-[10px] md:text-[14px] font-[500] min-w-[70px] md:min-w-[87px] flex items-center justify-center"
+                            onClick={() => handleSwapClick(asset.symbol)}
+                          >
+                            <Image src={Swap} alt="swap" width={10} height={10} className="mr-1 md:mr-2 w-2 h-2 md:w-3 md:h-3" />
+                            Swap
+                          </button>
+                        </div>
                       </div>
-                      
-                      <div className="flex-1 min-w-0">
-                        <p className="text-xs sm:text-[14px] font-medium text-[#FCFCFC] truncate">{item.title}</p>
-                        <p className="text-[10px] sm:text-[12px] text-[#DBDBDB] line-clamp-2">{item.description}</p>
-                      </div>
-                      
-                      <Image src={Larrow} alt="arrow" width={12} height={12} className="w-3 h-3 sm:w-3.5 sm:h-3.5 flex-shrink-0" />
                     </div>
-                  ))}
-                </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Todo List - Sidebar (takes 1/3 width on large screens) */}
+            <div className="lg:w-96">
+              <div className="flex justify-between items-center mb-4">
+                <p className="text-[14px] sm:text-[16px] font-[500] text-[#8F8F8F]">Todo list</p>
+                
+              </div>
+              
+              <div className="grid grid-cols-1 gap-2 sm:gap-3">
+                {todoItems.map((item, index) => (
+                  <div key={index} className="bg-[#222222] rounded-lg p-2 sm:p-3 flex items-center gap-2 sm:gap-3 cursor-pointer hover:bg-[#2A2A2A] transition-colors">
+                    <div className="relative w-8 h-8 sm:w-10 sm:h-10 flex items-center justify-center flex-shrink-0">
+                      <Image src={Eclipse} alt="background" width={32} height={32} className="w-8 h-8 sm:w-10 sm:h-10" />
+                      <Image 
+                        src={item.icon} 
+                        alt={item.title} 
+                        width={16}
+                        height={16}
+                        className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-4 h-4 sm:w-5 sm:h-5"
+                      />
+                    </div>
+                    
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs sm:text-[14px] font-medium text-[#FCFCFC] truncate">{item.title}</p>
+                      <p className="text-[10px] sm:text-[12px] text-[#DBDBDB] line-clamp-2">{item.description}</p>
+                    </div>
+                    
+                    <Image src={Larrow} alt="arrow" width={12} height={12} className="w-3 h-3 sm:w-3.5 sm:h-3.5 flex-shrink-0" />
+                  </div>
+                ))}
               </div>
             </div>
           </div>
@@ -717,9 +695,9 @@ const Dashboard: React.FC<QRCodeBoxProps> = ({ value }) => {
         </div>
 
         {/* Footer */}
-        <div className="w-[100%] h-[1px] bg-[#fff] mt-[50%] opacity-20 my-8"></div>
+        <div className="w-[100%] h-[1px] bg-[#fff]  opacity-20 my-8"></div>
         
-        <div className="mb-[80px] whitespace-nowrap mt-[10%]">
+        <div className="mb-[80px] mt-[20%] whitespace-nowrap">
           <Footer />
         </div>
       </div>

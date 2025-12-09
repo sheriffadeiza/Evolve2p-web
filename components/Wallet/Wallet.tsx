@@ -5,6 +5,7 @@ import Nav from "../../components/NAV/Nav";
 import Image from "next/image";
 import Parrow from "../../public/Assets/Evolve2p_pArrow/elements.svg";
 import SlashH from "../../public/Assets/Evolve2p_viewslash/view-off-slash.png";
+import ViewIcon from "../../public/Assets/Evolve2p_viewslash/view-off-slash.png"; // Add a proper view icon
 import Send from "../../public/Assets/Evolve2p_send/Dashboard/elements.svg";
 import Barrow from "../../public/Assets/Evolve2p_Barrow/arrow-down-01.svg";
 import Rarrowd from "../../public/Assets/Evolve2p_Rarrowd/arrow-down-right-01.svg";
@@ -94,6 +95,7 @@ const Wallet: React.FC<QRCodeBoxProps> = ({ value }) => {
   const [currentWallet, setCurrentWallet] = useState<Wallet | null>(null);
   const [currentCoin, setCurrentCoin] = useState("");
   const [showBalance, setShowBalance] = useState(true);
+  const [showAllBalances, setShowAllBalances] = useState(true); // New state for hiding all balances
   const [error, setError] = useState("");
   const [isTransOpen, setIsTransOpen] = useState(false);
   const [selectedCurrency, setSelectedCurrency] = useState<Currency>(currencies[0]);
@@ -222,7 +224,10 @@ const Wallet: React.FC<QRCodeBoxProps> = ({ value }) => {
 
   const toggleDropdown = () => setOpen((prev) => !prev);
   const toggleReceiveDropdown = () => setIsReceiveOpen((prev) => !prev);
-  const toggleVissibility = () => setShowBalance(!showBalance);
+  const toggleVisibility = () => {
+    setShowBalance(!showBalance);
+    setShowAllBalances(!showAllBalances); // Toggle all balances visibility
+  };
   const toggleTransDropdown = () => setIsTransOpen((prev) => !prev);
 
   const handleReceiveClick = (symbol: string) => {
@@ -371,14 +376,18 @@ const Wallet: React.FC<QRCodeBoxProps> = ({ value }) => {
               <p className="text-[14px] sm:text-[16px] font-[400] text-[#DBDBDB]">
                 Available Balance
               </p>
-              <Image
-                onClick={toggleVissibility}
-                src={SlashH}
-                alt="slash"
-                width={20}
-                height={20}
-                className="cursor-pointer w-5 h-5 sm:w-6 sm:h-6"
-              />
+              <div className="flex items-center cursor-pointer" onClick={toggleVisibility}>
+                <Image
+                  src={showBalance ? SlashH : ViewIcon}
+                  alt={showBalance ? "hide" : "show"}
+                  width={20}
+                  height={20}
+                  className="w-5 h-5 sm:w-6 sm:h-6"
+                />
+                <span className="text-[12px] sm:text-[14px] ml-2 text-[#DBDBDB]">
+                  {showBalance ? "Hide Balances" : "Show Balances"}
+                </span>
+              </div>
             </div>
             
             {/* Balance and Currency Selector - Responsive Layout */}
@@ -509,7 +518,9 @@ const Wallet: React.FC<QRCodeBoxProps> = ({ value }) => {
           <div className="bg-[#222222] rounded-[12px] p-4 sm:p-6">
             <div className="mb-4">
               <p className="text-[14px] sm:text-[16px] font-[400] text-[#DBDBDB]">Daily Limit</p>
-              <p className="text-[16px] sm:text-[18px] font-[500] text-[#FCFCFC]">$14,850,000</p>
+              <p className="text-[16px] sm:text-[18px] font-[500] text-[#FCFCFC]">
+                {showAllBalances ? "$14,850,000" : "****"}
+              </p>
             </div>
 
             <div className="w-full bg-[#4A4A4A] rounded-[4px] h-2 mb-2">
@@ -517,7 +528,9 @@ const Wallet: React.FC<QRCodeBoxProps> = ({ value }) => {
             </div>
 
             <div className="flex flex-col xs:flex-row xs:justify-between text-[12px] sm:text-[14px] font-[400] text-[#DBDBDB] mb-4 gap-1">
-              <p>$14,850,000 remaining</p>
+              <p>
+                {showAllBalances ? "$14,850,000 remaining" : "**** remaining"}
+              </p>
               <p>Refreshes in 10 minutes</p>
             </div>
 
@@ -562,7 +575,7 @@ const Wallet: React.FC<QRCodeBoxProps> = ({ value }) => {
                     <div className="flex items-center md:space-x-8 flex-1 justify-start md:justify-center">
                       <div className="text-right md:text-center">
                         <p className="text-[12px] md:text-[14px] font-[500] text-[#FCFCFC]">
-                          {formatBalance(walletBalance, asset.symbol)}
+                          {showAllBalances ? formatBalance(walletBalance, asset.symbol) : "****"}
                         </p>
                         <p className="text-[10px] md:text-[12px] font-[500] text-[#DBDBDB]">
                           {asset.symbol}
@@ -575,7 +588,7 @@ const Wallet: React.FC<QRCodeBoxProps> = ({ value }) => {
                         <div className="flex items-baseline space-x-1">
                           <span className="text-[10px] md:text-[12px] font-[500] text-[#DBDBDB]">$</span>
                           <span className="text-[12px] md:text-[14px] font-[500] text-[#FCFCFC]">
-                            {usdValue.toFixed(2)}
+                            {showAllBalances ? usdValue.toFixed(2) : "****"}
                           </span>
                         </div>
                       </div>
