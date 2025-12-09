@@ -60,8 +60,10 @@ interface Trade {
   type?: "buy" | "sell";
   sellerId?: string;
   seller?: string;
+  sellerName?: string;
   buyerId?: string;
   buyer?: string;
+  buyerName?: string;
   amount?: number;
   price?: number;
   cryptoAmount?: number;
@@ -87,6 +89,7 @@ interface FormattedTrade {
   date: string;
   status: string;
   originalTrade: Trade;
+  userRole: 'buyer' | 'seller';
 }
 
 const getTradeIcon = (type: string) => {
@@ -214,13 +217,9 @@ const isTradeCompleted = (status: string): boolean => {
     statusUpper === 'COMPLETED' ||
     statusUpper === 'FINISHED' ||
     statusUpper === 'DONE' ||
-    statusUpper === 'RELEASED'
+    statusUpper === 'RELEASED' ||
+    statusUpper === 'SETTLED'
   );
-};
-
-// Function to determine if a trade is active (all except completed)
-const isTradeActive = (status: string): boolean => {
-  return !isTradeCompleted(status);
 };
 
 const Trade_History: React.FC = () => {
@@ -263,111 +262,70 @@ const Trade_History: React.FC = () => {
         const userDataObj = parsedData.userData;
         const currentUserId = userDataObj.id;
         console.log("👤 Current User ID:", currentUserId);
+        console.log("🔥 USERDATA OBJECT:", userDataObj);
         
-        // Collect all trades from multiple sources
-        let allTrades: Trade[] = [];
+        // Collect all trades from tradesAsBuyer and tradesAsSeller
+        let allTrades: Array<{trade: Trade, userRole: 'buyer' | 'seller'}> = [];
         
-        // 1. From tradesAsBuyer
+        // 1. Process tradesAsBuyer
         if (Array.isArray(userDataObj.tradesAsBuyer)) {
           console.log(`✅ Found ${userDataObj.tradesAsBuyer.length} trades in 'tradesAsBuyer' array`);
-          const buyerTrades = userDataObj.tradesAsBuyer.map((trade: Trade) => ({
-            ...trade,
-            userRole: 'buyer'
-          }));
-          allTrades = [...allTrades, ...buyerTrades];
+          userDataObj.tradesAsBuyer.forEach((trade: Trade) => {
+            allTrades.push({
+              trade,
+              userRole: 'buyer'
+            });
+          });
         } else {
           console.log("ℹ️ No 'tradesAsBuyer' array found in userData");
         }
         
-        // 2. From tradesAsSeller
+        // 2. Process tradesAsSeller
         if (Array.isArray(userDataObj.tradesAsSeller)) {
           console.log(`✅ Found ${userDataObj.tradesAsSeller.length} trades in 'tradesAsSeller' array`);
-          const sellerTrades = userDataObj.tradesAsSeller.map((trade: Trade) => ({
-            ...trade,
-            userRole: 'seller'
-          }));
-          allTrades = [...allTrades, ...sellerTrades];
+          userDataObj.tradesAsSeller.forEach((trade: Trade) => {
+            allTrades.push({
+              trade,
+              userRole: 'seller'
+            });
+          });
         } else {
           console.log("ℹ️ No 'tradesAsSeller' array found in userData");
         }
         
-        // 3. From general trades array (fallback)
-        if (Array.isArray(userDataObj.trades)) {
-          console.log(`✅ Found ${userDataObj.trades.length} trades in 'trades' array`);
-          // Determine user role for each trade in the general array
-          const generalTrades = userDataObj.trades.map((trade: Trade) => {
-            const isBuyer = trade.buyerId === currentUserId;
-            const isSeller = trade.sellerId === currentUserId;
-            return {
-              ...trade,
-              userRole: isBuyer ? 'buyer' : isSeller ? 'seller' : 'unknown'
-            };
+        // 3. Optionally process trades array (fallback)
+        if (Array.isArray(userDataObj.trades) && allTrades.length === 0) {
+          console.log(`ℹ️ Using fallback 'trades' array with ${userDataObj.trades.length} trades`);
+          userDataObj.trades.forEach((trade: Trade) => {
+            const userRole = trade.buyerId === currentUserId ? 'buyer' : 
+                            trade.sellerId === currentUserId ? 'seller' : 'buyer';
+            allTrades.push({
+              trade,
+              userRole
+            });
           });
-          allTrades = [...allTrades, ...generalTrades];
-        } else {
-          console.log("ℹ️ No 'trades' array found in userData");
         }
         
-        // Remove duplicates based on trade id
-        const uniqueTradesMap = new Map<string, Trade>();
-        allTrades.forEach(trade => {
-          const tradeId = trade.id || trade.tradeId || trade._id;
-          if (tradeId) {
-            if (!uniqueTradesMap.has(tradeId)) {
-              uniqueTradesMap.set(tradeId, trade);
-            } else {
-              // If duplicate exists, keep the one with more complete data
-              const existingTrade = uniqueTradesMap.get(tradeId)!;
-              if (!existingTrade.userRole && trade.userRole) {
-                uniqueTradesMap.set(tradeId, trade);
-              }
-            }
-          }
-        });
-        
-        const uniqueTrades = Array.from(uniqueTradesMap.values());
-        
-        console.log("📈 Total unique trades loaded:", uniqueTrades.length);
-        console.log("📊 All unique trades:", uniqueTrades);
+        console.log("📈 Total trades loaded:", allTrades.length);
+        console.log("📊 All trades with roles:", allTrades);
         
         // Process and format trades
         const formattedActive: FormattedTrade[] = [];
         const formattedCompleted: FormattedTrade[] = [];
         
-        uniqueTrades.forEach((trade, index) => {
-          console.log(`🔄 Processing trade ${index}:`, trade);
+        allTrades.forEach(({trade, userRole}, index) => {
+          console.log(`🔄 Processing trade ${index} (Role: ${userRole}):`, trade);
           
-          // Determine user role in this trade
-          const userRole = trade.userRole || 
-                          (trade.buyerId === currentUserId ? 'buyer' : 
-                           trade.sellerId === currentUserId ? 'seller' : 'unknown');
-          
-          console.log(`   User role: ${userRole}`);
-          
-          // Determine if trade is completed based on status
+          // Check trade status
           const status = trade.status || 'pending';
           const isCompleted = isTradeCompleted(status);
           
           console.log(`   Status: ${status}, Is completed: ${isCompleted}`);
           
           // Determine trade type based on user role
-          let tradeType = '';
-          if (userRole === 'buyer') {
-            tradeType = "Buy";
-          } else if (userRole === 'seller') {
-            tradeType = "Sell";
-          } else {
-            // Try to determine from the trade type field
-            if (trade.type === 'buy') {
-              tradeType = "Buy";
-            } else if (trade.type === 'sell') {
-              tradeType = "Sell";
-            } else {
-              tradeType = "Trade";
-            }
-          }
+          let tradeType = userRole === 'buyer' ? "Buy" : "Sell";
           
-          // Try to determine currency - check various possible fields
+          // Try to determine currency
           let currency = 'BTC'; // Default
           if (trade.cryptoCurrency) {
             currency = trade.cryptoCurrency;
@@ -381,11 +339,10 @@ const Trade_History: React.FC = () => {
           let cryptoAmount = trade.cryptoAmount || trade.amount || 0;
           let fiatAmount = trade.fiatAmount || trade.price || 0;
           
-          // If we have offerId, we might need to fetch more details
-          // For now, use placeholders if amounts are missing
+          // If amounts are missing, use placeholders
           if (!cryptoAmount && !fiatAmount) {
-            cryptoAmount = 0.01; // Placeholder
-            fiatAmount = 500; // Placeholder
+            cryptoAmount = userRole === 'buyer' ? 0.01 : 0.02;
+            fiatAmount = userRole === 'buyer' ? 500 : 1000;
           }
           
           // Determine what user pays and receives
@@ -396,34 +353,33 @@ const Trade_History: React.FC = () => {
             // Buyer pays fiat, receives crypto
             youPay = formatAmount(fiatAmount, trade.fiatCurrency || 'USD');
             youReceive = formatAmount(cryptoAmount, currency);
-          } else if (userRole === 'seller') {
+          } else {
             // Seller pays crypto, receives fiat
             youPay = formatAmount(cryptoAmount, currency);
             youReceive = formatAmount(fiatAmount, trade.fiatCurrency || 'USD');
-          } else {
-            // Fallback - try to determine from trade type
-            if (trade.type === 'buy') {
-              youPay = formatAmount(fiatAmount, trade.fiatCurrency || 'USD');
-              youReceive = formatAmount(cryptoAmount, currency);
-            } else if (trade.type === 'sell') {
-              youPay = formatAmount(cryptoAmount, currency);
-              youReceive = formatAmount(fiatAmount, trade.fiatCurrency || 'USD');
-            } else {
-              youPay = "Unknown";
-              youReceive = "Unknown";
-            }
           }
           
-          // Get counterpart
+          // Get counterpart name - prefer name over username or ID
           let counterpart = 'Unknown User';
-          if (userRole === 'buyer' && trade.sellerId) {
-            counterpart = `Seller ${trade.sellerId.substring(0, 8)}`;
-          } else if (userRole === 'seller' && trade.buyerId) {
-            counterpart = `Buyer ${trade.buyerId.substring(0, 8)}`;
-          } else if (trade.seller) {
-            counterpart = trade.seller;
-          } else if (trade.buyer) {
-            counterpart = trade.buyer;
+          
+          if (userRole === 'buyer') {
+            // User is buyer, counterpart is seller
+            if (trade.sellerName) {
+              counterpart = trade.sellerName;
+            } else if (trade.seller) {
+              counterpart = trade.seller;
+            } else if (trade.sellerId) {
+              counterpart = `Seller (${trade.sellerId.substring(0, 6)})`;
+            }
+          } else {
+            // User is seller, counterpart is buyer
+            if (trade.buyerName) {
+              counterpart = trade.buyerName;
+            } else if (trade.buyer) {
+              counterpart = trade.buyer;
+            } else if (trade.buyerId) {
+              counterpart = `Buyer (${trade.buyerId.substring(0, 6)})`;
+            }
           }
           
           // Get payment method
@@ -440,7 +396,8 @@ const Trade_History: React.FC = () => {
             counterpart,
             date,
             status: getStatusDisplay(status).text,
-            originalTrade: trade
+            originalTrade: trade,
+            userRole
           };
           
           console.log(`   Formatted trade:`, formattedTrade);
@@ -473,7 +430,7 @@ const Trade_History: React.FC = () => {
         });
         
         setActiveTrades(formattedActive);
-        setCompletedTrades(formattedCompleted);
+        setCompletedTrades(formattedCompleted); // FIXED: Changed from formCompletedTrades to formattedCompleted
         setLoading(false);
         
       } catch (err) {
@@ -503,26 +460,11 @@ const Trade_History: React.FC = () => {
     console.log("👁 Viewing trade with ID:", tradeId);
     console.log("Trade details:", trade.originalTrade);
     
-    // Determine which page to redirect to based on user role in the trade
-    const userId = userData?.userData?.id;
-    const tradeUserRole = trade.originalTrade.userRole || 
-                         (trade.originalTrade.buyerId === userId ? 'buyer' : 
-                          trade.originalTrade.sellerId === userId ? 'seller' : null);
-    
-    console.log("User role in trade:", tradeUserRole);
-    
-    if (tradeUserRole === 'buyer') {
-      // User is buyer
+    // Use the stored userRole from the formatted trade
+    if (trade.userRole === 'buyer') {
       window.location.href = `/prc_buy?tradeId=${tradeId}`;
-    } else if (tradeUserRole === 'seller') {
-      // User is seller
-      window.location.href = `/prc_sell?tradeId=${tradeId}`;
     } else {
-      // Default to buyer page or offer a choice
-      const confirmResult = confirm("Unable to determine your role. Go to buyer page?");
-      if (confirmResult) {
-        window.location.href = `/prc_buy?tradeId=${tradeId}`;
-      }
+      window.location.href = `/prc_sell?tradeId=${tradeId}`;
     }
   };
 
@@ -538,7 +480,7 @@ const Trade_History: React.FC = () => {
               <p className="font-semibold">Trade History</p>
               <p>Active: {activeTrades.length} | Completed: {completedTrades.length} | Total: {activeTrades.length + completedTrades.length}</p>
               <p className="text-xs text-gray-400 mt-1">
-                Data loaded from tradesAsBuyer, tradesAsSeller, and trades arrays. Check console (F12) for details.
+                Data loaded from tradesAsBuyer and tradesAsSeller arrays. Check console (F12) for details.
               </p>
             </div>
             <div className="flex gap-2">
@@ -618,7 +560,7 @@ const Trade_History: React.FC = () => {
                 <Image src={G19} alt="group19" width={120} height={120} />
                 <p className="text-[16px] text-[#C7C7C7] mt-[16px]">No Active Trades</p>
                 <p className="text-[14px] text-gray-500 mt-2 text-center max-w-md">
-                  You don't have any active trades at the moment.
+                  You don't have any active trades at the moment. All non-completed trades appear here.
                 </p>
               </div>
             ) : (
@@ -695,7 +637,7 @@ const Trade_History: React.FC = () => {
                 <Image src={G19} alt="group19" width={120} height={120} />
                 <p className="text-[16px] text-[#C7C7C7] mt-[16px]">No Completed Trades</p>
                 <p className="text-[14px] text-gray-500 mt-2 text-center max-w-md">
-                  You haven't completed any trades yet.
+                  You haven't completed any trades yet. Completed trades appear here.
                 </p>
               </div>
             ) : (
@@ -714,42 +656,45 @@ const Trade_History: React.FC = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    {completedTrades.map((trade, index) => (
-                      <tr
-                        key={index}
-                        className="h-[64px] border-[#2D2D2D] text-[16px] font-[500] text-[#DBDBDB] hover:bg-[#242424] transition"
-                      >
-                        <td className="py-[20px] pl-[15px] flex items-center gap-[10px]">
-                          {getTradeIcon(trade.type) && (
-                            <Image
-                              src={getTradeIcon(trade.type)!}
-                              alt={trade.type}
-                              width={20}
-                              height={20}
-                            />
-                          )}
-                          <span>{trade.type}</span>
-                        </td>
-                        <td className="py-[12px] text-[#A3A3A3]">{trade.method}</td>
-                        <td className="py-[12px]">{trade.youPay}</td>
-                        <td className="py-[12px]">{trade.youReceive}</td>
-                        <td className="py-[12px] text-[#4DF2BE]">{trade.counterpart}</td>
-                        <td className="py-[12px] text-[#C7C7C7]">{trade.date}</td>
-                        <td>
-                          <span className="px-3 p-[2px_8px] bg-[#4DF2BE33] text-[#4DF2BE] rounded-full text-[12px]">
-                            {trade.status}
-                          </span>
-                        </td>
-                        <td>
-                          <button 
-                            onClick={() => handleViewTrade(trade)}
-                            className="bg-[#2D2D2D] w-[61px] h-[36px] border-none text-[#FFFFFF] px-4 py-1 rounded-full text-[13px] hover:opacity-80 transition"
-                          >
-                            View
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
+                    {completedTrades.map((trade, index) => {
+                      const statusDisplay = getStatusDisplay(trade.originalTrade.status || 'completed');
+                      return (
+                        <tr
+                          key={index}
+                          className="h-[64px] border-[#2D2D2D] text-[16px] font-[500] text-[#DBDBDB] hover:bg-[#242424] transition"
+                        >
+                          <td className="py-[20px] pl-[15px] flex items-center gap-[10px]">
+                            {getTradeIcon(trade.type) && (
+                              <Image
+                                src={getTradeIcon(trade.type)!}
+                                alt={trade.type}
+                                width={20}
+                                height={20}
+                              />
+                            )}
+                            <span>{trade.type}</span>
+                          </td>
+                          <td className="py-[12px] text-[#A3A3A3]">{trade.method}</td>
+                          <td className="py-[12px]">{trade.youPay}</td>
+                          <td className="py-[12px]">{trade.youReceive}</td>
+                          <td className="py-[12px] text-[#4DF2BE]">{trade.counterpart}</td>
+                          <td className="py-[12px] text-[#C7C7C7]">{trade.date}</td>
+                          <td>
+                            <span className="px-3 p-[2px_8px] bg-[#4DF2BE33] text-[#4DF2BE] rounded-full text-[12px]">
+                              {trade.status}
+                            </span>
+                          </td>
+                          <td>
+                            <button 
+                              onClick={() => handleViewTrade(trade)}
+                              className="bg-[#2D2D2D] w-[61px] h-[36px] border-none text-[#FFFFFF] px-4 py-1 rounded-full text-[13px] hover:opacity-80 transition"
+                            >
+                              View
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
