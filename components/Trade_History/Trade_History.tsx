@@ -108,16 +108,35 @@ const formatDate = (dateString: string): string => {
   }
 };
 
-const formatAmount = (amount: number | undefined, currency: string = 'USD'): string => {
+const formatCurrency = (amount: number | undefined, currency: string): string => {
   if (amount === undefined || amount === null) return "Unknown";
   
+  // Format crypto currencies
   if (currency === 'BTC' || currency === 'ETH') {
     return `${amount.toFixed(6)} ${currency}`;
   }
-  if (currency === 'USD' || currency === 'USDT' || currency === 'USDC') {
+  
+  // Format stablecoins
+  if (currency === 'USDT' || currency === 'USDC') {
+    return `${amount.toFixed(2)} ${currency}`;
+  }
+  
+  // Format fiat currencies
+  if (currency === 'USD') {
     return `$${amount.toFixed(2)}`;
   }
-  return `${amount} ${currency}`;
+  if (currency === 'NGN') {
+    return `₦${amount.toFixed(2)}`;
+  }
+  if (currency === 'EUR') {
+    return `€${amount.toFixed(2)}`;
+  }
+  if (currency === 'GBP') {
+    return `£${amount.toFixed(2)}`;
+  }
+  
+  // Default format for other currencies
+  return `${amount.toFixed(2)} ${currency}`;
 };
 
 const getStatusDisplay = (status: string) => {
@@ -359,6 +378,14 @@ const Trade_History: React.FC = () => {
     if (!trade) return 'BTC';
     if (typeof trade.cryptoCurrency === 'string') return trade.cryptoCurrency;
     if (trade.offer?.crypto && typeof trade.offer.crypto === 'string') return trade.offer.crypto;
+    if (trade.currency && typeof trade.currency === 'string') {
+      // Check if currency field contains crypto
+      const upperCurrency = trade.currency.toUpperCase();
+      if (upperCurrency.includes('BTC') || upperCurrency.includes('ETH') || 
+          upperCurrency.includes('USDT') || upperCurrency.includes('USDC')) {
+        return upperCurrency;
+      }
+    }
     return 'BTC';
   };
 
@@ -366,6 +393,14 @@ const Trade_History: React.FC = () => {
     if (!trade) return 'USD';
     if (typeof trade.fiatCurrency === 'string') return trade.fiatCurrency;
     if (trade.offer?.currency && typeof trade.offer.currency === 'string') return trade.offer.currency;
+    if (trade.currency && typeof trade.currency === 'string') {
+      // Check if currency field contains fiat
+      const upperCurrency = trade.currency.toUpperCase();
+      if (!upperCurrency.includes('BTC') && !upperCurrency.includes('ETH') && 
+          !upperCurrency.includes('USDT') && !upperCurrency.includes('USDC')) {
+        return upperCurrency;
+      }
+    }
     return 'USD';
   };
 
@@ -421,28 +456,33 @@ const Trade_History: React.FC = () => {
     const isBuyer = trade.buyerId === userId || trade.buyer?.id === userId;
     
     if (isBuyer) {
-      // Buyer pays fiat (USD)
+      // Buyer pays fiat (the currency used in the trade)
       const amount = trade.amountFiat || trade.fiatAmount || trade.price || 0;
-      return `$${amount.toFixed(2)}`;
+      const currency = getFiatCurrency(trade);
+      return formatCurrency(amount, currency);
     } else {
-      // Seller receives fiat (USD) - but in "You Pay" column, we show what they're giving
-      // Actually seller gives crypto, but since "You Receive" shows crypto, let's show fiat here
-      const amount = trade.amountFiat || trade.fiatAmount || trade.price || 0;
-      return `$${amount.toFixed(2)}`;
+      // Seller pays crypto (gives away crypto)
+      const amount = trade.amountCrypto || trade.cryptoAmount || trade.amount || 0;
+      const currency = getCryptoCurrency(trade);
+      return formatCurrency(amount, currency);
     }
   };
 
   const getYouReceive = (trade: Trade, userId?: string): string => {
     if (!trade || !userId) return "Unknown";
     
-    const cryptoCurrency = getCryptoCurrency(trade);
-    const amount = trade.amountCrypto || trade.cryptoAmount || trade.amount || 0;
+    const isBuyer = trade.buyerId === userId || trade.buyer?.id === userId;
     
-    // Always show the crypto amount in "You Receive" column
-    if (cryptoCurrency === 'BTC' || cryptoCurrency === 'ETH') {
-      return `${amount.toFixed(6)} ${cryptoCurrency}`;
+    if (isBuyer) {
+      // Buyer receives crypto
+      const amount = trade.amountCrypto || trade.cryptoAmount || trade.amount || 0;
+      const currency = getCryptoCurrency(trade);
+      return formatCurrency(amount, currency);
     } else {
-      return `${amount.toFixed(2)} ${cryptoCurrency}`;
+      // Seller receives fiat (the currency used in the trade)
+      const amount = trade.amountFiat || trade.fiatAmount || trade.price || 0;
+      const currency = getFiatCurrency(trade);
+      return formatCurrency(amount, currency);
     }
   };
 
@@ -762,11 +802,11 @@ const Trade_History: React.FC = () => {
       </div>
       
       {/* Divider - Responsive spacing */}
-         <div className="w-[100%]  h-[1px] bg-[#fff] mt-[50%] opacity-20 my-8"></div>
-        
-                <div className=" mb-[80px] mt-[10%] ">
-                  <Footer />
-                </div>
+      <div className="w-[100%] h-[1px] bg-[#fff] mt-[50%] opacity-20 my-8"></div>
+      
+      <div className="mb-[80px] mt-[10%]">
+        <Footer />
+      </div>
     </main>
   );
 };
