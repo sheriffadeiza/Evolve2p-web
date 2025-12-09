@@ -32,7 +32,7 @@ interface UserData {
     wallets?: any[];
     transactions?: any[];
     swaps?: any[];
-    trades?: Trade[]; // This is the main trades array
+    trades?: Trade[];
     tradesAsSeller?: Trade[];
     tradesAsBuyer?: Trade[];
     notifications?: any[];
@@ -206,6 +206,23 @@ const getStatusDisplay = (status: string) => {
   };
 };
 
+// Function to determine if a trade is completed
+const isTradeCompleted = (status: string): boolean => {
+  const statusUpper = status.toUpperCase();
+  return (
+    statusUpper.includes('COMPLETE') ||
+    statusUpper === 'COMPLETED' ||
+    statusUpper === 'FINISHED' ||
+    statusUpper === 'DONE' ||
+    statusUpper === 'RELEASED'
+  );
+};
+
+// Function to determine if a trade is active (all except completed)
+const isTradeActive = (status: string): boolean => {
+  return !isTradeCompleted(status);
+};
+
 const Trade_History: React.FC = () => {
   const [activeTab, setActiveTab] = useState<"active" | "completed">("active");
   const [activeTrades, setActiveTrades] = useState<FormattedTrade[]>([]);
@@ -218,7 +235,6 @@ const Trade_History: React.FC = () => {
       try {
         console.log("🔍 Loading UserData from localStorage...");
         
-        // Get userData from localStorage with proper checks
         const userDataRaw = typeof window !== "undefined" ? localStorage.getItem("UserData") : null;
         if (!userDataRaw) {
           console.log("❌ No UserData found in localStorage");
@@ -247,53 +263,108 @@ const Trade_History: React.FC = () => {
         const userDataObj = parsedData.userData;
         const currentUserId = userDataObj.id;
         console.log("👤 Current User ID:", currentUserId);
-        console.log("🔥 USERDATA OBJECT:", userDataObj);
         
-        // Check for trades array
+        // Collect all trades from multiple sources
         let allTrades: Trade[] = [];
         
-        if (Array.isArray(userDataObj.trades)) {
-          console.log(`✅ Found ${userDataObj.trades.length} trades in 'trades' array`);
-          allTrades = [...userDataObj.trades];
+        // 1. From tradesAsBuyer
+        if (Array.isArray(userDataObj.tradesAsBuyer)) {
+          console.log(`✅ Found ${userDataObj.tradesAsBuyer.length} trades in 'tradesAsBuyer' array`);
+          const buyerTrades = userDataObj.tradesAsBuyer.map((trade: Trade) => ({
+            ...trade,
+            userRole: 'buyer'
+          }));
+          allTrades = [...allTrades, ...buyerTrades];
         } else {
-          console.log("❌ No 'trades' array found in userData");
-          setLoading(false);
-          return;
+          console.log("ℹ️ No 'tradesAsBuyer' array found in userData");
         }
         
-        console.log("📈 Total trades loaded:", allTrades.length);
-        console.log("📊 All trades:", allTrades);
+        // 2. From tradesAsSeller
+        if (Array.isArray(userDataObj.tradesAsSeller)) {
+          console.log(`✅ Found ${userDataObj.tradesAsSeller.length} trades in 'tradesAsSeller' array`);
+          const sellerTrades = userDataObj.tradesAsSeller.map((trade: Trade) => ({
+            ...trade,
+            userRole: 'seller'
+          }));
+          allTrades = [...allTrades, ...sellerTrades];
+        } else {
+          console.log("ℹ️ No 'tradesAsSeller' array found in userData");
+        }
+        
+        // 3. From general trades array (fallback)
+        if (Array.isArray(userDataObj.trades)) {
+          console.log(`✅ Found ${userDataObj.trades.length} trades in 'trades' array`);
+          // Determine user role for each trade in the general array
+          const generalTrades = userDataObj.trades.map((trade: Trade) => {
+            const isBuyer = trade.buyerId === currentUserId;
+            const isSeller = trade.sellerId === currentUserId;
+            return {
+              ...trade,
+              userRole: isBuyer ? 'buyer' : isSeller ? 'seller' : 'unknown'
+            };
+          });
+          allTrades = [...allTrades, ...generalTrades];
+        } else {
+          console.log("ℹ️ No 'trades' array found in userData");
+        }
+        
+        // Remove duplicates based on trade id
+        const uniqueTradesMap = new Map<string, Trade>();
+        allTrades.forEach(trade => {
+          const tradeId = trade.id || trade.tradeId || trade._id;
+          if (tradeId) {
+            if (!uniqueTradesMap.has(tradeId)) {
+              uniqueTradesMap.set(tradeId, trade);
+            } else {
+              // If duplicate exists, keep the one with more complete data
+              const existingTrade = uniqueTradesMap.get(tradeId)!;
+              if (!existingTrade.userRole && trade.userRole) {
+                uniqueTradesMap.set(tradeId, trade);
+              }
+            }
+          }
+        });
+        
+        const uniqueTrades = Array.from(uniqueTradesMap.values());
+        
+        console.log("📈 Total unique trades loaded:", uniqueTrades.length);
+        console.log("📊 All unique trades:", uniqueTrades);
         
         // Process and format trades
         const formattedActive: FormattedTrade[] = [];
         const formattedCompleted: FormattedTrade[] = [];
         
-        allTrades.forEach((trade, index) => {
+        uniqueTrades.forEach((trade, index) => {
           console.log(`🔄 Processing trade ${index}:`, trade);
           
           // Determine user role in this trade
-          const isBuyer = trade.buyerId === currentUserId;
-          const isSeller = trade.sellerId === currentUserId;
+          const userRole = trade.userRole || 
+                          (trade.buyerId === currentUserId ? 'buyer' : 
+                           trade.sellerId === currentUserId ? 'seller' : 'unknown');
           
-          console.log(`   User is buyer: ${isBuyer}, seller: ${isSeller}`);
+          console.log(`   User role: ${userRole}`);
           
-          // Determine if trade is completed
-          const status = trade.status?.toUpperCase() || 'PENDING';
-          const isCompleted = status === 'COMPLETED' || 
-                             status === 'FINISHED' ||
-                             status === 'DONE' ||
-                             status === 'RELEASED';
+          // Determine if trade is completed based on status
+          const status = trade.status || 'pending';
+          const isCompleted = isTradeCompleted(status);
           
           console.log(`   Status: ${status}, Is completed: ${isCompleted}`);
           
           // Determine trade type based on user role
           let tradeType = '';
-          if (isBuyer) {
+          if (userRole === 'buyer') {
             tradeType = "Buy";
-          } else if (isSeller) {
+          } else if (userRole === 'seller') {
             tradeType = "Sell";
           } else {
-            tradeType = "Trade"; // Shouldn't happen if user is involved
+            // Try to determine from the trade type field
+            if (trade.type === 'buy') {
+              tradeType = "Buy";
+            } else if (trade.type === 'sell') {
+              tradeType = "Sell";
+            } else {
+              tradeType = "Trade";
+            }
           }
           
           // Try to determine currency - check various possible fields
@@ -321,26 +392,38 @@ const Trade_History: React.FC = () => {
           let youPay = '';
           let youReceive = '';
           
-          if (isBuyer) {
+          if (userRole === 'buyer') {
             // Buyer pays fiat, receives crypto
             youPay = formatAmount(fiatAmount, trade.fiatCurrency || 'USD');
             youReceive = formatAmount(cryptoAmount, currency);
-          } else if (isSeller) {
+          } else if (userRole === 'seller') {
             // Seller pays crypto, receives fiat
             youPay = formatAmount(cryptoAmount, currency);
             youReceive = formatAmount(fiatAmount, trade.fiatCurrency || 'USD');
           } else {
-            // Fallback
-            youPay = "Unknown";
-            youReceive = "Unknown";
+            // Fallback - try to determine from trade type
+            if (trade.type === 'buy') {
+              youPay = formatAmount(fiatAmount, trade.fiatCurrency || 'USD');
+              youReceive = formatAmount(cryptoAmount, currency);
+            } else if (trade.type === 'sell') {
+              youPay = formatAmount(cryptoAmount, currency);
+              youReceive = formatAmount(fiatAmount, trade.fiatCurrency || 'USD');
+            } else {
+              youPay = "Unknown";
+              youReceive = "Unknown";
+            }
           }
           
           // Get counterpart
           let counterpart = 'Unknown User';
-          if (isBuyer && trade.sellerId) {
-            counterpart = `User ${trade.sellerId.substring(0, 8)}`;
-          } else if (isSeller && trade.buyerId) {
-            counterpart = `User ${trade.buyerId.substring(0, 8)}`;
+          if (userRole === 'buyer' && trade.sellerId) {
+            counterpart = `Seller ${trade.sellerId.substring(0, 8)}`;
+          } else if (userRole === 'seller' && trade.buyerId) {
+            counterpart = `Buyer ${trade.buyerId.substring(0, 8)}`;
+          } else if (trade.seller) {
+            counterpart = trade.seller;
+          } else if (trade.buyer) {
+            counterpart = trade.buyer;
           }
           
           // Get payment method
@@ -356,7 +439,7 @@ const Trade_History: React.FC = () => {
             youReceive,
             counterpart,
             date,
-            status: getStatusDisplay(trade.status || 'pending').text,
+            status: getStatusDisplay(status).text,
             originalTrade: trade
           };
           
@@ -371,8 +454,6 @@ const Trade_History: React.FC = () => {
         
         console.log("✅ Active trades count:", formattedActive.length);
         console.log("✅ Completed trades count:", formattedCompleted.length);
-        console.log("📊 Formatted active trades:", formattedActive);
-        console.log("📊 Formatted completed trades:", formattedCompleted);
         
         // Sort by date (most recent first)
         formattedActive.sort((a, b) => {
@@ -424,20 +505,24 @@ const Trade_History: React.FC = () => {
     
     // Determine which page to redirect to based on user role in the trade
     const userId = userData?.userData?.id;
-    const buyerId = trade.originalTrade.buyerId;
-    const sellerId = trade.originalTrade.sellerId;
+    const tradeUserRole = trade.originalTrade.userRole || 
+                         (trade.originalTrade.buyerId === userId ? 'buyer' : 
+                          trade.originalTrade.sellerId === userId ? 'seller' : null);
     
-    console.log("User info:", { userId, buyerId, sellerId });
+    console.log("User role in trade:", tradeUserRole);
     
-    if (userId && buyerId === userId) {
+    if (tradeUserRole === 'buyer') {
       // User is buyer
       window.location.href = `/prc_buy?tradeId=${tradeId}`;
-    } else if (userId && sellerId === userId) {
+    } else if (tradeUserRole === 'seller') {
       // User is seller
       window.location.href = `/prc_sell?tradeId=${tradeId}`;
     } else {
-      // Default to buyer page
-      window.location.href = `/prc_buy?tradeId=${tradeId}`;
+      // Default to buyer page or offer a choice
+      const confirmResult = confirm("Unable to determine your role. Go to buyer page?");
+      if (confirmResult) {
+        window.location.href = `/prc_buy?tradeId=${tradeId}`;
+      }
     }
   };
 
@@ -453,7 +538,7 @@ const Trade_History: React.FC = () => {
               <p className="font-semibold">Trade History</p>
               <p>Active: {activeTrades.length} | Completed: {completedTrades.length} | Total: {activeTrades.length + completedTrades.length}</p>
               <p className="text-xs text-gray-400 mt-1">
-                Data loaded from localStorage. Check console (F12) for details.
+                Data loaded from tradesAsBuyer, tradesAsSeller, and trades arrays. Check console (F12) for details.
               </p>
             </div>
             <div className="flex gap-2">
