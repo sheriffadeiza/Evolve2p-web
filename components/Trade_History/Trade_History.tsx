@@ -439,16 +439,31 @@ const Trade_History: React.FC = () => {
     const isBuyer = trade.buyerId === currentUserId || trade.buyer?.id === currentUserId;
     const isSeller = trade.sellerId === currentUserId || trade.seller?.id === currentUserId;
     
-    if (isBuyer) {
+    if (isBuyer && trade.seller) {
       // User is buyer, counterpart is seller
-      if (trade.seller?.name) return trade.seller.name;
-      if (trade.seller?.username) return trade.seller.username;
-      if (trade.sellerId) return `Seller (${trade.sellerId.substring(0, 6)})`;
-    } else if (isSeller) {
+      const seller = trade.seller;
+      if (typeof seller === 'string') return seller;
+      if (typeof seller === 'object') {
+        if (seller.name) return seller.name;
+        if (seller.username) return seller.username;
+        if (seller.id) return `Seller (${seller.id.substring(0, 6)})`;
+      }
+    } else if (isSeller && trade.buyer) {
       // User is seller, counterpart is buyer
-      if (trade.buyer?.name) return trade.buyer.name;
-      if (trade.buyer?.username) return trade.buyer.username;
-      if (trade.buyerId) return `Buyer (${trade.buyerId.substring(0, 6)})`;
+      const buyer = trade.buyer;
+      if (typeof buyer === 'string') return buyer;
+      if (typeof buyer === 'object') {
+        if (buyer.name) return buyer.name;
+        if (buyer.username) return buyer.username;
+        if (buyer.id) return `Buyer (${buyer.id.substring(0, 6)})`;
+      }
+    }
+    
+    // Fallback to IDs
+    if (isBuyer && trade.sellerId) {
+      return `Seller (${trade.sellerId.substring(0, 6)})`;
+    } else if (isSeller && trade.buyerId) {
+      return `Buyer (${trade.buyerId.substring(0, 6)})`;
     }
     
     return 'Unknown User';
@@ -603,6 +618,11 @@ const Trade_History: React.FC = () => {
                       const tradeType = getTradeType(trade, userId);
                       const cryptoCurrency = getCryptoCurrency(trade);
                       const displayType = `${tradeType} ${cryptoCurrency}`;
+                      const counterpartName = getCounterpartName(trade, userId);
+                      const youPay = getYouPay(trade, userId);
+                      const youReceive = getYouReceive(trade, userId);
+                      const paymentMethod = getPaymentMethod(trade);
+                      const date = formatDate(trade.createdAt);
                       
                       return (
                         <tr
@@ -620,11 +640,11 @@ const Trade_History: React.FC = () => {
                             )}
                             <span>{displayType}</span>
                           </td>
-                          <td className="py-[12px] text-[#A3A3A3]">{getPaymentMethod(trade)}</td>
-                          <td className="py-[12px]">{getYouPay(trade, userId)}</td>
-                          <td className="py-[12px]">{getYouReceive(trade, userId)}</td>
-                          <td className="py-[12px] text-[#4DF2BE]">{getCounterpartName(trade, userId)}</td>
-                          <td className="py-[12px] text-[#C7C7C7]">{formatDate(trade.createdAt)}</td>
+                          <td className="py-[12px] text-[#A3A3A3]">{paymentMethod}</td>
+                          <td className="py-[12px]">{youPay}</td>
+                          <td className="py-[12px]">{youReceive}</td>
+                          <td className="py-[12px] text-[#4DF2BE]">{counterpartName}</td>
+                          <td className="py-[12px] text-[#C7C7C7]">{date}</td>
                           <td>
                             <span
                               className={`px-3 p-[2px_8px] rounded-full text-[12px] ${statusDisplay.bgColor} ${statusDisplay.textColor}`}
@@ -685,6 +705,11 @@ const Trade_History: React.FC = () => {
                       const tradeType = getTradeType(trade, userId);
                       const cryptoCurrency = getCryptoCurrency(trade);
                       const displayType = `${tradeType} ${cryptoCurrency}`;
+                      const counterpartName = getCounterpartName(trade, userId);
+                      const youPay = getYouPay(trade, userId);
+                      const youReceive = getYouReceive(trade, userId);
+                      const paymentMethod = getPaymentMethod(trade);
+                      const date = formatDate(trade.createdAt);
                       
                       return (
                         <tr
@@ -702,11 +727,11 @@ const Trade_History: React.FC = () => {
                             )}
                             <span>{displayType}</span>
                           </td>
-                          <td className="py-[12px] text-[#A3A3A3]">{getPaymentMethod(trade)}</td>
-                          <td className="py-[12px]">{getYouPay(trade, userId)}</td>
-                          <td className="py-[12px]">{getYouReceive(trade, userId)}</td>
-                          <td className="py-[12px] text-[#4DF2BE]">{getCounterpartName(trade, userId)}</td>
-                          <td className="py-[12px] text-[#C7C7C7]">{formatDate(trade.createdAt)}</td>
+                          <td className="py-[12px] text-[#A3A3A3]">{paymentMethod}</td>
+                          <td className="py-[12px]">{youPay}</td>
+                          <td className="py-[12px]">{youReceive}</td>
+                          <td className="py-[12px] text-[#4DF2BE]">{counterpartName}</td>
+                          <td className="py-[12px] text-[#C7C7C7]">{date}</td>
                           <td>
                             <span className="px-3 p-[2px_8px] bg-[#4DF2BE33] text-[#4DF2BE] rounded-full text-[12px]">
                               {statusDisplay.text}
