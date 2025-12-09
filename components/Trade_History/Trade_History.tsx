@@ -11,6 +11,51 @@ import USDC from "../../public/Assets/Evolve2p_USDC/USD Coin (USDC).svg";
 import USDT from "../../public/Assets/Evolve2p_USDT/Tether (USDT).svg";
 import G19 from "../../public/Assets/Evolve2p_group19/Group 19.svg";
 
+interface Trade {
+  id: string;
+  tradeId?: string;
+  _id?: string;
+  type?: "buy" | "sell";
+  sellerId?: string;
+  seller?: {
+    id: string;
+    email: string;
+    phone: string;
+    username: string;
+    name?: string;
+    [key: string]: any;
+  };
+  buyerId?: string;
+  buyer?: {
+    id: string;
+    email: string;
+    phone: string;
+    username: string;
+    name?: string;
+    [key: string]: any;
+  };
+  amountCrypto?: number;
+  amountFiat?: number;
+  price?: number;
+  cryptoAmount?: number;
+  fiatAmount?: number;
+  currency?: string;
+  cryptoCurrency?: string;
+  fiatCurrency?: string;
+  status: string;
+  paymentMethod?: string;
+  counterpart?: string;
+  offerId?: string;
+  createdAt: string;
+  updatedAt?: string;
+  completedAt?: string;
+  paidAt?: string;
+  expiresAt?: string;
+  tradePrice?: number;
+  offer?: any;
+  [key: string]: any;
+}
+
 interface UserData {
   userData?: {
     id?: string;
@@ -53,50 +98,11 @@ interface UserData {
   [key: string]: any;
 }
 
-interface Trade {
-  id: string;
-  tradeId?: string;
-  _id?: string;
-  type?: "buy" | "sell";
-  sellerId?: string;
-  seller?: string;
-  sellerName?: string;
-  buyerId?: string;
-  buyer?: string;
-  buyerName?: string;
-  amount?: number;
-  price?: number;
-  cryptoAmount?: number;
-  fiatAmount?: number;
-  currency?: string;
-  cryptoCurrency?: string;
-  fiatCurrency?: string;
-  status: string;
-  paymentMethod?: string;
-  counterpart?: string;
-  offerId?: string;
-  createdAt: string;
-  updatedAt?: string;
-  [key: string]: any;
-}
-
-interface FormattedTrade {
-  type: string;
-  method: string;
-  youPay: string;
-  youReceive: string;
-  counterpart: string;
-  date: string;
-  status: string;
-  originalTrade: Trade;
-  userRole: 'buyer' | 'seller';
-}
-
-const getTradeIcon = (type: string) => {
-  if (type.includes("BTC") || type.includes("Bitcoin")) return BTC;
-  if (type.includes("ETH") || type.includes("Ethereum")) return ETH;
-  if (type.includes("USDC")) return USDC;
-  if (type.includes("USDT")) return USDT;
+const getTradeIcon = (cryptoCurrency: string = '') => {
+  if (cryptoCurrency.includes("BTC") || cryptoCurrency.includes("Bitcoin")) return BTC;
+  if (cryptoCurrency.includes("ETH") || cryptoCurrency.includes("Ethereum")) return ETH;
+  if (cryptoCurrency.includes("USDC")) return USDC;
+  if (cryptoCurrency.includes("USDT")) return USDT;
   return null;
 };
 
@@ -224,8 +230,8 @@ const isTradeCompleted = (status: string): boolean => {
 
 const Trade_History: React.FC = () => {
   const [activeTab, setActiveTab] = useState<"active" | "completed">("active");
-  const [activeTrades, setActiveTrades] = useState<FormattedTrade[]>([]);
-  const [completedTrades, setCompletedTrades] = useState<FormattedTrade[]>([]);
+  const [activeTrades, setActiveTrades] = useState<Trade[]>([]);
+  const [completedTrades, setCompletedTrades] = useState<Trade[]>([]);
   const [loading, setLoading] = useState(true);
   const [userData, setUserData] = useState<UserData | null>(null);
 
@@ -262,20 +268,14 @@ const Trade_History: React.FC = () => {
         const userDataObj = parsedData.userData;
         const currentUserId = userDataObj.id;
         console.log("👤 Current User ID:", currentUserId);
-        console.log("🔥 USERDATA OBJECT:", userDataObj);
         
         // Collect all trades from tradesAsBuyer and tradesAsSeller
-        let allTrades: Array<{trade: Trade, userRole: 'buyer' | 'seller'}> = [];
+        let allTrades: Trade[] = [];
         
         // 1. Process tradesAsBuyer
         if (Array.isArray(userDataObj.tradesAsBuyer)) {
           console.log(`✅ Found ${userDataObj.tradesAsBuyer.length} trades in 'tradesAsBuyer' array`);
-          userDataObj.tradesAsBuyer.forEach((trade: Trade) => {
-            allTrades.push({
-              trade,
-              userRole: 'buyer'
-            });
-          });
+          allTrades = [...allTrades, ...userDataObj.tradesAsBuyer];
         } else {
           console.log("ℹ️ No 'tradesAsBuyer' array found in userData");
         }
@@ -283,12 +283,7 @@ const Trade_History: React.FC = () => {
         // 2. Process tradesAsSeller
         if (Array.isArray(userDataObj.tradesAsSeller)) {
           console.log(`✅ Found ${userDataObj.tradesAsSeller.length} trades in 'tradesAsSeller' array`);
-          userDataObj.tradesAsSeller.forEach((trade: Trade) => {
-            allTrades.push({
-              trade,
-              userRole: 'seller'
-            });
-          });
+          allTrades = [...allTrades, ...userDataObj.tradesAsSeller];
         } else {
           console.log("ℹ️ No 'tradesAsSeller' array found in userData");
         }
@@ -296,141 +291,53 @@ const Trade_History: React.FC = () => {
         // 3. Optionally process trades array (fallback)
         if (Array.isArray(userDataObj.trades) && allTrades.length === 0) {
           console.log(`ℹ️ Using fallback 'trades' array with ${userDataObj.trades.length} trades`);
-          userDataObj.trades.forEach((trade: Trade) => {
-            const userRole = trade.buyerId === currentUserId ? 'buyer' : 
-                            trade.sellerId === currentUserId ? 'seller' : 'buyer';
-            allTrades.push({
-              trade,
-              userRole
-            });
-          });
+          allTrades = [...allTrades, ...userDataObj.trades];
         }
         
         console.log("📈 Total trades loaded:", allTrades.length);
-        console.log("📊 All trades with roles:", allTrades);
+        console.log("📊 Sample trade:", allTrades.length > 0 ? allTrades[0] : 'No trades');
         
-        // Process and format trades
-        const formattedActive: FormattedTrade[] = [];
-        const formattedCompleted: FormattedTrade[] = [];
+        // Separate active and completed trades
+        const active: Trade[] = [];
+        const completed: Trade[] = [];
         
-        allTrades.forEach(({trade, userRole}, index) => {
-          console.log(`🔄 Processing trade ${index} (Role: ${userRole}):`, trade);
+        allTrades.forEach((trade, index) => {
+          console.log(`🔄 Processing trade ${index}:`, trade);
           
-          // Check trade status
           const status = trade.status || 'pending';
           const isCompleted = isTradeCompleted(status);
           
           console.log(`   Status: ${status}, Is completed: ${isCompleted}`);
           
-          // Determine trade type based on user role
-          let tradeType = userRole === 'buyer' ? "Buy" : "Sell";
-          
-          // Try to determine currency
-          let currency = 'BTC'; // Default
-          if (trade.cryptoCurrency) {
-            currency = trade.cryptoCurrency;
-          } else if (trade.currency) {
-            currency = trade.currency;
-          }
-          
-          tradeType += ` ${currency}`;
-          
-          // Determine amounts
-          let cryptoAmount = trade.cryptoAmount || trade.amount || 0;
-          let fiatAmount = trade.fiatAmount || trade.price || 0;
-          
-          // If amounts are missing, use placeholders
-          if (!cryptoAmount && !fiatAmount) {
-            cryptoAmount = userRole === 'buyer' ? 0.01 : 0.02;
-            fiatAmount = userRole === 'buyer' ? 500 : 1000;
-          }
-          
-          // Determine what user pays and receives
-          let youPay = '';
-          let youReceive = '';
-          
-          if (userRole === 'buyer') {
-            // Buyer pays fiat, receives crypto
-            youPay = formatAmount(fiatAmount, trade.fiatCurrency || 'USD');
-            youReceive = formatAmount(cryptoAmount, currency);
-          } else {
-            // Seller pays crypto, receives fiat
-            youPay = formatAmount(cryptoAmount, currency);
-            youReceive = formatAmount(fiatAmount, trade.fiatCurrency || 'USD');
-          }
-          
-          // Get counterpart name - prefer name over username or ID
-          let counterpart = 'Unknown User';
-          
-          if (userRole === 'buyer') {
-            // User is buyer, counterpart is seller
-            if (trade.sellerName) {
-              counterpart = trade.sellerName;
-            } else if (trade.seller) {
-              counterpart = trade.seller;
-            } else if (trade.sellerId) {
-              counterpart = `Seller (${trade.sellerId.substring(0, 6)})`;
-            }
-          } else {
-            // User is seller, counterpart is buyer
-            if (trade.buyerName) {
-              counterpart = trade.buyerName;
-            } else if (trade.buyer) {
-              counterpart = trade.buyer;
-            } else if (trade.buyerId) {
-              counterpart = `Buyer (${trade.buyerId.substring(0, 6)})`;
-            }
-          }
-          
-          // Get payment method
-          const method = trade.paymentMethod || 'Bank Transfer';
-          
-          // Get date
-          const date = trade.createdAt ? formatDate(trade.createdAt) : 'Unknown Date';
-          
-          const formattedTrade: FormattedTrade = {
-            type: tradeType,
-            method: method,
-            youPay,
-            youReceive,
-            counterpart,
-            date,
-            status: getStatusDisplay(status).text,
-            originalTrade: trade,
-            userRole
-          };
-          
-          console.log(`   Formatted trade:`, formattedTrade);
-          
           if (isCompleted) {
-            formattedCompleted.push(formattedTrade);
+            completed.push(trade);
           } else {
-            formattedActive.push(formattedTrade);
+            active.push(trade);
           }
         });
         
-        console.log("✅ Active trades count:", formattedActive.length);
-        console.log("✅ Completed trades count:", formattedCompleted.length);
+        console.log("✅ Active trades count:", active.length);
+        console.log("✅ Completed trades count:", completed.length);
         
         // Sort by date (most recent first)
-        formattedActive.sort((a, b) => {
+        active.sort((a, b) => {
           try {
-            return new Date(b.originalTrade.createdAt).getTime() - new Date(a.originalTrade.createdAt).getTime();
+            return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
           } catch {
             return 0;
           }
         });
         
-        formattedCompleted.sort((a, b) => {
+        completed.sort((a, b) => {
           try {
-            return new Date(b.originalTrade.createdAt).getTime() - new Date(a.originalTrade.createdAt).getTime();
+            return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
           } catch {
             return 0;
           }
         });
         
-        setActiveTrades(formattedActive);
-        setCompletedTrades(formattedCompleted); // FIXED: Changed from formCompletedTrades to formattedCompleted
+        setActiveTrades(active);
+        setCompletedTrades(completed);
         setLoading(false);
         
       } catch (err) {
@@ -450,21 +357,132 @@ const Trade_History: React.FC = () => {
     return () => window.removeEventListener('focus', handleFocus);
   }, []);
 
-  const handleViewTrade = (trade: FormattedTrade) => {
-    const tradeId = trade.originalTrade.id || trade.originalTrade.tradeId || trade.originalTrade._id;
+  const handleViewTrade = (trade: Trade) => {
+    const tradeId = trade.id || trade.tradeId || trade._id;
     if (!tradeId) {
       alert("No trade ID found");
       return;
     }
     
     console.log("👁 Viewing trade with ID:", tradeId);
-    console.log("Trade details:", trade.originalTrade);
+    console.log("Trade details:", trade);
     
-    // Use the stored userRole from the formatted trade
-    if (trade.userRole === 'buyer') {
+    // Determine user role
+    const userId = userData?.userData?.id;
+    let userRole = '';
+    
+    if (trade.buyerId === userId) {
+      userRole = 'buyer';
+    } else if (trade.sellerId === userId) {
+      userRole = 'seller';
+    } else if (trade.buyer?.id === userId) {
+      userRole = 'buyer';
+    } else if (trade.seller?.id === userId) {
+      userRole = 'seller';
+    }
+    
+    console.log("User role:", userRole);
+    
+    if (userRole === 'buyer') {
       window.location.href = `/prc_buy?tradeId=${tradeId}`;
-    } else {
+    } else if (userRole === 'seller') {
       window.location.href = `/prc_sell?tradeId=${tradeId}`;
+    } else {
+      // Try to determine from tradesAsBuyer/tradesAsSeller arrays
+      const isBuyerTrade = userData?.userData?.tradesAsBuyer?.some(t => t.id === tradeId);
+      const isSellerTrade = userData?.userData?.tradesAsSeller?.some(t => t.id === tradeId);
+      
+      if (isBuyerTrade) {
+        window.location.href = `/prc_buy?tradeId=${tradeId}`;
+      } else if (isSellerTrade) {
+        window.location.href = `/prc_sell?tradeId=${tradeId}`;
+      } else {
+        const confirmResult = confirm("Unable to determine your role. Go to buyer page?");
+        if (confirmResult) {
+          window.location.href = `/prc_buy?tradeId=${tradeId}`;
+        }
+      }
+    }
+  };
+
+  const getTradeType = (trade: Trade, userId?: string): string => {
+    if (trade.buyerId === userId || trade.buyer?.id === userId) {
+      return "Buy";
+    } else if (trade.sellerId === userId || trade.seller?.id === userId) {
+      return "Sell";
+    }
+    return "Trade";
+  };
+
+  const getCryptoCurrency = (trade: Trade): string => {
+    if (trade.cryptoCurrency) return trade.cryptoCurrency;
+    if (trade.offer?.crypto) return trade.offer.crypto;
+    return 'BTC';
+  };
+
+  const getFiatCurrency = (trade: Trade): string => {
+    if (trade.fiatCurrency) return trade.fiatCurrency;
+    if (trade.offer?.currency) return trade.offer.currency;
+    return 'USD';
+  };
+
+  const getPaymentMethod = (trade: Trade): string => {
+    if (trade.paymentMethod) return trade.paymentMethod;
+    if (trade.offer?.paymentMethod) return trade.offer.paymentMethod;
+    return 'Bank Transfer';
+  };
+
+  const getCounterpartName = (trade: Trade, userId?: string): string => {
+    const currentUserId = userId;
+    
+    // Determine if user is buyer or seller
+    const isBuyer = trade.buyerId === currentUserId || trade.buyer?.id === currentUserId;
+    const isSeller = trade.sellerId === currentUserId || trade.seller?.id === currentUserId;
+    
+    if (isBuyer) {
+      // User is buyer, counterpart is seller
+      if (trade.seller?.name) return trade.seller.name;
+      if (trade.seller?.username) return trade.seller.username;
+      if (trade.sellerId) return `Seller (${trade.sellerId.substring(0, 6)})`;
+    } else if (isSeller) {
+      // User is seller, counterpart is buyer
+      if (trade.buyer?.name) return trade.buyer.name;
+      if (trade.buyer?.username) return trade.buyer.username;
+      if (trade.buyerId) return `Buyer (${trade.buyerId.substring(0, 6)})`;
+    }
+    
+    return 'Unknown User';
+  };
+
+  const getYouPay = (trade: Trade, userId?: string): string => {
+    const isBuyer = trade.buyerId === userId || trade.buyer?.id === userId;
+    
+    if (isBuyer) {
+      // Buyer pays fiat
+      const amount = trade.amountFiat || trade.fiatAmount || trade.price || 0;
+      const currency = getFiatCurrency(trade);
+      return formatAmount(amount, currency);
+    } else {
+      // Seller pays crypto
+      const amount = trade.amountCrypto || trade.cryptoAmount || trade.amount || 0;
+      const currency = getCryptoCurrency(trade);
+      return formatAmount(amount, currency);
+    }
+  };
+
+  const getYouReceive = (trade: Trade, userId?: string): string => {
+    const isBuyer = trade.buyerId === userId || trade.buyer?.id === userId;
+    
+    if (isBuyer) {
+      // Buyer receives crypto
+      const amount = trade.amountCrypto || trade.cryptoAmount || trade.amount || 0;
+      const currency = getCryptoCurrency(trade);
+      return formatAmount(amount, currency);
+    } else {
+      // Seller receives fiat
+      const amount = trade.amountFiat || trade.fiatAmount || trade.price || 0;
+      const currency = getFiatCurrency(trade);
+      return formatAmount(amount, currency);
     }
   };
 
@@ -580,33 +598,38 @@ const Trade_History: React.FC = () => {
                   </thead>
                   <tbody>
                     {activeTrades.map((trade, index) => {
-                      const statusDisplay = getStatusDisplay(trade.originalTrade.status || 'pending');
+                      const userId = userData?.userData?.id;
+                      const statusDisplay = getStatusDisplay(trade.status || 'pending');
+                      const tradeType = getTradeType(trade, userId);
+                      const cryptoCurrency = getCryptoCurrency(trade);
+                      const displayType = `${tradeType} ${cryptoCurrency}`;
+                      
                       return (
                         <tr
-                          key={index}
+                          key={trade.id || index}
                           className="h-[64px] border-[#2D2D2D] text-[16px] font-[500] text-[#DBDBDB] hover:bg-[#242424] transition"
                         >
                           <td className="py-[20px] pl-[15px] flex items-center gap-[10px]">
-                            {getTradeIcon(trade.type) && (
+                            {getTradeIcon(cryptoCurrency) && (
                               <Image
-                                src={getTradeIcon(trade.type)!}
-                                alt={trade.type}
+                                src={getTradeIcon(cryptoCurrency)!}
+                                alt={cryptoCurrency}
                                 width={20}
                                 height={20}
                               />
                             )}
-                            <span>{trade.type}</span>
+                            <span>{displayType}</span>
                           </td>
-                          <td className="py-[12px] text-[#A3A3A3]">{trade.method}</td>
-                          <td className="py-[12px]">{trade.youPay}</td>
-                          <td className="py-[12px]">{trade.youReceive}</td>
-                          <td className="py-[12px] text-[#4DF2BE]">{trade.counterpart}</td>
-                          <td className="py-[12px] text-[#C7C7C7]">{trade.date}</td>
+                          <td className="py-[12px] text-[#A3A3A3]">{getPaymentMethod(trade)}</td>
+                          <td className="py-[12px]">{getYouPay(trade, userId)}</td>
+                          <td className="py-[12px]">{getYouReceive(trade, userId)}</td>
+                          <td className="py-[12px] text-[#4DF2BE]">{getCounterpartName(trade, userId)}</td>
+                          <td className="py-[12px] text-[#C7C7C7]">{formatDate(trade.createdAt)}</td>
                           <td>
                             <span
                               className={`px-3 p-[2px_8px] rounded-full text-[12px] ${statusDisplay.bgColor} ${statusDisplay.textColor}`}
                             >
-                              {trade.status}
+                              {statusDisplay.text}
                             </span>
                           </td>
                           <td>
@@ -657,31 +680,36 @@ const Trade_History: React.FC = () => {
                   </thead>
                   <tbody>
                     {completedTrades.map((trade, index) => {
-                      const statusDisplay = getStatusDisplay(trade.originalTrade.status || 'completed');
+                      const userId = userData?.userData?.id;
+                      const statusDisplay = getStatusDisplay(trade.status || 'completed');
+                      const tradeType = getTradeType(trade, userId);
+                      const cryptoCurrency = getCryptoCurrency(trade);
+                      const displayType = `${tradeType} ${cryptoCurrency}`;
+                      
                       return (
                         <tr
-                          key={index}
+                          key={trade.id || index}
                           className="h-[64px] border-[#2D2D2D] text-[16px] font-[500] text-[#DBDBDB] hover:bg-[#242424] transition"
                         >
                           <td className="py-[20px] pl-[15px] flex items-center gap-[10px]">
-                            {getTradeIcon(trade.type) && (
+                            {getTradeIcon(cryptoCurrency) && (
                               <Image
-                                src={getTradeIcon(trade.type)!}
-                                alt={trade.type}
+                                src={getTradeIcon(cryptoCurrency)!}
+                                alt={cryptoCurrency}
                                 width={20}
                                 height={20}
                               />
                             )}
-                            <span>{trade.type}</span>
+                            <span>{displayType}</span>
                           </td>
-                          <td className="py-[12px] text-[#A3A3A3]">{trade.method}</td>
-                          <td className="py-[12px]">{trade.youPay}</td>
-                          <td className="py-[12px]">{trade.youReceive}</td>
-                          <td className="py-[12px] text-[#4DF2BE]">{trade.counterpart}</td>
-                          <td className="py-[12px] text-[#C7C7C7]">{trade.date}</td>
+                          <td className="py-[12px] text-[#A3A3A3]">{getPaymentMethod(trade)}</td>
+                          <td className="py-[12px]">{getYouPay(trade, userId)}</td>
+                          <td className="py-[12px]">{getYouReceive(trade, userId)}</td>
+                          <td className="py-[12px] text-[#4DF2BE]">{getCounterpartName(trade, userId)}</td>
+                          <td className="py-[12px] text-[#C7C7C7]">{formatDate(trade.createdAt)}</td>
                           <td>
                             <span className="px-3 p-[2px_8px] bg-[#4DF2BE33] text-[#4DF2BE] rounded-full text-[12px]">
-                              {trade.status}
+                              {statusDisplay.text}
                             </span>
                           </td>
                           <td>
