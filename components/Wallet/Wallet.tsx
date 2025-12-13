@@ -135,6 +135,28 @@ const Wallet: React.FC<QRCodeBoxProps> = ({ value }) => {
     return isNaN(num) ? 0 : num;
   };
 
+  // Function to extract token from localStorage
+  const getAuthToken = (): string => {
+    if (typeof window === "undefined") return "";
+    
+    const userDataString = localStorage.getItem("UserData");
+    if (!userDataString) return "";
+    
+    try {
+      const userData = JSON.parse(userDataString);
+      // Try different possible token property names
+      return userData.token || 
+             userData.accessToken || 
+             userData.access_token || 
+             userData.authToken || 
+             localStorage.getItem("token") || 
+             "";
+    } catch (e) {
+      console.error("Error parsing user data for token:", e);
+      return "";
+    }
+  };
+
   useEffect(() => {
     const fetchAllPrices = async () => {
       setLoadingPrices(true);
@@ -290,34 +312,72 @@ const Wallet: React.FC<QRCodeBoxProps> = ({ value }) => {
     try {
       setIsSending(true);
       
+      // Get the auth token
+      const token = getAuthToken();
+      if (!token) {
+        throw new Error('Authentication token not found. Please login again.');
+      }
+      
+      // Validate amount
+      const amount = parseFloat(sendAmount);
+      if (isNaN(amount) || amount <= 0) {
+        throw new Error('Please enter a valid amount');
+      }
+
+      // Get sender's wallet
+      const senderWallet = clientUser?.wallets?.find((w: any) => 
+        w.currency?.toUpperCase() === selectedAsset.symbol.toUpperCase()
+      );
+      
+      if (!senderWallet) {
+        throw new Error('Sender wallet not found');
+      }
+
+      // Prepare transaction data for API
       const transactionData = {
-        senderId: clientUser?._id || clientUser?.id,
-        receiverAddress: receiverAddress,
-        amount: sendAmount,
-        currency: selectedAsset.symbol,
+        toAddress: receiverAddress.trim(),
+        amount: amount,
+        coin: selectedAsset.symbol,
+        fromAddress: senderWallet.address,
+        userId: clientUser?._id || clientUser?.id,
         networkFee: networkFee.toString(),
-        totalAmount: (parseFloat(sendAmount) + networkFee).toString(),
-        timestamp: new Date().toISOString(),
-        status: "pending"
+        totalAmount: (amount + networkFee).toString(),
+        timestamp: new Date().toISOString()
       };
 
-      const response = await fetch('https://evolve2p-backend.onrender.com/api/transfer', {
+      console.log('Sending transaction data:', transactionData);
+      console.log('Using token (first 20 chars):', token.substring(0, 20) + '...');
+
+      // Make API call to your backend
+      const response = await fetch('https://evolve2p-backend.onrender.com/api/send', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'Authorization': `Bearer ${token}`,
         },
         body: JSON.stringify(transactionData),
       });
 
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.message || `Transaction failed with status: ${response.status}`);
+      // Log response for debugging
+      console.log('Response status:', response.status);
+      
+      const responseText = await response.text();
+      console.log('Response text:', responseText);
+
+      let result;
+      try {
+        result = JSON.parse(responseText);
+      } catch (e) {
+        console.error('Failed to parse JSON response:', e);
+        throw new Error('Server returned invalid response');
       }
 
-      const result = await response.json();
-      
-      const mockHash = `0x${Array.from({length: 64}, () => 
+      if (!response.ok) {
+        throw new Error(result.message || result.error || `Transaction failed with status: ${response.status}`);
+      }
+
+      // Success handling
+      const mockHash = result.transactionHash || `0x${Array.from({length: 64}, () => 
         Math.floor(Math.random() * 16).toString(16)
       ).join('')}`;
       
@@ -325,7 +385,7 @@ const Wallet: React.FC<QRCodeBoxProps> = ({ value }) => {
       
       // Create transaction object for viewing details
       const newTransaction: Transaction = {
-        id: `e2p_txn_${mockHash.substring(2, 10).toUpperCase()}`,
+        id: result.transactionId || `e2p_txn_${mockHash.substring(2, 10).toUpperCase()}`,
         amount: `-${sendAmount} ${selectedAsset.symbol}`,
         currency: selectedAsset.symbol,
         receiverAddress: receiverAddress,
@@ -344,6 +404,7 @@ const Wallet: React.FC<QRCodeBoxProps> = ({ value }) => {
       
       setRecentTransaction(newTransaction);
       
+      // Update local wallet balance
       if (clientUser?.wallets) {
         const updatedWallets = clientUser.wallets.map((wallet: Wallet) => {
           if (wallet.currency?.toUpperCase() === selectedAsset.symbol.toUpperCase()) {
@@ -371,7 +432,29 @@ const Wallet: React.FC<QRCodeBoxProps> = ({ value }) => {
 
     } catch (error: any) {
       console.error('Transaction error:', error);
-      alert(`Transaction failed: ${error.message || 'Please try again.'}`);
+      
+      // Show more detailed error message
+      let errorMessage = 'Transaction failed. Please try again.';
+      
+      if (error.message.includes('jwt') || error.message.includes('token') || error.message.includes('auth')) {
+        errorMessage = 'Session expired. Please login again.';
+        // Optionally redirect to login
+        setTimeout(() => {
+          localStorage.removeItem('UserData');
+          localStorage.removeItem('token');
+          router.push('/Logins/login');
+        }, 2000);
+      } else if (error.message.includes('404')) {
+        errorMessage = 'Transfer endpoint not found. Please contact support.';
+      } else if (error.message.includes('500')) {
+        errorMessage = 'Server error. Please try again later.';
+      } else if (error.message.includes('balance') || error.message.includes('insufficient')) {
+        errorMessage = 'Insufficient balance for this transaction.';
+      } else {
+        errorMessage = error.message || 'Transaction failed. Please try again.';
+      }
+      
+      alert(`Transaction failed: ${errorMessage}`);
     } finally {
       setIsSending(false);
     }

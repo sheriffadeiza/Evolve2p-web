@@ -321,7 +321,7 @@ const Dashboard: React.FC<QRCodeBoxProps> = ({ value }) => {
       };
 
       // Make API call to your backend
-      const response = await fetch('https://evolve2p-backend.onrender.com/api/transfer', {
+      const response = await fetch('https://evolve2p-backend.onrender.com/api/send', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
