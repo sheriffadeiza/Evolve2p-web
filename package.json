@@ -9,7 +9,7 @@
     "lint": "next lint"
   },
   "dependencies": {
-    "libphonenumber-js": "^1.12.31",
+    "libphonenumber-js": "^1.10.46",
     "lucide-react": "^0.539.0",
     "next": "^15.4.8",
     "qrcode.react": "^4.2.0",
@@ -22,8 +22,8 @@
   "devDependencies": {
     "@eslint/eslintrc": "^3.0.0",
     "@tailwindcss/postcss": "^4.0.0",
-    "@types/node": "^20.19.6",
-    "@types/react": "^18.3.23",
+    "@types/node": "^20.19.27",
+    "@types/react": "^18.3.27",
     "@types/react-dom": "^18.3.7",
     "autoprefixer": "^10.4.21",
     "eslint": "^8.56.0",
