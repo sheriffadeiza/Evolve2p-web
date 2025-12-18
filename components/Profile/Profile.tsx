@@ -48,7 +48,6 @@ interface Country {
   dial_code: string;
 }
 
-// Simplified UserData interface - removed nested duplication
 interface UserData {
   email: string;
   username: string;
@@ -61,7 +60,7 @@ interface UserData {
   language?: string;
   currency?: string;
   accessToken?: string;
-  // Removed the nested userData object since it was unnecessary duplication
+  userData?: any;
 }
 
 const Toggle = ({
@@ -112,10 +111,10 @@ const Profile = () => {
   const [openCountry, setOpenCountry] = useState(false);
   const [countrySearch, setCountrySearch] = useState("");
 
-  // User data states - simplified
+  // User data states
   const [userData, setUserData] = useState<UserData | null>(null);
-  const [email, setEmail] = useState<string>("");
-  const [username, setUsername] = useState<string>("");
+  const [clientUser, setClientUser] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
 
   // Date states
   const days = Array.from({ length: 31 }, (_, i) => i + 1);
@@ -152,177 +151,30 @@ const Profile = () => {
   const [saveMessage, setSaveMessage] = useState("");
   const [originalData, setOriginalData] = useState<any>(null);
 
-  // Debug function to log user data structure
-  const debugUserDataStructure = () => {
-    if (typeof window !== "undefined") {
-      const allKeys = Object.keys(localStorage);
-      console.log("🔍 All localStorage keys:", allKeys);
-      
-      allKeys.forEach(key => {
-        if (key.toLowerCase().includes('user') || 
-            key.toLowerCase().includes('auth') || 
-            key.toLowerCase().includes('reg')) {
-          try {
-            const value = localStorage.getItem(key);
-            if (value) {
-              console.log(`📦 ${key}:`, JSON.parse(value));
-            }
-          } catch (e) {
-            console.log(`📦 ${key}:`, localStorage.getItem(key));
-          }
-        }
-      });
-    }
-  };
-
-  // Function to update phoneVerified in localStorage - simplified
+  // Function to update phoneVerified in localStorage
   const updatePhoneVerifiedInLocalStorage = (isVerified: boolean) => {
     try {
       const stored = localStorage.getItem("UserData");
       if (stored) {
         const parsed = JSON.parse(stored);
         
-        // Simplified: update phoneVerified directly
         const updatedData = {
           ...parsed,
-          phoneVerified: isVerified
+          phoneVerified: isVerified,
+          userData: parsed.userData ? {
+            ...parsed.userData,
+            phoneVerified: isVerified
+          } : parsed.userData
         };
         
         localStorage.setItem("UserData", JSON.stringify(updatedData));
         setUserData(updatedData);
-        
-        console.log(`✅ Updated phoneVerified to ${isVerified} in localStorage`);
         return true;
       }
     } catch (error) {
-      console.error("❌ Error updating phoneVerified in localStorage:", error);
+      console.error("Error updating phoneVerified in localStorage:", error);
     }
     return false;
-  };
-
-  // Function to check for registration data structure
-  const checkRegistrationData = () => {
-    if (typeof window !== "undefined") {
-      try {
-        // Check if there's registration data saved elsewhere
-        const registrationData = localStorage.getItem("registrationData") || 
-                                localStorage.getItem("signupData") ||
-                                localStorage.getItem("authData");
-        
-        if (registrationData) {
-          const parsedReg = JSON.parse(registrationData);
-          console.log("📋 Found registration data:", parsedReg);
-          
-          // Check for username in registration data
-          if (parsedReg.username || parsedReg.name) {
-            const regUsername = parsedReg.username || parsedReg.name;
-            console.log("🎯 Username from registration:", regUsername);
-            
-            // Update the current UserData with registration username
-            const currentData = localStorage.getItem("UserData");
-            if (currentData) {
-              const parsedCurrent = JSON.parse(currentData);
-              const updatedData = {
-                ...parsedCurrent,
-                username: regUsername
-              };
-              localStorage.setItem("UserData", JSON.stringify(updatedData));
-              console.log("✅ Updated UserData with registration username:", regUsername);
-              return regUsername;
-            }
-          }
-        }
-      } catch (error) {
-        console.error("❌ Error checking registration data:", error);
-      }
-    }
-    return null;
-  };
-
-  // Function to check and fix localStorage data structure - UPDATED for proper username handling
-  const checkAndFixUserData = () => {
-    if (typeof window !== "undefined") {
-      const userDataStr = localStorage.getItem("UserData");
-      
-      if (userDataStr) {
-        try {
-          const parsedData = JSON.parse(userDataStr);
-          console.log("📊 Raw parsed UserData:", parsedData);
-          
-          // Check for username in all possible locations
-          let extractedUsername = "";
-          
-          // Priority 1: Direct username field
-          if (parsedData.username) {
-            extractedUsername = parsedData.username;
-            console.log("✅ Found username in root:", extractedUsername);
-          }
-          // Priority 2: Nested userData name field (from registration)
-          else if (parsedData.userData?.name) {
-            extractedUsername = parsedData.userData.name;
-            console.log("✅ Found username in userData.name:", extractedUsername);
-          }
-          // Priority 3: Email-based username (fallback)
-          else if (parsedData.email || parsedData.userData?.email) {
-            const email = parsedData.email || parsedData.userData?.email || "";
-            extractedUsername = email.split('@')[0] || "user";
-            console.log("📧 Generated username from email:", extractedUsername);
-          }
-          // Priority 4: If no data found, use default
-          else {
-            extractedUsername = "user";
-            console.log("⚠️ No username found, using default");
-          }
-          
-          // Handle legacy data structure with nested userData
-          if (parsedData.userData) {
-            // Flatten the nested structure
-            const fixedData: UserData = {
-              email: parsedData.userData.email || parsedData.email || "",
-              username: extractedUsername,
-              phone: parsedData.phone || "",
-              country: parsedData.country || { name: "Nigeria", code: "NG", dial_code: "+234" },
-              verified: parsedData.verified || true,
-              phoneVerified: parsedData.phoneVerified || parsedData.userData.phoneVerified || false,
-              accessToken: parsedData.accessToken || "",
-              dayOfBirth: parsedData.dayOfBirth || parsedData.userData.DOB,
-              darkMode: parsedData.darkMode,
-              language: parsedData.language,
-              currency: parsedData.currency
-            };
-            
-            localStorage.setItem("UserData", JSON.stringify(fixedData));
-            console.log("✅ Fixed and saved UserData with username:", fixedData.username);
-            return fixedData;
-          }
-          
-          // If no nested structure, ensure all fields exist with proper username
-          const existingData: UserData = {
-            email: parsedData.email || "",
-            username: extractedUsername,
-            phone: parsedData.phone || "",
-            country: parsedData.country || { name: "Nigeria", code: "NG", dial_code: "+234" },
-            verified: parsedData.verified || true,
-            phoneVerified: parsedData.phoneVerified || false,
-            accessToken: parsedData.accessToken || "",
-            dayOfBirth: parsedData.dayOfBirth,
-            darkMode: parsedData.darkMode,
-            language: parsedData.language,
-            currency: parsedData.currency
-          };
-          
-          localStorage.setItem("UserData", JSON.stringify(existingData));
-          console.log("✅ Updated existing UserData with username:", existingData.username);
-          return existingData;
-          
-        } catch (error) {
-          console.error('❌ Error parsing UserData:', error);
-        }
-      } else {
-        console.log("❌ No UserData found in localStorage");
-      }
-    }
-    return null;
   };
 
   // Phone validation function using libphonenumber-js
@@ -335,11 +187,9 @@ const Profile = () => {
       };
     }
 
-    // Create full number for validation
     const fullNumber = `${countryDialCode}${phoneNumber}`;
     
     try {
-      // Parse the phone number
       const phoneNumberObj = parsePhoneNumberFromString(fullNumber);
       
       if (!phoneNumberObj) {
@@ -350,16 +200,8 @@ const Profile = () => {
         };
       }
 
-      // Check if the number is valid
       const isValid = isValidPhoneNumber(fullNumber);
-      
-      // Format the number nicely
       const formatted = phoneNumberObj.formatInternational();
-      
-      // Get country calling code
-      const callingCode = phoneNumberObj.countryCallingCode;
-      
-      // Check if number matches selected country
       const phoneCountry = phoneNumberObj.country;
       
       let message = "";
@@ -376,17 +218,14 @@ const Profile = () => {
         isValid,
         message,
         formattedNumber: formatted,
-        countryCallingCode: callingCode,
         detectedCountry: phoneCountry
       };
       
     } catch (error) {
-      console.error('Phone validation error:', error);
       return {
         isValid: false,
         message: "Error validating phone number",
         formattedNumber: "",
-        countryCallingCode: "",
         detectedCountry: undefined
       };
     }
@@ -412,11 +251,9 @@ const Profile = () => {
 
           if (!validation.isValid) {
             setUserClickedVerified(false);
-            // Update localStorage to set phoneVerified to false if number becomes invalid
             updatePhoneVerifiedInLocalStorage(false);
           }
         } catch (error) {
-          console.error('Phone validation error:', error);
           setIsPhoneVerified(false);
           setPhoneValidationError("Error validating phone number");
           setUserClickedVerified(false);
@@ -443,20 +280,13 @@ const Profile = () => {
     validatePhone();
   }, [debouncedPhone, selectedCountry]);
 
-  // Handle verified phone click - UPDATED to update localStorage
+  // Handle verified phone click
   const handleVerifiedClick = () => {
     if (isPhoneVerified) {
       setUserClickedVerified(true);
-      
-      // Update localStorage immediately when user clicks verify
-      const updatedSuccessfully = updatePhoneVerifiedInLocalStorage(true);
-      
-      if (updatedSuccessfully) {
-        setSaveMessage("✅ Phone number verified! Don't forget to save changes.");
-        setTimeout(() => setSaveMessage(""), 3000);
-      } else {
-        setSaveMessage("⚠️ Could not update verification status. Please try again.");
-      }
+      updatePhoneVerifiedInLocalStorage(true);
+      setSaveMessage("✅ Phone number verified! Don't forget to save changes.");
+      setTimeout(() => setSaveMessage(""), 3000);
     }
   };
 
@@ -486,7 +316,6 @@ const Profile = () => {
 
         setCountries(formattedCountries);
       } catch (error) {
-        console.error('Error loading countries:', error);
         setCountries([
           { name: "Nigeria", code: "NG", dial_code: "+234" },
           { name: "United States", code: "US", dial_code: "+1" },
@@ -506,118 +335,97 @@ const Profile = () => {
   useEffect(() => {
     const loadUserData = async () => {
       if (typeof window !== "undefined") {
-        // Debug localStorage structure
-        debugUserDataStructure();
+        setLoading(true);
         
-        // First check and fix the data structure if needed
-        const fixedUserData = checkAndFixUserData();
-        
-        // Check for registration data that might have the real username
-        const registrationUsername = checkRegistrationData();
-        
-        // If we found a registration username, reload the data
-        if (registrationUsername) {
-          const reloadedData = checkAndFixUserData();
-          if (reloadedData) {
-            console.log("🔄 Reloaded data with registration username:", reloadedData.username);
-            setUserData(reloadedData);
-            setEmail(reloadedData.email);
-            setUsername(reloadedData.username);
-            setPhone(reloadedData.phone || "");
-            setSelectedCountry(reloadedData.country || { name: "Nigeria", code: "NG", dial_code: "+234" });
+        const stored = localStorage.getItem("UserData");
+        if (stored) {
+          try {
+            const parsed = JSON.parse(stored);
+            
+            // Extract user data from either root or nested userData
+            const userDataFromStorage = parsed?.userData || parsed;
+            
+            // Set the client user data - this is where username should be
+            setClientUser(userDataFromStorage);
+            
+            // Create UserData object from the stored data
+            const userDataObj: UserData = {
+              email: userDataFromStorage.email || parsed.email || "",
+              username: userDataFromStorage.username || parsed.username || "",
+              phone: parsed.phone || userDataFromStorage.phone || "",
+              country: parsed.country || userDataFromStorage.country || { name: "Nigeria", code: "NG", dial_code: "+234" },
+              verified: parsed.verified || userDataFromStorage.verified || true,
+              phoneVerified: parsed.phoneVerified || userDataFromStorage.phoneVerified || false,
+              accessToken: parsed.accessToken || userDataFromStorage.accessToken || "",
+              dayOfBirth: parsed.dayOfBirth || userDataFromStorage.DOB || userDataFromStorage.dayOfBirth,
+              darkMode: parsed.darkMode || userDataFromStorage.darkMode,
+              language: parsed.language || userDataFromStorage.language,
+              currency: parsed.currency || userDataFromStorage.currency,
+              userData: userDataFromStorage
+            };
+            
+            setUserData(userDataObj);
+            
+            // Set initial data
+            setPhone(userDataObj.phone || "");
+            setSelectedCountry(userDataObj.country || { name: "Nigeria", code: "NG", dial_code: "+234" });
             
             // Validate the initial phone if exists
-            if (reloadedData.phone && reloadedData.phone.length >= 4 && reloadedData.country) {
+            if (userDataObj.phone && userDataObj.phone.length >= 4 && userDataObj.country) {
               const validation = validatePhoneNumberWithLib(
-                reloadedData.phone,
-                reloadedData.country.dial_code,
-                reloadedData.country.code
+                userDataObj.phone,
+                userDataObj.country.dial_code,
+                userDataObj.country.code
               );
               setIsPhoneVerified(validation.isValid);
               setPhoneFormatted(validation.formattedNumber);
             }
             
             // Set date of birth if available
-            if (reloadedData.dayOfBirth) {
-              const birthDate = new Date(reloadedData.dayOfBirth);
-              setDay(birthDate.getDate().toString().padStart(2, "0"));
-              setMonth((birthDate.getMonth() + 1).toString().padStart(2, "0"));
-              setYear(birthDate.getFullYear().toString());
+            if (userDataObj.dayOfBirth) {
+              try {
+                const birthDate = new Date(userDataObj.dayOfBirth);
+                if (!isNaN(birthDate.getTime())) {
+                  setDay(birthDate.getDate().toString().padStart(2, "0"));
+                  setMonth((birthDate.getMonth() + 1).toString().padStart(2, "0"));
+                  setYear(birthDate.getFullYear().toString());
+                }
+              } catch (dateError) {
+                console.error("Error parsing date of birth:", dateError);
+              }
             }
             
-            setDarkModeEnabled(reloadedData.darkMode || false);
-            setSelectedLang(reloadedData.language || "English");
+            setDarkModeEnabled(userDataObj.darkMode || false);
+            setSelectedLang(userDataObj.language || "English");
             
             // Set userClickedVerified based on existing phoneVerified status
-            setUserClickedVerified(reloadedData.phoneVerified || false);
-            if (reloadedData.phoneVerified && reloadedData.phone) {
+            const phoneVerifiedStatus = userDataObj.phoneVerified || false;
+            setUserClickedVerified(phoneVerifiedStatus);
+            if (phoneVerifiedStatus && userDataObj.phone) {
               setIsPhoneVerified(true);
             }
 
             // Save original data for discard functionality
-            setOriginalData({
-              phone: reloadedData.phone || "",
-              country: reloadedData.country || { name: "Nigeria", code: "NG", dial_code: "+234" },
-              day: reloadedData.dayOfBirth ? new Date(reloadedData.dayOfBirth).getDate().toString().padStart(2, "0") : "",
-              month: reloadedData.dayOfBirth ? (new Date(reloadedData.dayOfBirth).getMonth() + 1).toString().padStart(2, "0") : "",
-              year: reloadedData.dayOfBirth ? new Date(reloadedData.dayOfBirth).getFullYear().toString() : "",
-              darkMode: reloadedData.darkMode || false,
-              language: reloadedData.language || "English",
-              currency: reloadedData.currency || "USD",
-              phoneVerified: reloadedData.phoneVerified || false
-            });
+            const originalDataObj = {
+              phone: userDataObj.phone || "",
+              country: userDataObj.country || { name: "Nigeria", code: "NG", dial_code: "+234" },
+              day: userDataObj.dayOfBirth ? new Date(userDataObj.dayOfBirth).getDate().toString().padStart(2, "0") : "",
+              month: userDataObj.dayOfBirth ? (new Date(userDataObj.dayOfBirth).getMonth() + 1).toString().padStart(2, "0") : "",
+              year: userDataObj.dayOfBirth ? new Date(userDataObj.dayOfBirth).getFullYear().toString() : "",
+              darkMode: userDataObj.darkMode || false,
+              language: userDataObj.language || "English",
+              currency: userDataObj.currency || "USD",
+              phoneVerified: phoneVerifiedStatus
+            };
+            
+            setOriginalData(originalDataObj);
+            
+          } catch (error) {
+            setSaveMessage("Error loading user data. Please refresh the page.");
           }
-        } else if (fixedUserData) {
-          console.log("📥 Loading user data:", fixedUserData);
-          setUserData(fixedUserData);
-          setEmail(fixedUserData.email);
-          setUsername(fixedUserData.username);
-          setPhone(fixedUserData.phone || "");
-          setSelectedCountry(fixedUserData.country || { name: "Nigeria", code: "NG", dial_code: "+234" });
-          
-          // Validate the initial phone if exists
-          if (fixedUserData.phone && fixedUserData.phone.length >= 4 && fixedUserData.country) {
-            const validation = validatePhoneNumberWithLib(
-              fixedUserData.phone,
-              fixedUserData.country.dial_code,
-              fixedUserData.country.code
-            );
-            setIsPhoneVerified(validation.isValid);
-            setPhoneFormatted(validation.formattedNumber);
-          }
-          
-          // Set date of birth if available
-          if (fixedUserData.dayOfBirth) {
-            const birthDate = new Date(fixedUserData.dayOfBirth);
-            setDay(birthDate.getDate().toString().padStart(2, "0"));
-            setMonth((birthDate.getMonth() + 1).toString().padStart(2, "0"));
-            setYear(birthDate.getFullYear().toString());
-          }
-          
-          setDarkModeEnabled(fixedUserData.darkMode || false);
-          setSelectedLang(fixedUserData.language || "English");
-          
-          // Set userClickedVerified based on existing phoneVerified status
-          setUserClickedVerified(fixedUserData.phoneVerified || false);
-          if (fixedUserData.phoneVerified && fixedUserData.phone) {
-            setIsPhoneVerified(true);
-          }
-
-          // Save original data for discard functionality
-          setOriginalData({
-            phone: fixedUserData.phone || "",
-            country: fixedUserData.country || { name: "Nigeria", code: "NG", dial_code: "+234" },
-            day: fixedUserData.dayOfBirth ? new Date(fixedUserData.dayOfBirth).getDate().toString().padStart(2, "0") : "",
-            month: fixedUserData.dayOfBirth ? (new Date(fixedUserData.dayOfBirth).getMonth() + 1).toString().padStart(2, "0") : "",
-            year: fixedUserData.dayOfBirth ? new Date(fixedUserData.dayOfBirth).getFullYear().toString() : "",
-            darkMode: fixedUserData.darkMode || false,
-            language: fixedUserData.language || "English",
-            currency: fixedUserData.currency || "USD",
-            phoneVerified: fixedUserData.phoneVerified || false
-          });
-        } else {
-          console.log("❌ No valid UserData found in localStorage");
         }
+        
+        setLoading(false);
       }
     };
 
@@ -702,9 +510,45 @@ const Profile = () => {
     ? countryCurrencyService.searchCurrencies(currencySearch)
     : currencyOptions;
 
-  // CORRECTED Save Changes function - simplified
+  // Helper function to get display email
+  const getDisplayEmail = () => {
+    if (loading) return "Loading...";
+    
+    if (clientUser?.email) {
+      return clientUser.email;
+    }
+    
+    if (userData?.email) {
+      return userData.email;
+    }
+    
+    return "No email found";
+  };
+
+  // Helper function to get display username - EXACTLY ONE @
+  const getDisplayUsername = () => {
+    if (loading) return "@User";
+    
+    let rawUsername = "";
+    
+    // Get username from clientUser (which contains userData from localStorage)
+    if (clientUser?.username) {
+      rawUsername = clientUser.username;
+    }
+    
+    // If we have a username, clean it and add exactly one @
+    if (rawUsername) {
+      // Remove ALL @ characters from the username
+      const cleanUsername = rawUsername.replace(/@/g, '');
+      // Add exactly one @ prefix
+      return `@${cleanUsername}`;
+    }
+    
+    return "@User";
+  };
+
+  // CORRECTED Save Changes function
   const handleSaveChanges = async () => {
-    // Prevent save if phone is not verified by user click
     if (!userClickedVerified) {
       setSaveMessage("❌ Please verify your phone number before saving changes");
       setTimeout(() => setSaveMessage(""), 3000);
@@ -728,17 +572,16 @@ const Profile = () => {
         return;
       }
 
-      // Prepare update data - ONLY what the API accepts
+      // Prepare update data
       const composedPhone = phoneFormatted || `${selectedCountry.dial_code}${phone}`;
       
-      // Format date of birth for localStorage only (not sent to API)
+      // Format date of birth for localStorage
       let formattedDateOfBirth = null;
       if (day && month && year) {
         const formattedDay = day.padStart(2, '0');
         const formattedMonth = month.padStart(2, '0');
         formattedDateOfBirth = `${year}-${formattedMonth}-${formattedDay}`;
         
-        // Validate the date
         const dateObj = new Date(formattedDateOfBirth);
         if (isNaN(dateObj.getTime())) {
           setSaveMessage("❌ Invalid date of birth");
@@ -747,13 +590,10 @@ const Profile = () => {
         }
       }
 
-      // Only send the fields that the API accepts
       const updateData = {
         phone: composedPhone,
         country: selectedCountry.code
       };
-
-      console.log("🔄 Sending update request to API:", updateData);
 
       const res = await fetch("https://evolve2p-backend.onrender.com/api/update-user", {
         method: "PUT",
@@ -764,32 +604,21 @@ const Profile = () => {
         body: JSON.stringify(updateData),
       });
 
-      console.log("📥 Response Status:", res.status, res.statusText);
-
       let responseData;
       let responseText = "";
       
       try {
         responseText = await res.text();
-        console.log("📥 Raw Response:", responseText);
-        
         if (responseText && responseText.trim() !== "") {
           responseData = JSON.parse(responseText);
         } else {
           responseData = {};
         }
       } catch (parseError) {
-        console.error("❌ Response parse error:", parseError);
         responseData = { rawResponse: responseText };
       }
 
       if (!res.ok) {
-        console.error("❌ API Error:", {
-          status: res.status,
-          statusText: res.statusText,
-          response: responseData
-        });
-        
         let errorMessage = "Failed to update profile";
         
         if (responseData) {
@@ -809,25 +638,35 @@ const Profile = () => {
       }
 
       // ✅ SUCCESS - API update successful
-      console.log("✅ Profile updated successfully via API!", responseData);
       setSaveMessage("✅ Profile updated successfully! Phone verification saved.");
       
-      // Update localStorage with ALL data
-      const updatedUserData = { 
-        ...userData, 
-        phone: phone,
-        country: selectedCountry,
-        phoneVerified: true, // Always set to true after successful save
-        ...(formattedDateOfBirth && { dayOfBirth: formattedDateOfBirth }),
-        darkMode: darkModeEnabled,
-        language: selectedLang,
-        currency: selectedCurrency?.code || "USD"
-      };
-      
-      localStorage.setItem("UserData", JSON.stringify(updatedUserData));
-      setUserData(updatedUserData);
+      // Update localStorage
+      const currentStored = localStorage.getItem("UserData");
+      if (currentStored) {
+        const currentParsed = JSON.parse(currentStored);
+        const updatedUserData = { 
+          ...currentParsed, 
+          phone: phone,
+          country: selectedCountry,
+          phoneVerified: true,
+          ...(formattedDateOfBirth && { dayOfBirth: formattedDateOfBirth }),
+          darkMode: darkModeEnabled,
+          language: selectedLang,
+          currency: selectedCurrency?.code || "USD",
+          userData: currentParsed.userData ? {
+            ...currentParsed.userData,
+            phoneVerified: true
+          } : currentParsed.userData
+        };
+        
+        localStorage.setItem("UserData", JSON.stringify(updatedUserData));
+        setUserData(updatedUserData);
+        
+        const userDataFromStorage = updatedUserData?.userData || updatedUserData;
+        setClientUser(userDataFromStorage);
+      }
 
-      // Update original data to current state
+      // Update original data
       setOriginalData({
         phone,
         country: selectedCountry,
@@ -840,18 +679,16 @@ const Profile = () => {
         phoneVerified: true
       });
 
-      // Clear message after 3 seconds
       setTimeout(() => setSaveMessage(""), 3000);
 
     } catch (error) {
-      console.error("💥 Network error:", error);
       setSaveMessage("❌ Network error: Failed to connect to server");
     } finally {
       setIsSaving(false);
     }
   };
 
-  // Discard Changes function - simplified
+  // Discard Changes function
   const handleDiscardChanges = () => {
     if (originalData) {
       setPhone(originalData.phone || "");
@@ -863,13 +700,18 @@ const Profile = () => {
       setSelectedLang(originalData.language || "English");
       setUserClickedVerified(originalData.phoneVerified || false);
       
-      // Update localStorage to match discarded state
-      if (userData) {
+      const currentStored = localStorage.getItem("UserData");
+      if (currentStored && userData) {
+        const currentParsed = JSON.parse(currentStored);
         const updatedUserData = {
-          ...userData,
+          ...currentParsed,
           phone: originalData.phone || "",
           country: originalData.country || { name: "Nigeria", code: "NG", dial_code: "+234" },
-          phoneVerified: originalData.phoneVerified || false
+          phoneVerified: originalData.phoneVerified || false,
+          userData: currentParsed.userData ? {
+            ...currentParsed.userData,
+            phoneVerified: originalData.phoneVerified || false
+          } : currentParsed.userData
         };
         
         localStorage.setItem("UserData", JSON.stringify(updatedUserData));
@@ -889,62 +731,25 @@ const Profile = () => {
 
       setSaveMessage("✅ Changes discarded");
       setTimeout(() => setSaveMessage(""), 3000);
-    } else if (userData) {
-      // Fallback: restore from current userData
-      setPhone(userData.phone || "");
-      setSelectedCountry(userData.country || { name: "Nigeria", code: "NG", dial_code: "+234" });
-      
-      // Restore Date of Birth
-      if (userData.dayOfBirth) {
-        const birthDate = new Date(userData.dayOfBirth);
-        setDay(birthDate.getDate().toString().padStart(2, "0"));
-        setMonth((birthDate.getMonth() + 1).toString().padStart(2, "0"));
-        setYear(birthDate.getFullYear().toString());
-      } else {
-        setDay("");
-        setMonth("");
-        setYear("");
-      }
-      
-      setDarkModeEnabled(userData.darkMode || false);
-      setSelectedLang(userData.language || "English");
-      setUserClickedVerified(userData.phoneVerified || false);
-
-      setIsPhoneVerified(userData.phoneVerified || false);
-      setPhoneValidationError("");
-      setPhoneFormatted("");
-
-      setSaveMessage("✅ Changes discarded");
-      setTimeout(() => setSaveMessage(""), 3000);
     }
   };
 
-  // Helper function to get display email - simplified
-  const getDisplayEmail = () => {
-    return userData?.email || "No email found";
-  };
-
-  // Helper function to get display username - UPDATED for better extraction
-  const getDisplayUsername = () => {
-    if (!userData) return "Loading...";
-    
-    // Try to get username from multiple sources
-    const username = userData.username || 
-                    (userData as any)?.userData?.name || 
-                    userData.email?.split('@')[0] || 
-                    "user";
-    
-    // Clean up the username (remove any @ symbol if present)
-    const cleanUsername = username.replace(/^@+/, '');
-    
-    console.log("👤 Display username:", { 
-      raw: username, 
-      clean: cleanUsername,
-      userData: userData 
-    });
-    
-    return cleanUsername;
-  };
+  // Show loading state
+  if (loading) {
+    return (
+      <main className="min-h-screen bg-[#0F1012] text-white">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 md:py-8">
+          <Nav />
+          <div className="flex justify-center items-center h-64">
+            <div className="text-center">
+              <div className="w-12 h-12 mx-auto border-4 border-[#4DF2BE] border-t-transparent rounded-full animate-spin mb-4"></div>
+              <p className="text-gray-400">Loading profile...</p>
+            </div>
+          </div>
+        </div>
+      </main>
+    );
+  }
 
   return (
     <main className="min-h-screen bg-[#0F1012] text-white">
@@ -1044,9 +849,7 @@ const Profile = () => {
                   Username
                 </label>
                 <div className="relative">
-                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[#8F8F8F] text-base">
-                    @
-                  </span>
+                  
                   <input
                     type="text"
                     readOnly
