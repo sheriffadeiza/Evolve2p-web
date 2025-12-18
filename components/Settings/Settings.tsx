@@ -10,6 +10,7 @@ import Mark_green from "../../public/Assets/Evolve2p_mark/elements.svg";
 import Lg_arrow from "../../public/Assets/Evolve2p_Lgarrow/Profile/arrow-right-01.svg";
 import Arrow_great from "../../public/Assets/Evolve2p_Larrow/arrow-right-01.svg";
 import Gbell from "../../public/Assets/Evolve2p_Gbell/Profile/elements.svg";
+import Profile from "../../public/Assets/Evolve2p_G_AccountL/Profile/user-check-01.svg";
 import Gclock from "../../public/Assets/Evolve2p_Gclock/Profile/elements.svg";
 import Changep from "../../public/Assets/Evolve2p_changeP/Profile/elements.svg";
 import Glocked from "../../public/Assets/Evolve2p_Glocked/Profile/locked.svg";
@@ -20,7 +21,12 @@ import Switch from "../../public/Assets/Evolve2p_switch/Profile/elements.svg";
 
 const Settings = () => {
   const [showLogoutModal, setShowLogoutModal] = useState(false);
-  const [clientUser, setClientUser] = useState<{ username?: string } | null>(null);
+  const [clientUser, setClientUser] = useState<{ 
+    username?: string; 
+    kycVerified?: boolean;
+    verificationStatus?: string;
+    isVerified?: boolean;
+  } | null>(null);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const pathname = usePathname();
   const router = useRouter();
@@ -43,6 +49,17 @@ const Settings = () => {
         : `@${clientUser.username}`
       : "@User";
 
+  // Check if user is verified
+  const isUserVerified = () => {
+    if (!clientUser) return false;
+    
+    // Check multiple possible verification fields
+    return clientUser.kycVerified === true || 
+           clientUser.verificationStatus === 'verified' || 
+           clientUser.isVerified === true ||
+           clientUser.verificationStatus === 'approved';
+  };
+
   // ✅ Logout handler
   const handleLogout = () => {
     try {
@@ -60,13 +77,15 @@ const Settings = () => {
   // Menu items data for better organization
   const menuSections = [
     {
-      title: "PREFERENCES",
+      title: "ACCOUNT",
       items: [
         {
-          href: "/notifications",
-          icon: Gbell,
-          label: "Notification",
-          path: "/notifications"
+          href: "/account_ver",
+          icon: Profile,
+          label: "Account Verification",
+          path: "/account_ver",
+          showVerificationStatus: true,
+          isVerified: isUserVerified()
         },
         {
           href: "/translim",
@@ -201,35 +220,47 @@ const Settings = () => {
                     onClick={() => setIsMobileMenuOpen(false)}
                   >
                     <div
-                      className={`flex items-center justify-between p-3 cursor-pointer transition-colors ${
+                      className={`flex flex-col p-3 cursor-pointer transition-colors ${
                         pathname.startsWith(item.path)
                           ? "bg-[#20342E]"
                           : "bg-[#2D2D2D] hover:bg-[#3A3A3A]"
                       }`}
                     >
-                      <div className="flex items-center gap-3 lg:gap-4">
-                        <Image 
-                          src={item.icon} 
-                          alt={item.label} 
-                          className="w-5 h-5 lg:w-6 lg:h-6" 
-                        />
-                        <p
-                          className={`text-sm lg:text-base font-medium ${
-                            pathname.startsWith(item.path)
-                              ? "text-[#4DF2BE]"
-                              : "text-[#DBDBDB]"
-                          }`}
-                        >
-                          {item.label}
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-2 lg:gap-3">
+                      {/* Main content row */}
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3 lg:gap-4">
+                          <Image 
+                            src={item.icon} 
+                            alt={item.label} 
+                            className="w-5 h-5 lg:w-6 lg:h-6" 
+                          />
+                          <p
+                            className={`text-sm lg:text-base font-medium ${
+                              pathname.startsWith(item.path)
+                                ? "text-[#4DF2BE]"
+                                : "text-[#DBDBDB]"
+                            }`}
+                          >
+                            {item.label}
+                          </p>
+                        </div>
                         <Image 
                           src={Arrow_great} 
                           alt="arrow" 
                           className="w-3 h-3 lg:w-4 lg:h-4" 
                         />
                       </div>
+                      
+                      {/* Verification status row (only for Account Verification) */}
+                      {item.showVerificationStatus && (
+                        <div className="mt-2 ml-8 lg:ml-10">
+                          <span className={`text-xs ${
+                            item.isVerified ? "text-[#4DF2BE]" : "text-[#FE857D]"
+                          }`}>
+                            {item.isVerified ? "✓ Verified" : "Not Verified"}
+                          </span>
+                        </div>
+                      )}
                     </div>
                   </Link>
                 ))}

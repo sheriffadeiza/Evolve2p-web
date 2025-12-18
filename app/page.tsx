@@ -2,6 +2,8 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
+import Elogo from "../public/Assets/Evolve2p_elogo/Fav Icon/Logo.svg";
+import Image from 'next/image';
 
 const FloatingParticles = () => {
   const [particles, setParticles] = useState<Array<{id: number; x: number; y: number; size: number; duration: number}>>([]);
@@ -26,7 +28,7 @@ const FloatingParticles = () => {
       {particles.map(particle => (
         <div
           key={particle.id}
-          className="absolute rounded-full bg-gradient-to-r from-blue-400/20 to-emerald-400/20"
+          className="absolute rounded-full bg-gradient-to-r from-[#4DF2BE]/20 to-black/20"
           style={{
             left: `${particle.x}%`,
             top: `${particle.y}%`,
@@ -42,10 +44,10 @@ const FloatingParticles = () => {
 
 const AnimatedTitle = ({ onColorChange }: { onColorChange: (color: string) => void }) => {
   const [displayText, setDisplayText] = useState<string>('');
-  const [currentColor, setCurrentColor] = useState<string>('#3B82F6');
+  const [currentColor, setCurrentColor] = useState<string>('#4DF2BE');
   const [glowIntensity, setGlowIntensity] = useState<number>(1);
   const fullText: string = 'Welcome to Evolve2p';
-  const colors: string[] = ['#3B82F6', '#10B981', '#8B5CF6', '#EC4899', '#F59E0B']; // More vibrant colors
+  const colors: string[] = ['#4DF2BE', '#000000', '#3DF2A7', '#2DF291', '#1DF27B'];
 
   useEffect(() => {
     let currentIndex: number = 0;
@@ -94,7 +96,7 @@ const AnimatedTitle = ({ onColorChange }: { onColorChange: (color: string) => vo
 
   return (
     <h1 
-      className="text-5xl md:text-7xl font-bold mb-6 bg-gradient-to-r from-blue-400 via-emerald-400 to-purple-400 bg-clip-text text-transparent"
+      className="text-5xl md:text-7xl font-bold mb-6 bg-gradient-to-r from-[#4DF2BE] via-white to-[#4DF2BE] bg-clip-text text-transparent"
       style={{
         filter: `drop-shadow(0 0 ${glowIntensity * 20}px ${currentColor}40)`,
         transition: 'all 0.5s ease-in-out'
@@ -108,14 +110,14 @@ const AnimatedTitle = ({ onColorChange }: { onColorChange: (color: string) => vo
 
 const FeatureCard = ({ icon, title, description, delay }: { icon: string; title: string; description: string; delay: number }) => (
   <div 
-    className="group bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-sm border border-white/10 rounded-2xl p-6 hover:from-white/15 hover:to-white/10 hover:border-white/20 transition-all duration-500 hover:scale-105 hover:-translate-y-2"
+    className="group bg-gradient-to-br from-[#4DF2BE]/10 to-black/10 backdrop-blur-sm border border-white/10 rounded-2xl p-6 hover:from-[#4DF2BE]/20 hover:to-black/20 hover:border-[#4DF2BE]/30 transition-all duration-500 hover:scale-105 hover:-translate-y-2"
     style={{ animationDelay: `${delay}ms` }}
   >
-    <div className="text-3xl mb-4 group-hover:scale-110 transition-transform duration-300">
+    <div className="text-3xl mb-4 group-hover:scale-110 transition-transform duration-300 text-[#4DF2BE]">
       {icon}
     </div>
     <h3 className="text-xl font-semibold text-white mb-2">{title}</h3>
-    <p className="text-gray-300 text-sm leading-relaxed">{description}</p>
+    <p className="text-gray-200 text-sm leading-relaxed">{description}</p>
   </div>
 );
 
@@ -125,8 +127,8 @@ const AnimatedButton = ({ href, children, variant = 'primary', className = '' }:
   const baseStyles = "relative overflow-hidden font-bold py-4 px-8 rounded-2xl transition-all duration-500 no-underline group";
   
   const variants = {
-    primary: "bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white shadow-2xl hover:shadow-blue-500/25",
-    secondary: "bg-gradient-to-r from-gray-700 to-gray-800 hover:from-gray-600 hover:to-gray-700 text-white border border-white/10 hover:border-white/20 shadow-2xl"
+    primary: "bg-gradient-to-r from-[#4DF2BE] to-[#2DF291] hover:from-[#4DF2BE] hover:to-[#3DF2A7] text-black shadow-2xl hover:shadow-[#4DF2BE]/50",
+    secondary: "bg-gradient-to-r from-black/70 to-black hover:from-black hover:to-black/90 text-[#4DF2BE] border border-[#4DF2BE]/20 hover:border-[#4DF2BE]/40 shadow-2xl"
   };
 
   return (
@@ -159,7 +161,7 @@ const AnimatedButton = ({ href, children, variant = 'primary', className = '' }:
 };
 
 export default function Home() {
-  const [bgGradient, setBgGradient] = useState<string>('linear-gradient(135deg, #0F1012 0%, #1a1b2e 50%, #0F1012 100%)');
+  const [bgGradient, setBgGradient] = useState<string>('linear-gradient(135deg, #000000 0%, #0A0A0A 50%, #000000 100%)');
   const [featuresVisible, setFeaturesVisible] = useState(false);
 
   useEffect(() => {
@@ -168,53 +170,53 @@ export default function Home() {
 
   const handleColorChange = (color: string) => {
     const gradients = {
-      '#3B82F6': 'linear-gradient(135deg, #0F1012 0%, #1e3a8a 50%, #0F1012 100%)',
-      '#10B981': 'linear-gradient(135deg, #0F1012 0%, #065f46 50%, #0F1012 100%)',
-      '#8B5CF6': 'linear-gradient(135deg, #0F1012 0%, #5b21b6 50%, #0F1012 100%)',
-      '#EC4899': 'linear-gradient(135deg, #0F1012 0%, #9d174d 50%, #0F1012 100%)',
-      '#F59E0B': 'linear-gradient(135deg, #0F1012 0%, #92400e 50%, #0F1012 100%)'
+      '#4DF2BE': 'linear-gradient(135deg, #000000 0%, #0A1A14 50%, #000000 100%)',
+      '#000000': 'linear-gradient(135deg, #000000 0%, #0A0A0A 50%, #000000 100%)',
+      '#3DF2A7': 'linear-gradient(135deg, #000000 0%, #0A1F17 50%, #000000 100%)',
+      '#2DF291': 'linear-gradient(135deg, #000000 0%, #0A2519 50%, #000000 100%)',
+      '#1DF27B': 'linear-gradient(135deg, #000000 0%, #0A2A1C 50%, #000000 100%)'
     };
     
-    setBgGradient(gradients[color as keyof typeof gradients] || gradients['#3B82F6']);
+    setBgGradient(gradients[color as keyof typeof gradients] || gradients['#4DF2BE']);
   };
 
   const features = [
     {
-      icon: "⚡",
-      title: "Lightning Fast",
-      description: "Execute trades with ultra-low latency and real-time market data"
+      icon: "↔️",
+      title: "Send & Receive Crypto",
+      description: "Seamlessly send and receive cryptocurrencies with friends, family, or businesses instantly with low fees"
     },
     {
-      icon: "🔒",
-      title: "Bank-Grade Security",
-      description: "Your assets are protected with military-grade encryption"
+      icon: "🔄",
+      title: "Swap Any Token",
+      description: "Instantly swap between hundreds of cryptocurrencies with competitive rates and minimal slippage"
     },
     {
-      icon: "📈",
-      title: "Advanced Analytics",
-      description: "Make informed decisions with professional trading tools"
+      icon: "📊",
+      title: "Create & Find Offers",
+      description: "Create buy/sell offers or discover existing offers to trade directly with other users at your preferred rates"
     }
   ];
 
   return (
     <div 
-      className="min-h-screen flex flex-col items-center justify-center relative overflow-hidden transition-all duration-1000"
+      className="min-h-screen flex flex-col items-center justify-center relative overflow-hidden transition-all duration-1000 bg-[#4DF2BE]"
       style={{ background: bgGradient }}
     >
       {/* Animated Background Elements */}
       <FloatingParticles />
       
       {/* Gradient Orbs */}
-      <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl animate-pulse" />
-      <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-purple-500/10 rounded-full blur-3xl animate-pulse delay-1000" />
-      <div className="absolute top-1/2 right-1/3 w-64 h-64 bg-emerald-500/10 rounded-full blur-3xl animate-pulse delay-500" />
+      <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-[#4DF2BE]/20 rounded-full blur-3xl animate-pulse" />
+      <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-black/20 rounded-full blur-3xl animate-pulse delay-1000" />
+      <div className="absolute top-1/2 right-1/3 w-64 h-64 bg-[#4DF2BE]/10 rounded-full blur-3xl animate-pulse delay-500" />
 
       <div className="relative z-10 text-center px-6 py-12 max-w-6xl mx-auto">
         {/* Main Title Section */}
         <div className="mb-16">
           <AnimatedTitle onColorChange={handleColorChange} />
-          <p className="text-xl md:text-2xl mb-12 text-gray-300 font-light max-w-2xl mx-auto leading-relaxed">
-            Experience the future of cryptocurrency trading with our secure, intuitive, and powerful platform designed for both beginners and professionals.
+          <p className="text-xl md:text-2xl mb-12 text-gray-200 font-light max-w-2xl mx-auto leading-relaxed">
+            Experience the future of cryptocurrency trading with Evolve2p - the user-friendly platform for sending, receiving, swapping, and trading crypto with ease.
           </p>
 
           {/* CTA Buttons */}
@@ -228,7 +230,7 @@ export default function Home() {
           </div>
         </div>
 
-        {/* Features Grid */}
+        {/* Features Grid - Updated for crypto app features */}
         <div className={`grid grid-cols-1 md:grid-cols-3 gap-8 mb-16 transition-all duration-1000 ${
           featuresVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'
         }`}>
@@ -243,13 +245,13 @@ export default function Home() {
           ))}
         </div>
 
-        {/* Stats Section */}
+        {/* Stats Section - Updated for crypto app */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-8 mb-16">
           {[
-            { number: "50K+", label: "Active Traders" },
-            { number: "$2B+", label: "Volume Traded" },
-            { number: "99.9%", label: "Uptime" },
-            { number: "150+", label: "Countries" }
+            { number: "50K+", label: "Active Users" },
+            { number: "$10M+", label: "Monthly Volume" },
+            { number: "500+", label: "Tokens Supported" },
+            { number: "24/7", label: "Trading" }
           ].map((stat, index) => (
             <div 
               key={index}
@@ -257,27 +259,35 @@ export default function Home() {
               style={{ animationDelay: `${1200 + index * 100}ms`, animationFillMode: 'forwards' }}
             >
               <div className="text-2xl md:text-3xl font-bold text-white mb-2">{stat.number}</div>
-              <div className="text-sm text-gray-400">{stat.label}</div>
+              <div className="text-sm text-[#4DF2BE]">{stat.label}</div>
             </div>
           ))}
         </div>
 
-        {/* Trust Badges */}
+        {/* Trust Badges - Updated Elogo with #4DF2BE bg and #0F1012 text */}
         <div className="flex flex-wrap justify-center items-center gap-8 opacity-0 animate-fade-in" style={{ animationDelay: '1800ms', animationFillMode: 'forwards' }}>
-          <div className="text-gray-400 text-sm">Trusted by traders worldwide</div>
-          <div className="flex gap-6 text-2xl">
-            <span className="opacity-60 hover:opacity-100 transition-opacity">🔐</span>
-            <span className="opacity-60 hover:opacity-100 transition-opacity">🌍</span>
-            <span className="opacity-60 hover:opacity-100 transition-opacity">💎</span>
-            <span className="opacity-60 hover:opacity-100 transition-opacity">🚀</span>
+          <div className="text-[#4DF2BE] text-sm">Trusted by crypto users worldwide</div>
+          <div className="flex gap-6">
+            <div className="bg-[#4DF2BE] p-3 rounded-xl flex items-center justify-center">
+              <Image 
+                src={Elogo} 
+                alt="Evolve2p Logo"
+                width={48}
+                height={48}
+                className="h-12 w-auto filter invert brightness-0"
+                style={{ 
+                  filter: 'invert(14%) sepia(6%) saturate(1191%) hue-rotate(176deg) brightness(92%) contrast(92%)'
+                }}
+              />
+            </div>
           </div>
         </div>
       </div>
 
       {/* Footer */}
-      <div className="absolute bottom-6 left-0 right-0 text-center">
-        <p className="text-gray-500 text-sm">
-          Built with ❤️ for the crypto community
+      <div className="absolute bottom-[20px] left-0 right-0 text-center">
+        <p className="text-[#4DF2BE] text-sm">
+           Evolve2p crypto revolution &copy; {new Date().getFullYear()}. All rights reserved.
         </p>
       </div>
 

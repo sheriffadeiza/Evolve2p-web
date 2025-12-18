@@ -35,8 +35,6 @@ interface Notification {
   createdAt?: string;
 }
 
-type FilterType = "all" | "trades" | "wallet" | "others";
-
 const safeToString = (value: any): string => {
   if (typeof value === 'string') return value;
   if (value === null || value === undefined) return '';
@@ -210,7 +208,6 @@ const Bell_Notify = () => {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [allTrades, setAllTrades] = useState<Trade[]>([]);
   const [userData, setUserData] = useState<any>(null);
-  const [activeFilter, setActiveFilter] = useState<FilterType>("all");
 
   useEffect(() => {
     const loadUserData = () => {
@@ -354,13 +351,6 @@ const Bell_Notify = () => {
     router.push(redirectUrl);
   }, [router, markNotificationAsRead, getCurrentUserId]);
 
-  const filterButtons: { label: string; value: FilterType }[] = [
-    { label: "All", value: "all" },
-    { label: "Trades", value: "trades" },
-    { label: "Wallet", value: "wallet" },
-    { label: "Others", value: "others" },
-  ];
-
   const dismissNotification = useCallback((notificationId: string) => {
     setNotifications(prev => prev.filter(n => n.id !== notificationId));
     
@@ -420,31 +410,8 @@ const Bell_Notify = () => {
     }
   }, []);
 
-  const filteredNotifications = notifications.filter(notification => {
-    if (activeFilter === "all") return true;
-    if (activeFilter === "trades") {
-      const type = safeToString(notification.type);
-      const title = safeToString(notification.title).toLowerCase();
-      const message = safeToString(notification.message).toLowerCase();
-      return type.includes("TRADE") || 
-             title.includes("trade") ||
-             message.includes("trade") ||
-             !!notification.matchedTrade;
-    }
-    if (activeFilter === "wallet") {
-      const type = safeToString(notification.type);
-      const title = safeToString(notification.title).toLowerCase();
-      const message = safeToString(notification.message).toLowerCase();
-      return type.includes("WALLET") || 
-             title.includes("wallet") ||
-             message.includes("deposit") ||
-             message.includes("withdraw");
-    }
-    return true;
-  });
-
   // Group notifications by date
-  const groupedNotifications = groupNotificationsByDate(filteredNotifications);
+  const groupedNotifications = groupNotificationsByDate(notifications);
 
   return (
     <main className="min-h-screen bg-[#0F1012] text-white">
@@ -455,47 +422,39 @@ const Bell_Notify = () => {
 
       {/* Page Content */}
       <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="flex items-center justify-between mb-6">
+        {/* Header with Back Arrow */}
+        <div className="flex items-center gap-3 mb-8">
+          <button
+            onClick={() => router.back()}
+            className="flex items-center justify-center w-10 h-10 rounded-full bg-[#1A1B1E] hover:bg-[#2A2B2E] transition-colors"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+            </svg>
+          </button>
           <h1 className="text-2xl sm:text-3xl font-bold">Notifications</h1>
-          <div className="flex gap-4">
-            {notifications.length > 0 && (
-              <>
-                <button
-                  onClick={markAllAsRead}
-                  className="text-sm text-[#4DF2BE] hover:underline hover:text-[#3DD2A5] transition-colors"
-                >
-                  Mark all as read
-                </button>
-                <button
-                  onClick={dismissAllNotifications}
-                  className="text-sm text-red-400 hover:underline hover:text-red-300 transition-colors"
-                >
-                  Dismiss all
-                </button>
-              </>
-            )}
-          </div>
         </div>
 
-        {/* Filter Tabs */}
-        <div className="grid grid-cols-4 gap-1 bg-[#111214] rounded-xl p-1 mb-8 text-sm">
-          {filterButtons.map(({ label, value }) => (
+        {/* Action Buttons */}
+        {notifications.length > 0 && (
+          <div className="flex gap-4 mb-8">
             <button
-              key={value}
-              onClick={() => setActiveFilter(value)}
-              className={`py-2.5 px-1 rounded-lg font-medium transition-colors duration-200 ${
-                activeFilter === value
-                  ? "bg-[#4DF2BE] text-black"
-                  : "text-gray-300 hover:text-white hover:bg-[#1A1B1E]"
-              }`}
+              onClick={markAllAsRead}
+              className="text-sm text-[#4DF2BE] hover:underline hover:text-[#3DD2A5] transition-colors"
             >
-              {label}
+              Mark all as read
             </button>
-          ))}
-        </div>
+            <button
+              onClick={dismissAllNotifications}
+              className="text-sm text-red-400 hover:underline hover:text-red-300 transition-colors"
+            >
+              Dismiss all
+            </button>
+          </div>
+        )}
 
         {/* Empty State */}
-        {filteredNotifications.length === 0 && (
+        {notifications.length === 0 && (
           <div className="text-center py-12">
             <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-[#1A1B1E] flex items-center justify-center">
               <span className="text-2xl">🔔</span>
@@ -508,7 +467,7 @@ const Bell_Notify = () => {
         )}
 
         {/* Notification List with Date Grouping */}
-        {filteredNotifications.length > 0 && (
+        {notifications.length > 0 && (
           <div className="flex flex-col gap-6">
             {Object.entries(groupedNotifications).map(([dateHeader, dateNotifications]) => (
               <div key={dateHeader} className="space-y-4">
@@ -628,14 +587,14 @@ const Bell_Notify = () => {
             ))}
           </div>
         )}
-
-        
       </div>
+
+      {/* Footer */}
       <div className="w-[50%] ml-[30%] h-[1px] bg-[#fff] mt-[50%] opacity-20 my-8"></div>
               
-        <div className="mb-[80px] p-[50px] mt-[10%]">
-          <Footer />
-        </div>
+      <div className="mb-[80px] p-[50px] mt-[10%]">
+        <Footer />
+      </div>
     </main>
   );
 };

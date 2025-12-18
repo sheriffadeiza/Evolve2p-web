@@ -145,11 +145,34 @@ const Dashboard: React.FC<QRCodeBoxProps> = ({ value }) => {
   const [isSending, setIsSending] = useState(false);
   const [transactionHash, setTransactionHash] = useState<string>("");
   const [recentTransaction, setRecentTransaction] = useState<Transaction | null>(null);
+  const [authToken, setAuthToken] = useState<string>("");
   
   const safeNumber = (value: any): number => {
     if (value === null || value === undefined) return 0;
     const num = Number(value);
     return isNaN(num) ? 0 : num;
+  };
+
+  // Function to extract token from localStorage
+  const getAuthToken = (): string => {
+    if (typeof window === "undefined") return "";
+    
+    const userDataString = localStorage.getItem("UserData");
+    if (!userDataString) return "";
+    
+    try {
+      const userData = JSON.parse(userDataString);
+      // Try different possible token property names
+      return userData.token || 
+             userData.accessToken || 
+             userData.access_token || 
+             userData.authToken || 
+             localStorage.getItem("token") || 
+             "";
+    } catch (e) {
+      console.error("Error parsing user data for token:", e);
+      return "";
+    }
   };
 
   useEffect(() => {
@@ -308,37 +331,72 @@ const Dashboard: React.FC<QRCodeBoxProps> = ({ value }) => {
     try {
       setIsSending(true);
       
+      // Get the auth token
+      const token = getAuthToken();
+      if (!token) {
+        throw new Error('Authentication token not found. Please login again.');
+      }
+      
+      // Validate amount
+      const amount = parseFloat(sendAmount);
+      if (isNaN(amount) || amount <= 0) {
+        throw new Error('Please enter a valid amount');
+      }
+
+      // Get sender's wallet
+      const senderWallet = clientUser?.wallets?.find((w: any) => 
+        w.currency?.toUpperCase() === selectedAsset.symbol.toUpperCase()
+      );
+      
+      if (!senderWallet) {
+        throw new Error('Sender wallet not found');
+      }
+
       // Prepare transaction data for API
       const transactionData = {
-        senderId: clientUser?._id || clientUser?.id,
-        receiverAddress: receiverAddress,
-        amount: sendAmount,
-        currency: selectedAsset.symbol,
+        toAddress: receiverAddress.trim(),
+        amount: amount,
+        coin: selectedAsset.symbol,
+        fromAddress: senderWallet.address,
+        userId: clientUser?._id || clientUser?.id,
         networkFee: networkFee.toString(),
-        totalAmount: (parseFloat(sendAmount) + networkFee).toString(),
-        timestamp: new Date().toISOString(),
-        status: "pending"
+        totalAmount: (amount + networkFee).toString(),
+        timestamp: new Date().toISOString()
       };
+
+      console.log('Sending transaction data:', transactionData);
+      console.log('Using token (first 20 chars):', token.substring(0, 20) + '...');
 
       // Make API call to your backend
       const response = await fetch('https://evolve2p-backend.onrender.com/api/send', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'Authorization': `Bearer ${token}`,
         },
         body: JSON.stringify(transactionData),
       });
 
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.message || `Transaction failed with status: ${response.status}`);
+      // Log response for debugging
+      console.log('Response status:', response.status);
+      
+      const responseText = await response.text();
+      console.log('Response text:', responseText);
+
+      let result;
+      try {
+        result = JSON.parse(responseText);
+      } catch (e) {
+        console.error('Failed to parse JSON response:', e);
+        throw new Error('Server returned invalid response');
       }
 
-      const result = await response.json();
-      
-      // Generate a mock transaction hash (in real app, this would come from the API)
-      const mockHash = `0x${Array.from({length: 64}, () => 
+      if (!response.ok) {
+        throw new Error(result.message || result.error || `Transaction failed with status: ${response.status}`);
+      }
+
+      // Success handling
+      const mockHash = result.transactionHash || `0x${Array.from({length: 64}, () => 
         Math.floor(Math.random() * 16).toString(16)
       ).join('')}`;
       
@@ -346,7 +404,7 @@ const Dashboard: React.FC<QRCodeBoxProps> = ({ value }) => {
       
       // Create transaction object for viewing details
       const newTransaction: Transaction = {
-        id: `e2p_txn_${mockHash.substring(2, 10).toUpperCase()}`,
+        id: result.transactionId || `e2p_txn_${mockHash.substring(2, 10).toUpperCase()}`,
         amount: `-${sendAmount} ${selectedAsset.symbol}`,
         currency: selectedAsset.symbol,
         receiverAddress: receiverAddress,
@@ -390,11 +448,33 @@ const Dashboard: React.FC<QRCodeBoxProps> = ({ value }) => {
       closeReviewModal();
       setTimeout(() => {
         setSuccess(true);
-      }, 300); // Small delay for smooth transition
+      }, 300);
 
     } catch (error: any) {
       console.error('Transaction error:', error);
-      alert(`Transaction failed: ${error.message || 'Please try again.'}`);
+      
+      // Show more detailed error message
+      let errorMessage = 'Transaction failed. Please try again.';
+      
+      if (error.message.includes('jwt') || error.message.includes('token') || error.message.includes('auth')) {
+        errorMessage = 'Session expired. Please login again.';
+        // Optionally redirect to login
+        setTimeout(() => {
+          localStorage.removeItem('UserData');
+          localStorage.removeItem('token');
+          router.push('/Logins/login');
+        }, 2000);
+      } else if (error.message.includes('404')) {
+        errorMessage = 'Transfer endpoint not found. Please contact support.';
+      } else if (error.message.includes('500')) {
+        errorMessage = 'Server error. Please try again later.';
+      } else if (error.message.includes('balance') || error.message.includes('insufficient')) {
+        errorMessage = 'Insufficient balance for this transaction.';
+      } else {
+        errorMessage = error.message || 'Transaction failed. Please try again.';
+      }
+      
+      alert(`Transaction failed: ${errorMessage}`);
     } finally {
       setIsSending(false);
     }
@@ -539,6 +619,13 @@ const Dashboard: React.FC<QRCodeBoxProps> = ({ value }) => {
       }
       try {
         const userData = JSON.parse(stored);
+        // Extract token and store it
+        const token = userData.token || userData.accessToken || userData.access_token || userData.authToken;
+        if (token) {
+          setAuthToken(token);
+        }
+        
+        // Set client user data
         setClientUser(userData?.userData || userData);
         setLoading(false);
       } catch (e) {
@@ -607,13 +694,44 @@ const Dashboard: React.FC<QRCodeBoxProps> = ({ value }) => {
     { symbol: "USDT", name: "USDT", icon: USDT },
   ];
 
+  // Updated todoItems with navigation handlers
   const todoItems = [
-    { icon: Buy, title: "Buy Crypto", description: "Start a new buy order" },
-    { icon: Sell, title: "Sell Crypto", description: "Start a new sell order" },
-    { icon: Offer, title: "Post an Offer", description: "Create your P2P offer" },
-    { icon: Limit, title: "Increase Buy/Sell Limits", description: "Unlock higher trading limits by upgrading verification." },
-    { icon: Set, title: "Set Up 2FA", description: "Secure your account with two-factor authentication." },
-    { icon: Refer, title: "Refer & Earn", description: "Invite friends and earn rewards on every trade." },
+    { 
+      icon: Buy, 
+      title: "Buy Crypto", 
+      description: "Start a new buy order",
+      onClick: () => router.push("/market_place")
+    },
+    { 
+      icon: Sell, 
+      title: "Sell Crypto", 
+      description: "Start a new sell order",
+      onClick: () => router.push("/market_place")
+    },
+    { 
+      icon: Offer, 
+      title: "Post an Offer", 
+      description: "Create your P2P offer",
+      onClick: () => router.push("/market_place/post_ad")
+    },
+    { 
+      icon: Limit, 
+      title: "Increase Buy/Sell Limits", 
+      description: "Unlock higher trading limits by upgrading verification."
+      // Keep existing behavior or add navigation if you have a specific page
+    },
+    { 
+      icon: Set, 
+      title: "Set Up 2FA", 
+      description: "Secure your account with two-factor authentication.",
+      onClick: () => router.push("/tfa")
+    },
+    { 
+      icon: Refer, 
+      title: "Refer & Earn", 
+      description: "Invite friends and earn rewards on every trade."
+      // Keep existing behavior or add navigation if you have a specific page
+    },
   ];
 
   if (loading) {
@@ -931,12 +1049,15 @@ const Dashboard: React.FC<QRCodeBoxProps> = ({ value }) => {
             <div className="lg:w-96">
               <div className="flex justify-between items-center mb-4">
                 <p className="text-[14px] sm:text-[16px] font-[500] text-[#8F8F8F]">Todo list</p>
-                
               </div>
               
               <div className="grid grid-cols-1 gap-2 sm:gap-3">
                 {todoItems.map((item, index) => (
-                  <div key={index} className="bg-[#222222] rounded-lg p-2 sm:p-3 flex items-center gap-2 sm:gap-3 cursor-pointer hover:bg-[#2A2A2A] transition-colors">
+                  <div 
+                    key={index} 
+                    className="bg-[#222222] rounded-lg p-2 sm:p-3 flex items-center gap-2 sm:gap-3 cursor-pointer hover:bg-[#2A2A2A] transition-colors"
+                    onClick={item.onClick}
+                  >
                     <div className="relative w-8 h-8 sm:w-10 sm:h-10 flex items-center justify-center flex-shrink-0">
                       <Image src={Eclipse} alt="background" width={32} height={32} className="w-8 h-8 sm:w-10 sm:h-10" />
                       <Image 
@@ -967,7 +1088,7 @@ const Dashboard: React.FC<QRCodeBoxProps> = ({ value }) => {
         </div>
 
         {/* Footer */}
-        <div className="w-[100%] h-[1px] bg-[#fff]  opacity-20 my-8"></div>
+        <div className="w-[100%] h-[1px] mt-[30%] bg-[#fff]  opacity-20 my-8"></div>
         
         <div className="mb-[80px] mt-[20%] whitespace-nowrap">
           <Footer />

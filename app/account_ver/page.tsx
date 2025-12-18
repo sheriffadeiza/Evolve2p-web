@@ -1,11 +1,11 @@
 import React from 'react';
-import Notifications from '@/components/Notifications/Notifications';
+import Account_ver from '@/components/Account _ver/Account_ver';
 
 
 const page = () => {
   return (
     <div>
-      <Notifications/>
+      <Account_ver/>
     </div>
   )
 }

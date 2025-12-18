@@ -77,7 +77,7 @@ const Nav: React.FC = () => {
 
   const profileOptions = [
     { name: "My Profile", icon: ProfileIcon, action: () => router.push("/profile") },
-    { name: "Notifications", icon: SettingsIcon, action: () => router.push("/notifications") },
+    { name: "Notifications", icon: SettingsIcon, action: () => router.push("/bell_notify") },
     { name: "My Transactions", icon: TransactionsIcon, action: () => router.push("/transactions") },
     { name: "Transaction Limit", icon: LimitIcon, action: () => router.push("/translim") },
     { name: "Trade History", icon: HistoryIcon, action: () => router.push("/tradehistory") },
@@ -88,7 +88,7 @@ const Nav: React.FC = () => {
     profileOptions.unshift({
       name: "Verify me",
       icon: VerifyIcon,
-      action: () => {} // Add your verification route here if needed
+      action: () => router.push("/Signups/KYC") // Add your verification route here if needed
     });
   }
 

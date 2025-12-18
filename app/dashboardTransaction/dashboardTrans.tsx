@@ -59,95 +59,164 @@ const DashboardTransactions = () => {
   const recentTransactions = filteredTransactions.slice(0, 10);
 
   return (
-    <div className="w-full lg:w-[913px] h-[722px]  sm:mt-[4%] mt-[34%]  md:mt-[0px]">
+    <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
       {/* Header */}
-      <div className="flex items-center justify-between w-full lg:w-[900px] h-[24px] rounded-[12px] mb-[20px] ">
-        <p className="text-[16px] font-[500] text-[#8F8F8F]">Transactions</p>
-        <div className="flex items-center space-x-[10px]">
-          <Link href="/transactions" className="flex items-center">
-            <p className="text-[14px] font-[700] text-[#FCFCFC]">See all</p>
-            <Image src={R_arrow} alt="rarrow" className="ml-2" />
+      <div className="flex items-center justify-between w-full rounded-[12px] mb-5 sm:mb-6">
+        <p className="text-[14px] sm:text-[16px] font-[500] text-[#8F8F8F]">Recent Transactions</p>
+        <div className="flex items-center space-x-2 sm:space-x-[10px]">
+          <Link href="/transactions" className="flex items-center hover:opacity-80">
+            <p className="text-[12px] sm:text-[14px] font-[700] text-[#FCFCFC]">View All</p>
+            <Image 
+              src={R_arrow} 
+              alt="rarrow" 
+              width={14}
+              height={14}
+              className="ml-1 sm:ml-2 w-3 h-3 sm:w-4 sm:h-4"
+            />
           </Link>
         </div>
       </div>
 
       {/* Transaction list */}
       {recentTransactions.length > 0 ? (
-        <table className="w-full mt-[30px] text-sm">
-          <thead>
-            <tr className="text-[#C7C7C7] text-[14px] font-[500]">
-              <th className="text-left py-2 pl-4">Type</th>
-              <th className="text-left py-2 pl-4">Amount</th>
-              <th className="text-left py-2 pl-4">Asset</th>
-              <th className="text-left py-2 pl-4">Counterparty</th>
-              <th className="text-left py-2 pl-4">Status</th>
-              <th className="text-left py-2 pl-4">Date</th>
-            </tr>
-          </thead>
-          <tbody>
+        <>
+          {/* Desktop Table (hidden on mobile) */}
+          <div className="hidden lg:block overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-[#C7C7C7] text-[14px] font-[500]">
+                  <th className="text-left py-3 pl-4">Transaction Type</th>
+                  <th className="text-left py-3 pl-4">Amount</th>
+                  <th className="text-left py-3 pl-4">Transaction Status</th>
+                  <th className="text-left py-3 pl-4">Transaction Date</th>
+                </tr>
+              </thead>
+              <tbody>
+                {recentTransactions.map((t, i) => (
+                  <tr
+                    key={i}
+                    className="border-b text-[#DBDBDB] font-[500] text-[16px] bg-[#222222] hover:bg-[#2A2A2A] transition-colors"
+                  >
+                    {/* Type */}
+                    <td className="py-3 pl-4">
+                      <div className="flex items-center gap-3">
+                        <div className="flex items-center justify-center w-8 h-8 bg-[#0F1012] rounded-full flex-shrink-0">
+                          <Image
+                            src={typeIcons[t.type] || BuyIcon}
+                            alt={t.type}
+                            width={16}
+                            height={16}
+                            className="w-4 h-4"
+                          />
+                        </div>
+                        <span className="text-[14px] truncate">{t.type}</span>
+                      </div>
+                    </td>
+
+                    {/* Amount */}
+                    <td className="py-3 pl-4 text-[14px]">{t.amount}</td>
+
+                    {/* Status - Reduced width */}
+                    <td className="py-3 pl-4">
+                      <span
+                        className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${
+                          statusColors[t.status] || "bg-gray-800 text-gray-400"
+                        }`}
+                      >
+                        <Image
+                          src={statusIcons[t.status] || completedIcon}
+                          alt={t.status}
+                          width={12}
+                          height={12}
+                          className="w-3 h-3"
+                        />
+                        <span>{t.status}</span>
+                      </span>
+                    </td>
+
+                    {/* Date */}
+                    <td className="py-3 pl-4 text-[12px] text-[#DBDBDB] whitespace-nowrap">
+                      {t.date ? new Date(t.date).toLocaleDateString('en-US', {
+                        month: 'short',
+                        day: 'numeric'
+                      }) : "-"}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Mobile Cards (visible on mobile and tablet) */}
+          <div className="lg:hidden space-y-3">
             {recentTransactions.map((t, i) => (
-              <tr
+              <div 
                 key={i}
-                className="border-b text-[#DBDBDB] font-[500] text-[16px] bg-[#222222]"
+                className="bg-[#222222] rounded-lg p-3 border border-[#333333]"
               >
-                {/* Type */}
-                <td className="flex items-center p-[10px_12px] gap-[20px]">
-                  <div className="flex items-center pl-4 w-[20px] h-[20px] bg-[#0F1012] p-[5.6px] rounded-full">
-                    <Image
-                      src={typeIcons[t.type] || BuyIcon}
-                      alt={t.type}
-                      width={16}
-                      height={16}
-                    />
+                {/* Header - Shows Type and Status */}
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-3">
+                    <div className="flex items-center justify-center w-8 h-8 bg-[#0F1012] rounded-full flex-shrink-0">
+                      <Image
+                        src={typeIcons[t.type] || BuyIcon}
+                        alt={t.type}
+                        width={16}
+                        height={16}
+                        className="w-4 h-4"
+                      />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-[14px] font-bold text-[#DBDBDB] truncate">{t.type}</p>
+                      <p className="text-[12px] text-[#8F8F8F] truncate">
+                        {t.date ? new Date(t.date).toLocaleDateString('en-US', {
+                          month: 'short',
+                          day: 'numeric',
+                          year: 'numeric'
+                        }) : ""}
+                      </p>
+                    </div>
                   </div>
-                  {t.type}
-                </td>
-
-                {/* Amount */}
-                <td className="py-3 pl-4">{t.amount}</td>
-
-                {/* Asset */}
-                <td className="py-3 pl-4">{t.asset}</td>
-
-                {/* Counterparty */}
-                <td className="py-3 pl-4">{t.counterparty || "-"}</td>
-
-                {/* Status */}
-                <td className="py-3 pl-4">
                   <span
-                    className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${
+                    className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${
                       statusColors[t.status] || "bg-gray-800 text-gray-400"
                     }`}
                   >
                     <Image
                       src={statusIcons[t.status] || completedIcon}
                       alt={t.status}
-                      width={14}
-                      height={14}
+                      width={12}
+                      height={12}
+                      className="w-3 h-3"
                     />
-                    {t.status}
+                    <span className="truncate">{t.status}</span>
                   </span>
-                </td>
+                </div>
 
-                {/* Date */}
-                <td className="py-3 pl-4">
-                  {t.date ? new Date(t.date).toDateString() : "-"}
-                </td>
-              </tr>
+                {/* Details - Shows Amount */}
+                <div>
+                  <p className="text-[12px] text-[#8F8F8F] mb-1">Transaction Amount</p>
+                  <p className="text-[14px] font-[600] text-[#DBDBDB]">{t.amount}</p>
+                </div>
+              </div>
             ))}
-          </tbody>
-        </table>
+          </div>
+        </>
       ) : (
         // 👇 placeholder if no transactions
-        <div className=" flex flex-col items-center lg:mt-[15%] justify-center border-0 border-red-500">
-          <Image src={G19} alt="group19" />
-          <p className="text-[14px] font-[400] text-[#8F8F8F]">
+        <div className="flex flex-col items-center justify-center py-8 sm:py-12 border-0">
+          <Image 
+            src={G19} 
+            alt="group19" 
+            width={120}
+            height={120}
+            className="w-20 h-20 sm:w-24 sm:h-24 mb-4"
+          />
+          <p className="text-[14px] font-[400] text-[#8F8F8F] text-center px-4">
             Your 10 most recent transactions will appear here
           </p>
         </div>
       )}
-
-      {/* Divider */}
     </div>
   );
 };
