@@ -15,7 +15,6 @@ import Lang from "../../public/Assets/Evolve2p_Lang/Profile/globe.svg";
 import Times from "../../public/Assets/Evolve2p_times/Icon container.png";
 import Footer from "../Footer/Footer";
 import { countryCurrencyService, CurrencyOption } from "../../utils/countryCurrencyService";
-import { parsePhoneNumberFromString, isValidPhoneNumber } from "libphonenumber-js";
 
 // Add blue tick icon
 const BlueTick = () => (
@@ -158,17 +157,25 @@ const Profile = () => {
       if (stored) {
         const parsed = JSON.parse(stored);
         
+        // Update at both root level and nested userData level
         const updatedData = {
           ...parsed,
           phoneVerified: isVerified,
-          userData: parsed.userData ? {
-            ...parsed.userData,
-            phoneVerified: isVerified
-          } : parsed.userData
+          ...(parsed.userData && {
+            userData: {
+              ...parsed.userData,
+              phoneVerified: isVerified
+            }
+          })
         };
         
         localStorage.setItem("UserData", JSON.stringify(updatedData));
         setUserData(updatedData);
+        
+        // Also update clientUser state
+        const userDataFromStorage = updatedData?.userData || updatedData;
+        setClientUser(userDataFromStorage);
+        
         return true;
       }
     } catch (error) {
@@ -177,8 +184,16 @@ const Profile = () => {
     return false;
   };
 
-  // Phone validation function using libphonenumber-js
-  const validatePhoneNumberWithLib = (phoneNumber: string, countryDialCode: string, countryCode: string) => {
+  // Phone validation function using libphonenumber-js - WITH DYNAMIC IMPORT
+  const validatePhoneNumberWithLib = async (phoneNumber: string, countryDialCode: string, countryCode: string) => {
+    if (typeof window === 'undefined') {
+      return { 
+        isValid: false, 
+        message: "Validating...",
+        formattedNumber: ""
+      };
+    }
+
     if (!phoneNumber || phoneNumber.length < 4) {
       return { 
         isValid: false, 
@@ -190,6 +205,10 @@ const Profile = () => {
     const fullNumber = `${countryDialCode}${phoneNumber}`;
     
     try {
+      // DYNAMIC IMPORT: Only import on the client side
+      const lib = await import('libphonenumber-js/min');
+      const { parsePhoneNumberFromString, isValidPhoneNumber } = lib;
+      
       const phoneNumberObj = parsePhoneNumberFromString(fullNumber);
       
       if (!phoneNumberObj) {
@@ -222,6 +241,7 @@ const Profile = () => {
       };
       
     } catch (error) {
+      console.error("libphonenumber-js validation error:", error);
       return {
         isValid: false,
         message: "Error validating phone number",
@@ -239,7 +259,7 @@ const Profile = () => {
         setPhoneValidationError("");
 
         try {
-          const validation = validatePhoneNumberWithLib(
+          const validation = await validatePhoneNumberWithLib(
             debouncedPhone, 
             selectedCountry.dial_code, 
             selectedCountry.code
@@ -270,10 +290,7 @@ const Profile = () => {
         updatePhoneVerifiedInLocalStorage(false);
       } else {
         setIsPhoneVerified(false);
-        setUserClickedVerified(false);
-        setPhoneFormatted("");
         setPhoneValidationError("");
-        updatePhoneVerifiedInLocalStorage(false);
       }
     };
 
@@ -284,9 +301,16 @@ const Profile = () => {
   const handleVerifiedClick = () => {
     if (isPhoneVerified) {
       setUserClickedVerified(true);
-      updatePhoneVerifiedInLocalStorage(true);
-      setSaveMessage("✅ Phone number verified! Don't forget to save changes.");
-      setTimeout(() => setSaveMessage(""), 3000);
+      
+      // Update localStorage immediately when user clicks verify
+      const updatedSuccessfully = updatePhoneVerifiedInLocalStorage(true);
+      
+      if (updatedSuccessfully) {
+        setSaveMessage("✅ Phone number verified! Don't forget to save changes.");
+        setTimeout(() => setSaveMessage(""), 3000);
+      } else {
+        setSaveMessage("⚠️ Could not update verification status. Please try again.");
+      }
     }
   };
 
@@ -334,102 +358,113 @@ const Profile = () => {
   // Load user data and currencies
   useEffect(() => {
     const loadUserData = async () => {
-      if (typeof window !== "undefined") {
-        setLoading(true);
-        
-        const stored = localStorage.getItem("UserData");
-        if (stored) {
-          try {
-            const parsed = JSON.parse(stored);
-            
-            // Extract user data from either root or nested userData
-            const userDataFromStorage = parsed?.userData || parsed;
-            
-            // Set the client user data - this is where username should be
-            setClientUser(userDataFromStorage);
-            
-            // Create UserData object from the stored data
-            const userDataObj: UserData = {
-              email: userDataFromStorage.email || parsed.email || "",
-              username: userDataFromStorage.username || parsed.username || "",
-              phone: parsed.phone || userDataFromStorage.phone || "",
-              country: parsed.country || userDataFromStorage.country || { name: "Nigeria", code: "NG", dial_code: "+234" },
-              verified: parsed.verified || userDataFromStorage.verified || true,
-              phoneVerified: parsed.phoneVerified || userDataFromStorage.phoneVerified || false,
-              accessToken: parsed.accessToken || userDataFromStorage.accessToken || "",
-              dayOfBirth: parsed.dayOfBirth || userDataFromStorage.DOB || userDataFromStorage.dayOfBirth,
-              darkMode: parsed.darkMode || userDataFromStorage.darkMode,
-              language: parsed.language || userDataFromStorage.language,
-              currency: parsed.currency || userDataFromStorage.currency,
-              userData: userDataFromStorage
-            };
-            
-            setUserData(userDataObj);
-            
-            // Set initial data
-            setPhone(userDataObj.phone || "");
-            setSelectedCountry(userDataObj.country || { name: "Nigeria", code: "NG", dial_code: "+234" });
-            
-            // Validate the initial phone if exists
+      if (typeof window === 'undefined') {
+        setLoading(false);
+        return;
+      }
+      
+      setLoading(true);
+      
+      const stored = localStorage.getItem("UserData");
+      if (stored) {
+        try {
+          const parsed = JSON.parse(stored);
+          
+          // Extract user data from either root or nested userData
+          const userDataFromStorage = parsed?.userData || parsed;
+          
+          // Set the client user data - this is where username should be
+          setClientUser(userDataFromStorage);
+          
+          // Create UserData object from the stored data
+          const userDataObj: UserData = {
+            email: userDataFromStorage.email || parsed.email || "",
+            username: userDataFromStorage.username || parsed.username || "",
+            phone: parsed.phone || userDataFromStorage.phone || "",
+            country: parsed.country || userDataFromStorage.country || { name: "Nigeria", code: "NG", dial_code: "+234" },
+            verified: parsed.verified || userDataFromStorage.verified || true,
+            phoneVerified: parsed.phoneVerified || userDataFromStorage.phoneVerified || false,
+            accessToken: parsed.accessToken || userDataFromStorage.accessToken || "",
+            dayOfBirth: parsed.dayOfBirth || userDataFromStorage.DOB || userDataFromStorage.dayOfBirth,
+            darkMode: parsed.darkMode || userDataFromStorage.darkMode,
+            language: parsed.language || userDataFromStorage.language,
+            currency: parsed.currency || userDataFromStorage.currency,
+            userData: userDataFromStorage
+          };
+          
+          setUserData(userDataObj);
+          
+          // Set initial data
+          setPhone(userDataObj.phone || "");
+          setSelectedCountry(userDataObj.country || { name: "Nigeria", code: "NG", dial_code: "+234" });
+          
+          // CRITICAL: Set verification status based on saved state
+          const phoneVerifiedStatus = userDataObj.phoneVerified || false;
+          setUserClickedVerified(phoneVerifiedStatus);
+          
+          if (phoneVerifiedStatus && userDataObj.phone) {
+            setIsPhoneVerified(true);
+            // Also validate the phone if it's marked as verified
             if (userDataObj.phone && userDataObj.phone.length >= 4 && userDataObj.country) {
-              const validation = validatePhoneNumberWithLib(
-                userDataObj.phone,
-                userDataObj.country.dial_code,
-                userDataObj.country.code
-              );
-              setIsPhoneVerified(validation.isValid);
-              setPhoneFormatted(validation.formattedNumber);
-            }
-            
-            // Set date of birth if available
-            if (userDataObj.dayOfBirth) {
               try {
-                const birthDate = new Date(userDataObj.dayOfBirth);
-                if (!isNaN(birthDate.getTime())) {
-                  setDay(birthDate.getDate().toString().padStart(2, "0"));
-                  setMonth((birthDate.getMonth() + 1).toString().padStart(2, "0"));
-                  setYear(birthDate.getFullYear().toString());
-                }
-              } catch (dateError) {
-                console.error("Error parsing date of birth:", dateError);
+                const validation = await validatePhoneNumberWithLib(
+                  userDataObj.phone,
+                  userDataObj.country.dial_code,
+                  userDataObj.country.code
+                );
+                setPhoneFormatted(validation.formattedNumber);
+              } catch (error) {
+                console.error("Initial phone validation error:", error);
               }
             }
-            
-            setDarkModeEnabled(userDataObj.darkMode || false);
-            setSelectedLang(userDataObj.language || "English");
-            
-            // Set userClickedVerified based on existing phoneVerified status
-            const phoneVerifiedStatus = userDataObj.phoneVerified || false;
-            setUserClickedVerified(phoneVerifiedStatus);
-            if (phoneVerifiedStatus && userDataObj.phone) {
-              setIsPhoneVerified(true);
-            }
-
-            // Save original data for discard functionality
-            const originalDataObj = {
-              phone: userDataObj.phone || "",
-              country: userDataObj.country || { name: "Nigeria", code: "NG", dial_code: "+234" },
-              day: userDataObj.dayOfBirth ? new Date(userDataObj.dayOfBirth).getDate().toString().padStart(2, "0") : "",
-              month: userDataObj.dayOfBirth ? (new Date(userDataObj.dayOfBirth).getMonth() + 1).toString().padStart(2, "0") : "",
-              year: userDataObj.dayOfBirth ? new Date(userDataObj.dayOfBirth).getFullYear().toString() : "",
-              darkMode: userDataObj.darkMode || false,
-              language: userDataObj.language || "English",
-              currency: userDataObj.currency || "USD",
-              phoneVerified: phoneVerifiedStatus
-            };
-            
-            setOriginalData(originalDataObj);
-            
-          } catch (error) {
-            setSaveMessage("Error loading user data. Please refresh the page.");
           }
+          
+          // Set date of birth if available
+          if (userDataObj.dayOfBirth) {
+            try {
+              const birthDate = new Date(userDataObj.dayOfBirth);
+              if (!isNaN(birthDate.getTime())) {
+                setDay(birthDate.getDate().toString().padStart(2, "0"));
+                setMonth((birthDate.getMonth() + 1).toString().padStart(2, "0"));
+                setYear(birthDate.getFullYear().toString());
+              }
+            } catch (dateError) {
+              console.error("Error parsing date of birth:", dateError);
+            }
+          }
+          
+          setDarkModeEnabled(userDataObj.darkMode || false);
+          setSelectedLang(userDataObj.language || "English");
+
+          // Save original data for discard functionality
+          const originalDataObj = {
+            phone: userDataObj.phone || "",
+            country: userDataObj.country || { name: "Nigeria", code: "NG", dial_code: "+234" },
+            day: userDataObj.dayOfBirth ? new Date(userDataObj.dayOfBirth).getDate().toString().padStart(2, "0") : "",
+            month: userDataObj.dayOfBirth ? (new Date(userDataObj.dayOfBirth).getMonth() + 1).toString().padStart(2, "0") : "",
+            year: userDataObj.dayOfBirth ? new Date(userDataObj.dayOfBirth).getFullYear().toString() : "",
+            darkMode: userDataObj.darkMode || false,
+            language: userDataObj.language || "English",
+            currency: userDataObj.currency || "USD",
+            phoneVerified: phoneVerifiedStatus
+          };
+          
+          setOriginalData(originalDataObj);
+          
+        } catch (error) {
+          setSaveMessage("Error loading user data. Please refresh the page.");
         }
-        
-        setLoading(false);
       }
+      
+      setLoading(false);
     };
 
     const loadCurrencies = async () => {
+      if (typeof window === 'undefined') {
+        setLoadingCurrencies(false);
+        return;
+      }
+      
       setLoadingCurrencies(true);
       try {
         await countryCurrencyService.initialize();
@@ -463,14 +498,10 @@ const Profile = () => {
 
     if (numericValue.length < 4) {
       setIsPhoneVerified(false);
-      setUserClickedVerified(false);
       setPhoneFormatted("");
       setPhoneValidationError("Phone number is too short");
-      updatePhoneVerifiedInLocalStorage(false);
     } else {
       setPhoneValidationError("");
-      setUserClickedVerified(false);
-      updatePhoneVerifiedInLocalStorage(false);
     }
   };
 
@@ -483,10 +514,16 @@ const Profile = () => {
     updatePhoneVerifiedInLocalStorage(false);
 
     if (phone.length >= 4) {
-      const validation = validatePhoneNumberWithLib(phone, country.dial_code, country.code);
-      setIsPhoneVerified(validation.isValid);
-      setPhoneFormatted(validation.formattedNumber);
-      setPhoneValidationError(validation.isValid ? "" : validation.message);
+      // Trigger validation asynchronously
+      validatePhoneNumberWithLib(phone, country.dial_code, country.code)
+        .then(validation => {
+          setIsPhoneVerified(validation.isValid);
+          setPhoneFormatted(validation.formattedNumber);
+          setPhoneValidationError(validation.isValid ? "" : validation.message);
+        })
+        .catch(error => {
+          console.error("Country change validation error:", error);
+        });
     }
   };
 
@@ -819,7 +856,7 @@ const Profile = () => {
                   </p>
                   <p className="text-xs text-gray-300 mt-1">
                     {userClickedVerified 
-                      ? "Your phone number is verified. Remember to save changes to update your profile."
+                      ? `Your phone number ${phoneFormatted || phone} is verified. Changes are saved locally.`
                       : "Enter your phone number, then click 'Click to Verify' above. Finally, save changes to complete verification."}
                   </p>
                 </div>
@@ -849,7 +886,9 @@ const Profile = () => {
                   Username
                 </label>
                 <div className="relative">
-                  
+                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[#8F8F8F] text-base">
+                    @
+                  </span>
                   <input
                     type="text"
                     readOnly
@@ -874,24 +913,28 @@ const Profile = () => {
                       {phone && phone.length >= 4 && (
                         phoneVerificationLoading ? (
                           <span className="text-sm text-[#8F8F8F]">Checking...</span>
-                        ) : isPhoneVerified ? (
-                          userClickedVerified ? (
-                            <span className="text-sm font-bold text-[#4DF2BE] flex items-center gap-1">
-                              ✓ Verified
-                            </span>
-                          ) : (
-                            <button
-                              type="button"
-                              onClick={handleVerifiedClick}
-                              className="text-sm font-bold text-[#4DF2BE] flex items-center gap-1 cursor-pointer hover:underline bg-transparent border-none"
-                            >
-                              ✓ Click to Verify
-                            </button>
-                          )
                         ) : (
-                          <span className="text-sm font-bold text-[#FE857D] flex items-center gap-1">
-                            ✗ Not Verified
-                          </span>
+                          <div className="flex items-center gap-2">
+                            {isPhoneVerified ? (
+                              userClickedVerified ? (
+                                <span className="text-sm font-bold text-[#4DF2BE] flex items-center gap-1">
+                                  ✓ Verified
+                                </span>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={handleVerifiedClick}
+                                  className="text-sm font-bold text-[#4DF2BE] flex items-center gap-1 cursor-pointer hover:underline bg-transparent border-none"
+                                >
+                                  ✓ Click to Verify
+                                </button>
+                              )
+                            ) : (
+                              <span className="text-sm font-bold text-[#FE857D] flex items-center gap-1">
+                                ✗ Not Verified
+                              </span>
+                            )}
+                          </div>
                         )
                       )}
                     </div>
