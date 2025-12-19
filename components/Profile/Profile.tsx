@@ -17,7 +17,6 @@ import Footer from "../Footer/Footer";
 import { countryCurrencyService, CurrencyOption } from "../../utils/countryCurrencyService";
 import PhoneInput from 'react-phone-number-input';
 import { isValidPhoneNumber } from 'react-phone-number-input';
-import { E164Number } from 'libphonenumber-js';
 import 'react-phone-number-input/style.css';
 
 // Add blue tick icon
@@ -133,15 +132,15 @@ const Profile = () => {
   const [currencySearch, setCurrencySearch] = useState("");
   const [loadingCurrencies, setLoadingCurrencies] = useState(true);
 
-  // Phone and Country states
-  const [phoneNumber, setPhoneNumber] = useState<E164Number | undefined>();
+  // Phone and Country states - FIXED: Handle both string and undefined
+  const [phoneNumber, setPhoneNumber] = useState<string | undefined>("");
   const [isPhoneVerified, setIsPhoneVerified] = useState<boolean>(false);
   const [userClickedVerified, setUserClickedVerified] = useState<boolean>(false);
   const [phoneVerificationLoading, setPhoneVerificationLoading] = useState<boolean>(false);
   const [phoneValidationError, setPhoneValidationError] = useState<string>("");
   const [phoneFormatted, setPhoneFormatted] = useState<string>("");
   const [isNewPhoneNumber, setIsNewPhoneNumber] = useState<boolean>(false);
-  const [originalPhoneNumber, setOriginalPhoneNumber] = useState<E164Number | undefined>();
+  const [originalPhoneNumber, setOriginalPhoneNumber] = useState<string>("");
   
   const [countries, setCountries] = useState<Country[]>([]);
   const [selectedCountry, setSelectedCountry] = useState<Country>({
@@ -213,6 +212,11 @@ const Profile = () => {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  // Handle phone number change - FIXED: Accept string or undefined
+  const handlePhoneNumberChange = (value: string | undefined) => {
+    setPhoneNumber(value || "");
+  };
+
   // Function to update phoneVerified in localStorage AND backend
   const updatePhoneVerifiedInBackend = async (isVerified: boolean): Promise<boolean> => {
     try {
@@ -249,7 +253,7 @@ const Profile = () => {
                 "Authorization": `Bearer ${accessToken}`
               },
               body: JSON.stringify({
-                phone: phoneNumber.toString(),
+                phone: phoneNumber,
                 phoneVerified: isVerified
               }),
             });
@@ -275,8 +279,8 @@ const Profile = () => {
   };
 
   // Phone validation using react-phone-number-input
-  const validatePhoneNumber = (phone: E164Number | undefined) => {
-    if (!phone || phone.toString().length < 4) {
+  const validatePhoneNumber = (phone: string | undefined) => {
+    if (!phone || phone.length < 4) {
       return { 
         isValid: false, 
         message: "Phone number is too short",
@@ -285,8 +289,7 @@ const Profile = () => {
     }
 
     try {
-      const phoneString = phone.toString();
-      const isValid = isValidPhoneNumber(phoneString);
+      const isValid = isValidPhoneNumber(phone);
       
       let message = "";
       if (!isValid) {
@@ -298,7 +301,7 @@ const Profile = () => {
       return {
         isValid,
         message,
-        formattedNumber: phoneString,
+        formattedNumber: phone,
         detectedCountry: undefined
       };
       
@@ -316,7 +319,7 @@ const Profile = () => {
   // Validate phone number on change
   useEffect(() => {
     const validatePhone = () => {
-      if (phoneNumber && phoneNumber.toString().length >= 4) {
+      if (phoneNumber && phoneNumber.length >= 4) {
         setPhoneVerificationLoading(true);
         setPhoneValidationError("");
 
@@ -327,7 +330,7 @@ const Profile = () => {
         setPhoneValidationError(validation.isValid ? "" : validation.message);
 
         // Check if phone number has changed from original
-        if (originalPhoneNumber && phoneNumber.toString() !== originalPhoneNumber.toString()) {
+        if (originalPhoneNumber && phoneNumber !== originalPhoneNumber) {
           setIsNewPhoneNumber(true);
           setUserClickedVerified(false); // Reset verification for new number
           updatePhoneVerifiedInBackend(false);
@@ -341,10 +344,10 @@ const Profile = () => {
         }
         
         setPhoneVerificationLoading(false);
-      } else if (phoneNumber && phoneNumber.toString().length > 0) {
+      } else if (phoneNumber && phoneNumber.length > 0) {
         setIsPhoneVerified(false);
         setUserClickedVerified(false);
-        setIsNewPhoneNumber(originalPhoneNumber ? phoneNumber.toString() !== originalPhoneNumber.toString() : false);
+        setIsNewPhoneNumber(originalPhoneNumber ? phoneNumber !== originalPhoneNumber : false);
         setPhoneFormatted("");
         setPhoneValidationError("Phone number is too short");
         updatePhoneVerifiedInBackend(false);
@@ -358,7 +361,7 @@ const Profile = () => {
     validatePhone();
   }, [phoneNumber, originalPhoneNumber]);
 
-  // Handle verified phone click - FIXED WITH ASYNC/AWAIT
+  // Handle verified phone click
   const handleVerifiedClick = async () => {
     if (isPhoneVerified) {
       setUserClickedVerified(true);
@@ -424,7 +427,7 @@ const Profile = () => {
     loadCountries();
   }, []);
 
-  // Load user data and currencies - FIXED E.164 FORMATTING with backend sync
+  // Load user data and currencies
   useEffect(() => {
     const loadUserData = async () => {
       if (typeof window === 'undefined') {
@@ -466,8 +469,8 @@ const Profile = () => {
           // Format phone to E.164
           const formattedPhone = formatToE164(userDataObj.phone, selectedCountry.dial_code);
           
-          setPhoneNumber(formattedPhone as E164Number || undefined);
-          setOriginalPhoneNumber(formattedPhone as E164Number || undefined); // Store original for comparison
+          setPhoneNumber(formattedPhone || "");
+          setOriginalPhoneNumber(formattedPhone || ""); // Store original for comparison
           setSelectedCountry(selectedCountry);
           
           // SYNC VERIFICATION STATUS FROM BACKEND
@@ -484,7 +487,7 @@ const Profile = () => {
               
               if (response.ok) {
                 const freshUserData = await response.json();
-                const backendPhoneVerified = freshUserData?.phoneVerified || false;
+                const backendPhoneVerified = freshUserData?.user?.phoneVerified || freshUserData?.phoneVerified || false;
                 
                 // Update local state with backend verification status
                 setUserClickedVerified(backendPhoneVerified);
@@ -668,7 +671,7 @@ const Profile = () => {
     return "@User";
   };
 
-  // CORRECTED Save Changes function with backend persistence
+  // CORRECTED Save Changes function with proper phone number handling
   const handleSaveChanges = async () => {
     if (!userClickedVerified) {
       setSaveMessage("❌ Please verify your phone number before saving changes");
@@ -707,11 +710,16 @@ const Profile = () => {
         }
       }
 
+      // Ensure phone number is a string
+      const phoneToSave = phoneNumber || "";
+      
       const updateData = {
-        phone: phoneNumber || "",
+        phone: phoneToSave,
         country: selectedCountry.code,
         phoneVerified: true  // Include verification status in update
       };
+
+      console.log("Sending update data:", updateData); // Debug log
 
       const res = await fetch("https://evolve2p-backend.onrender.com/api/update-user", {
         method: "PUT",
@@ -759,7 +767,7 @@ const Profile = () => {
       let successMessage = "✅ Profile updated successfully!";
       if (isNewPhoneNumber) {
         successMessage += " New phone number saved and verified.";
-        setOriginalPhoneNumber(phoneNumber); // Update original phone number
+        setOriginalPhoneNumber(phoneToSave); // Update original phone number
         setIsNewPhoneNumber(false);
       } else {
         successMessage += " Phone verification status updated.";
@@ -772,7 +780,7 @@ const Profile = () => {
         const currentParsed = JSON.parse(currentStored);
         const updatedUserData = { 
           ...currentParsed, 
-          phone: phoneNumber || "",
+          phone: phoneToSave,
           country: selectedCountry,
           phoneVerified: true,
           ...(formattedDateOfBirth && { dayOfBirth: formattedDateOfBirth }),
@@ -781,6 +789,7 @@ const Profile = () => {
           currency: selectedCurrency?.code || "USD",
           userData: currentParsed.userData ? {
             ...currentParsed.userData,
+            phone: phoneToSave,
             phoneVerified: true
           } : currentParsed.userData
         };
@@ -793,7 +802,7 @@ const Profile = () => {
       }
 
       setOriginalData({
-        phone: phoneNumber || "",
+        phone: phoneToSave,
         country: selectedCountry,
         day,
         month,
@@ -807,6 +816,7 @@ const Profile = () => {
       setTimeout(() => setSaveMessage(""), 3000);
 
     } catch (error) {
+      console.error("Save error:", error);
       setSaveMessage("❌ Network error: Failed to connect to server");
     } finally {
       setIsSaving(false);
@@ -816,7 +826,7 @@ const Profile = () => {
   // Discard Changes function
   const handleDiscardChanges = () => {
     if (originalData) {
-      setPhoneNumber(originalData.phone as E164Number || undefined);
+      setPhoneNumber(originalData.phone || "");
       setSelectedCountry(originalData.country || { name: "Nigeria", code: "NG", dial_code: "+234" });
       setDay(originalData.day || "");
       setMonth(originalData.month || "");
@@ -1138,7 +1148,7 @@ const Profile = () => {
                       Phone number
                     </p>
                     <div className="flex items-center gap-2">
-                      {phoneNumber && phoneNumber.toString().length >= 4 && (
+                      {phoneNumber && phoneNumber.length >= 4 && (
                         phoneVerificationLoading ? (
                           <span className="text-sm text-[#8F8F8F]">Checking...</span>
                         ) : (
@@ -1173,8 +1183,8 @@ const Profile = () => {
                       international
                       countryCallingCodeEditable={false}
                       defaultCountry="NG"
-                      value={phoneNumber || ""}
-                      onChange={setPhoneNumber}
+                      value={phoneNumber}
+                      onChange={handlePhoneNumberChange} // FIXED: Using wrapper function
                       className="custom-phone-input"
                       style={{
                         '--PhoneInput-color--focus': '#4DF2BE',
@@ -1186,7 +1196,7 @@ const Profile = () => {
                     />
                     
                     <span className="absolute right-3 top-1/2 -translate-y-1/2">
-                      {phoneNumber && phoneNumber.toString().length >= 4 && isPhoneVerified && userClickedVerified ? (
+                      {phoneNumber && phoneNumber.length >= 4 && isPhoneVerified && userClickedVerified ? (
                         <BlueTick />
                       ) : (
                         <Image
