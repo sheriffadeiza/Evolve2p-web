@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import Image from "next/image";
 import Nav from "../NAV/Nav";
 import { useRouter } from "next/navigation";
@@ -87,8 +87,44 @@ const Toggle = ({
   );
 };
 
+// Helper function to format phone number to E.164
+const formatToE164 = (phone: string, countryDialCode: string = "+234"): string => {
+  if (!phone) return "";
+  
+  // If already in E.164 format, return as is
+  if (phone.startsWith('+')) {
+    return phone;
+  }
+  
+  // Remove all non-digits
+  const cleaned = phone.replace(/\D/g, '');
+  
+  if (!cleaned) return "";
+  
+  // Remove country code digits from dial code
+  const countryCodeDigits = countryDialCode.replace('+', '');
+  
+  // Remove leading zero if present
+  let digits = cleaned;
+  if (digits.startsWith('0')) {
+    digits = digits.substring(1);
+  }
+  
+  // Check if the number already starts with country code
+  if (digits.startsWith(countryCodeDigits)) {
+    return `+${digits}`;
+  }
+  
+  // Return in E.164 format
+  return `+${countryCodeDigits}${digits}`;
+};
+
 const Profile = () => {
   const router = useRouter();
+  const countryRef = useRef<HTMLDivElement>(null);
+  const currencyRef = useRef<HTMLDivElement>(null);
+  const langRef = useRef<HTMLDivElement>(null);
+  const dateRef = useRef<HTMLDivElement>(null);
 
   // Currency states using the service
   const [currencyOptions, setCurrencyOptions] = useState<CurrencyOption[]>([]);
@@ -97,7 +133,7 @@ const Profile = () => {
   const [currencySearch, setCurrencySearch] = useState("");
   const [loadingCurrencies, setLoadingCurrencies] = useState(true);
 
-  // Phone and Country states - USING REACT-PHONE-NUMBER-INPUT with correct type
+  // Phone and Country states
   const [phoneNumber, setPhoneNumber] = useState<E164Number | undefined>();
   const [isPhoneVerified, setIsPhoneVerified] = useState<boolean>(false);
   const [userClickedVerified, setUserClickedVerified] = useState<boolean>(false);
@@ -154,6 +190,27 @@ const Profile = () => {
   const [saveMessage, setSaveMessage] = useState("");
   const [originalData, setOriginalData] = useState<any>(null);
 
+  // Close dropdowns when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (countryRef.current && !countryRef.current.contains(event.target as Node)) {
+        setOpenCountry(false);
+      }
+      if (currencyRef.current && !currencyRef.current.contains(event.target as Node)) {
+        setOpenCurrency(false);
+      }
+      if (langRef.current && !langRef.current.contains(event.target as Node)) {
+        setOpenLang(false);
+      }
+      if (dateRef.current && !dateRef.current.contains(event.target as Node)) {
+        setOpenDate(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
   // Function to update phoneVerified in localStorage
   const updatePhoneVerifiedInLocalStorage = (isVerified: boolean) => {
     try {
@@ -161,7 +218,6 @@ const Profile = () => {
       if (stored) {
         const parsed = JSON.parse(stored);
         
-        // Update at both root level and nested userData level
         const updatedData = {
           ...parsed,
           phoneVerified: isVerified,
@@ -176,7 +232,6 @@ const Profile = () => {
         localStorage.setItem("UserData", JSON.stringify(updatedData));
         setUserData(updatedData);
         
-        // Also update clientUser state
         const userDataFromStorage = updatedData?.userData || updatedData;
         setClientUser(userDataFromStorage);
         
@@ -199,10 +254,8 @@ const Profile = () => {
     }
 
     try {
-      // Convert to string for validation
       const phoneString = phone.toString();
       const isValid = isValidPhoneNumber(phoneString);
-      // Alternative: const isPossible = isPossiblePhoneNumber(phoneString); // Checks length only
       
       let message = "";
       if (!isValid) {
@@ -214,7 +267,7 @@ const Profile = () => {
       return {
         isValid,
         message,
-        formattedNumber: phoneString, // react-phone-number-input provides E.164 format
+        formattedNumber: phoneString,
         detectedCountry: undefined
       };
       
@@ -236,7 +289,6 @@ const Profile = () => {
         setPhoneVerificationLoading(true);
         setPhoneValidationError("");
 
-        // Call validation function
         const validation = validatePhoneNumber(phoneNumber);
         
         setIsPhoneVerified(validation.isValid);
@@ -269,7 +321,6 @@ const Profile = () => {
     if (isPhoneVerified) {
       setUserClickedVerified(true);
       
-      // Update localStorage immediately when user clicks verify
       const updatedSuccessfully = updatePhoneVerifiedInLocalStorage(true);
       
       if (updatedSuccessfully) {
@@ -322,7 +373,7 @@ const Profile = () => {
     loadCountries();
   }, []);
 
-  // Load user data and currencies
+  // Load user data and currencies - FIXED E.164 FORMATTING
   useEffect(() => {
     const loadUserData = async () => {
       if (typeof window === 'undefined') {
@@ -337,13 +388,10 @@ const Profile = () => {
         try {
           const parsed = JSON.parse(stored);
           
-          // Extract user data from either root or nested userData
           const userDataFromStorage = parsed?.userData || parsed;
           
-          // Set the client user data - this is where username should be
           setClientUser(userDataFromStorage);
           
-          // Create UserData object from the stored data
           const userDataObj: UserData = {
             email: userDataFromStorage.email || parsed.email || "",
             username: userDataFromStorage.username || parsed.username || "",
@@ -361,11 +409,15 @@ const Profile = () => {
           
           setUserData(userDataObj);
           
-          // Set initial data - convert string to E164Number
-          setPhoneNumber(userDataObj.phone as E164Number || undefined);
-          setSelectedCountry(userDataObj.country || { name: "Nigeria", code: "NG", dial_code: "+234" });
+          // FIX: Convert local number to E.164 format
+          const selectedCountry = userDataObj.country || { name: "Nigeria", code: "NG", dial_code: "+234" };
           
-          // CRITICAL: Set verification status based on saved state
+          // Format phone to E.164
+          const formattedPhone = formatToE164(userDataObj.phone, selectedCountry.dial_code);
+          
+          setPhoneNumber(formattedPhone as E164Number || undefined);
+          setSelectedCountry(selectedCountry);
+          
           const phoneVerifiedStatus = userDataObj.phoneVerified || false;
           setUserClickedVerified(phoneVerifiedStatus);
           
@@ -373,7 +425,6 @@ const Profile = () => {
             setIsPhoneVerified(true);
           }
           
-          // Set date of birth if available
           if (userDataObj.dayOfBirth) {
             try {
               const birthDate = new Date(userDataObj.dayOfBirth);
@@ -390,10 +441,9 @@ const Profile = () => {
           setDarkModeEnabled(userDataObj.darkMode || false);
           setSelectedLang(userDataObj.language || "English");
 
-          // Save original data for discard functionality
           const originalDataObj = {
-            phone: userDataObj.phone || "",
-            country: userDataObj.country || { name: "Nigeria", code: "NG", dial_code: "+234" },
+            phone: formattedPhone || "",
+            country: selectedCountry,
             day: userDataObj.dayOfBirth ? new Date(userDataObj.dayOfBirth).getDate().toString().padStart(2, "0") : "",
             month: userDataObj.dayOfBirth ? (new Date(userDataObj.dayOfBirth).getMonth() + 1).toString().padStart(2, "0") : "",
             year: userDataObj.dayOfBirth ? new Date(userDataObj.dayOfBirth).getFullYear().toString() : "",
@@ -406,6 +456,7 @@ const Profile = () => {
           setOriginalData(originalDataObj);
           
         } catch (error) {
+          console.error("Error loading user data:", error);
           setSaveMessage("Error loading user data. Please refresh the page.");
         }
       }
@@ -458,7 +509,7 @@ const Profile = () => {
   const filteredCountries = countrySearch
     ? countries.filter(country =>
       country.name.toLowerCase().includes(countrySearch.toLowerCase()) ||
-      country.dial_code.includes(countrySearch)
+      country.code.toLowerCase().includes(countrySearch.toLowerCase())
     )
     : countries;
 
@@ -489,22 +540,18 @@ const Profile = () => {
     return "No email found";
   };
 
-  // Helper function to get display username - EXACTLY ONE @
+  // Helper function to get display username
   const getDisplayUsername = () => {
     if (loading) return "@User";
     
     let rawUsername = "";
     
-    // Get username from clientUser (which contains userData from localStorage)
     if (clientUser?.username) {
       rawUsername = clientUser.username;
     }
     
-    // If we have a username, clean it and add exactly one @
     if (rawUsername) {
-      // Remove ALL @ characters from the username
       const cleanUsername = rawUsername.replace(/@/g, '');
-      // Add exactly one @ prefix
       return `@${cleanUsername}`;
     }
     
@@ -536,7 +583,6 @@ const Profile = () => {
         return;
       }
 
-      // Format date of birth for localStorage
       let formattedDateOfBirth = null;
       if (day && month && year) {
         const formattedDay = day.padStart(2, '0');
@@ -598,10 +644,8 @@ const Profile = () => {
         return;
       }
 
-      // ✅ SUCCESS - API update successful
       setSaveMessage("✅ Profile updated successfully! Phone verification saved.");
       
-      // Update localStorage
       const currentStored = localStorage.getItem("UserData");
       if (currentStored) {
         const currentParsed = JSON.parse(currentStored);
@@ -627,7 +671,6 @@ const Profile = () => {
         setClientUser(userDataFromStorage);
       }
 
-      // Update original data
       setOriginalData({
         phone: phoneNumber || "",
         country: selectedCountry,
@@ -714,6 +757,135 @@ const Profile = () => {
 
   return (
     <main className="min-h-screen bg-[#0F1012] text-white">
+      <style jsx global>{`
+        /* Phone Input Container Styles */
+        .custom-phone-input {
+          width: 100%;
+        }
+        
+        .custom-phone-input .PhoneInput {
+          display: flex;
+          align-items: center;
+          width: 100%;
+        }
+        
+        .custom-phone-input .PhoneInputCountry {
+          background: #1F1F1F;
+          padding: 0.5rem;
+          border-radius: 0.5rem 0 0 0.5rem;
+          margin-right: 0.5rem;
+          border: 1px solid #3A3A3A;
+          height: 44px;
+          gap:40%;
+          min-width: 80px;
+        }
+        
+        .custom-phone-input .PhoneInputCountrySelect {
+          background: #000;
+          border: none;
+          color: #4DF2BE;
+        }
+        
+        .custom-phone-input .PhoneInputCountrySelectArrow {
+          color: #8F8F8F;
+          margin-left: 4px;
+        }
+        
+        .custom-phone-input .PhoneInputCountryIcon {
+          border-radius: 0.25rem;
+          width: 20px;
+          height: 15px;
+        }
+        
+        .custom-phone-input .PhoneInputCountryIcon--border {
+          box-shadow: none;
+        }
+        
+        .custom-phone-input .PhoneInputInput {
+          background: #1F1F1F;
+          color: #FFFFFF;
+          border: 1px solid #3A3A3A;
+          border-radius: 0 0.5rem 0.5rem 0;
+          padding: 0.75rem 1rem;
+          height: 44px;
+          font-size: 0.875rem;
+          width: 100%;
+          flex: 1;
+        }
+        
+        .custom-phone-input .PhoneInputInput:focus {
+          outline: none;
+          border-color: #4DF2BE;
+          box-shadow: 0 0 0 1px #4DF2BE;
+        }
+        
+        .custom-phone-input .PhoneInputInput::placeholder {
+          color: #8F8F8F;
+        }
+        
+        /* Phone Input Dropdown Styles */
+        .PhoneInputCountryDropdown {
+          background: #1A1A1A;
+          border: 1px solid #3A3A3A;
+          border-radius: 0.5rem;
+          box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+          max-height: 300px;
+          overflow-y: auto;
+          width: 320px !important;
+          z-index: 9999;
+        }
+        
+        .PhoneInputCountryDropdown::-webkit-scrollbar {
+          width: 6px;
+        }
+        
+        .PhoneInputCountryDropdown::-webkit-scrollbar-track {
+          background: #2D2D2D;
+          border-radius: 3px;
+        }
+        
+        .PhoneInputCountryDropdown::-webkit-scrollbar-thumb {
+          background: #4DF2BE;
+          border-radius: 3px;
+        }
+        
+        .PhoneInputCountryDropdown option {
+          background: #1A1A1A;
+          color: #FFFFFF;
+          padding: 0.75rem 1rem;
+          border-bottom: 1px solid #2D2D2D;
+          cursor: pointer;
+          transition: all 0.2s ease;
+        }
+        
+        .PhoneInputCountryDropdown option:hover {
+          background: #2D2D2D;
+        }
+        
+        .PhoneInputCountryDropdown option:checked,
+        .PhoneInputCountryDropdown option:focus {
+          background: #4DF2BE;
+          color: #0F1012;
+        }
+        
+        /* Responsive adjustments */
+        @media (max-width: 640px) {
+          .custom-phone-input .PhoneInputCountry {
+            min-width: 70px;
+          }
+          
+          .PhoneInputCountryDropdown {
+            width: 280px !important;
+          }
+        }
+        
+        @media (min-width: 1024px) {
+          .PhoneInputCountryDropdown {
+            width: 350px !important;
+          }
+        }
+      `}</style>
+
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 md:py-8">
         <Nav />
 
@@ -797,7 +969,7 @@ const Profile = () => {
                   type="email"
                   readOnly
                   value={getDisplayEmail()}
-                  className="h-12 lg:h-14 bg-[#222222] mt-1 px-4 rounded-lg text-sm font-normal border-none text-[#8F8F8F] cursor-not-allowed"
+                  className="h-12 lg:h-14 bg-[#1F1F1F] border border-[#3A3A3A] mt-1 px-4 rounded-lg text-sm font-normal text-[#FFFFFF] cursor-not-allowed focus:border-[#4DF2BE] transition-colors"
                 />
                 <div className="flex items-center h-7 bg-[#2D2D2D] text-xs text-[#8F8F8F] font-normal px-3 rounded-b-lg">
                   Contact admin to change email
@@ -810,14 +982,12 @@ const Profile = () => {
                   Username
                 </label>
                 <div className="relative">
-                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[#8F8F8F] text-base">
-                    @
-                  </span>
+                  
                   <input
                     type="text"
                     readOnly
                     value={getDisplayUsername()}
-                    className="w-full h-12 lg:h-14 bg-[#222222] px-10 mt-1 rounded-t-lg text-sm font-normal border-none text-[#8F8F8F] cursor-not-allowed"
+                    className="w-full h-12 lg:h-14 bg-[#1F1F1F] border border-[#3A3A3A] px-10 mt-1 rounded-t-lg text-sm font-normal text-[#FFFFFF] cursor-not-allowed focus:border-[#4DF2BE] transition-colors"
                   />
                 </div>
                 <div className="flex items-center h-7 bg-[#2D2D2D] text-xs text-[#8F8F8F] font-normal px-3 rounded-b-lg">
@@ -827,9 +997,9 @@ const Profile = () => {
 
               {/* Phone & Country - Editable */}
               <div className="flex flex-col lg:flex-row gap-4">
-                {/* Phone Number */}
+                {/* Phone Number - This handles country codes */}
                 <div className="flex-1">
-                  <div className="flex items-center justify-between">
+                  <div className="flex items-center justify-between mb-2">
                     <p className="text-sm font-medium text-[#C7C7C7]">
                       Phone number
                     </p>
@@ -864,64 +1034,36 @@ const Profile = () => {
                     </div>
                   </div>
 
-                  <div className="flex items-center mt-2">
-                    <div className="relative w-full">
-                      <PhoneInput
-                        international
-                        countryCallingCodeEditable={false}
-                        defaultCountry="NG"
-                        value={phoneNumber}
-                        onChange={setPhoneNumber}
-                        className="custom-phone-input"
-                        style={{
-                          '--PhoneInput-color--focus': '#4DF2BE',
-                          '--PhoneInputCountrySelectArrow-color': '#C7C7C7',
-                          '--PhoneInputCountryFlag-borderColor': 'transparent',
-                        } as React.CSSProperties}
-                      />
-                      <style jsx global>{`
-                        .custom-phone-input .PhoneInputInput {
-                          background: #222222;
-                          color: #C7C7C7;
-                          border: none;
-                          border-radius: 0.5rem;
-                          padding: 1rem;
-                          height: 3.5rem;
-                          font-size: 0.875rem;
-                          width: 100%;
-                        }
-                        .custom-phone-input .PhoneInputInput:focus {
-                          outline: none;
-                          box-shadow: 0 0 0 2px #4DF2BE;
-                        }
-                        .custom-phone-input .PhoneInputCountry {
-                          background: #3A3A3A;
-                          padding: 0.5rem;
-                          border-radius: 0.5rem 0 0 0.5rem;
-                          margin-right: 0.5rem;
-                        }
-                        .custom-phone-input .PhoneInputCountrySelectArrow {
-                          color: #C7C7C7;
-                        }
-                        .PhoneInputCountryIcon {
-                          border-radius: 0.25rem;
-                        }
-                      `}</style>
-                      
-                      <span className="absolute right-3 top-1/2 -translate-y-1/2">
-                        {phoneNumber && phoneNumber.toString().length >= 4 && isPhoneVerified && userClickedVerified ? (
-                          <BlueTick />
-                        ) : (
-                          <Image
-                            src={Yellow_i}
-                            alt="yellowi"
-                            width={20}
-                            height={20}
-                            className="w-5 h-5"
-                          />
-                        )}
-                      </span>
-                    </div>
+                  <div className="relative w-full">
+                    <PhoneInput
+                      international
+                      countryCallingCodeEditable={false}
+                      defaultCountry="NG"
+                      value={phoneNumber || ""}
+                      onChange={setPhoneNumber}
+                      className="custom-phone-input"
+                      style={{
+                        '--PhoneInput-color--focus': '#4DF2BE',
+                        '--PhoneInputCountrySelectArrow-color': '#C7C7C7',
+                        '--PhoneInputCountryFlag-borderColor': 'transparent',
+                        '--PhoneInputCountryFlag-height': '20px',
+                        '--PhoneInputCountryFlag-width': '30px',
+                      } as React.CSSProperties}
+                    />
+                    
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2">
+                      {phoneNumber && phoneNumber.toString().length >= 4 && isPhoneVerified && userClickedVerified ? (
+                        <BlueTick />
+                      ) : (
+                        <Image
+                          src={Yellow_i}
+                          alt="yellowi"
+                          width={20}
+                          height={20}
+                          className="w-5 h-5"
+                        />
+                      )}
+                    </span>
                   </div>
 
                   {/* Phone validation messages */}
@@ -940,92 +1082,118 @@ const Profile = () => {
                   )}
                 </div>
 
-                {/* Country */}
-                <div className="flex-1">
-                  <p className="text-sm font-medium text-[#C7C7C7]">
+                {/* Country Dropdown - Just shows countries (no codes) */}
+                <div className="flex-1" ref={countryRef}>
+                  <p className="text-sm font-medium text-[#C7C7C7] mb-2">
                     Country
                   </p>
-                  <div className="flex items-center mt-2">
-                    <div className="relative w-full">
-                      <div
-                        className="flex items-center cursor-pointer"
-                        onClick={() => setOpenCountry(!openCountry)}
-                      >
-                        <input
-                          type="text"
-                          readOnly
-                          className="w-full h-12 lg:h-14 bg-[#222222] rounded-lg border-none px-4 text-sm font-normal text-[#C7C7C7] cursor-pointer"
-                          value={selectedCountry.name}
-                        />
-                        <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                          <Image src={ArrowD} alt="arrow-down" className="w-4 h-4" />
+                  <div className="relative">
+                    <div
+                      className="flex items-center cursor-pointer"
+                      onClick={() => setOpenCountry(!openCountry)}
+                    >
+                      <div className="w-full h-12 lg:h-14 bg-gradient-to-b from-[#1F1F1F] to-[#222222] border border-[#3A3A3A] hover:border-[#4DF2BE]/50 transition-all duration-200 rounded-lg flex items-center justify-between px-4 group hover:shadow-lg hover:shadow-[#4DF2BE]/10">
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-6 bg-gradient-to-br from-[#2D2D2D] to-[#1A1A1A] rounded-md flex items-center justify-center text-xs font-semibold text-[#DBDBDB] shadow-md">
+                            {selectedCountry.code}
+                          </div>
+                          <span className="text-sm font-medium text-white">
+                            {selectedCountry.name}
+                          </span>
+                        </div>
+                        <div className={`transition-transform duration-200 ${openCountry ? "rotate-180" : ""}`}>
+                          <Image src={ArrowD} alt="arrow-down" className="w-4 h-4 opacity-70 group-hover:opacity-100" />
                         </div>
                       </div>
                     </div>
-                  </div>
 
-                  {openCountry && (
-                    <div className="absolute mt-2 w-full bg-[#1A1A1A] rounded-lg shadow-lg max-h-80 overflow-y-auto z-50 border border-[#2D2D2D]">
-                      <div className="p-4">
-                        <div className="flex justify-between items-center mb-4">
-                          <p className="text-base font-bold text-white">Select Country</p>
-                          <Image
-                            src={Times}
-                            alt="times"
-                            width={24}
-                            height={24}
-                            className="w-6 h-6 cursor-pointer"
-                            onClick={() => setOpenCountry(false)}
-                          />
-                        </div>
+                    {openCountry && (
+                      <div className="absolute mt-2 w-full bg-gradient-to-b from-[#1A1A1A] to-[#222222] rounded-lg shadow-xl max-h-80 overflow-y-auto z-50 border border-[#2D2D2D] backdrop-blur-sm">
+                        <div className="p-4">
+                          <div className="flex justify-between items-center mb-4">
+                            <p className="text-base font-bold text-white">Select Country</p>
+                            <button
+                              onClick={() => setOpenCountry(false)}
+                              className="w-6 h-6 rounded-full bg-[#2D2D2D] flex items-center justify-center hover:bg-[#3A3A3A] transition-colors"
+                            >
+                              <Image
+                                src={Times}
+                                alt="times"
+                                width={16}
+                                height={16}
+                                className="w-4 h-4"
+                              />
+                            </button>
+                          </div>
 
-                        <input
-                          type="text"
-                          placeholder="Search country..."
-                          value={countrySearch}
-                          onChange={(e) => setCountrySearch(e.target.value)}
-                          className="w-full h-12 px-4 bg-[#2D2D2D] border-none text-white rounded-lg outline-none text-sm mb-4"
-                        />
+                          <div className="relative mb-4">
+                            <input
+                              type="text"
+                              placeholder="Search country..."
+                              value={countrySearch}
+                              onChange={(e) => setCountrySearch(e.target.value)}
+                              className="w-full h-12 px-4 pl-10 bg-[#2D2D2D] border border-[#3A3A3A] text-white rounded-lg outline-none text-sm focus:border-[#4DF2BE] transition-colors"
+                            />
+                            <div className="absolute left-3 top-1/2 -translate-y-1/2">
+                              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M7.33333 12.6667C10.2789 12.6667 12.6667 10.2789 12.6667 7.33333C12.6667 4.38781 10.2789 2 7.33333 2C4.38781 2 2 4.38781 2 7.33333C2 10.2789 4.38781 12.6667 7.33333 12.6667Z" stroke="#8F8F8F" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                                <path d="M14 14L11.1 11.1" stroke="#8F8F8F" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                              </svg>
+                            </div>
+                          </div>
 
-                        <div className="space-y-2 max-h-60 overflow-y-auto">
-                          {filteredCountries.length > 0 ? (
-                            filteredCountries.map((country) => (
-                              <div
-                                key={country.code}
-                                onClick={() => handleCountrySelect(country)}
-                                className="flex items-center justify-between bg-[#3A3A3A] py-3 px-4 rounded-lg cursor-pointer hover:bg-[#4A4A4A]"
-                              >
-                                <div className="flex items-center gap-3">
-                                  <div className="w-8 h-6 bg-[#2D2D2D] rounded flex items-center justify-center text-xs text-[#DBDBDB]">
-                                    {country.code}
-                                  </div>
-                                  <div>
-                                    <div className="text-[#DBDBDB] text-sm font-medium">{country.name}</div>
+                          <div className="space-y-1 max-h-60 overflow-y-auto">
+                            {filteredCountries.length > 0 ? (
+                              filteredCountries.map((country) => (
+                                <div
+                                  key={country.code}
+                                  onClick={() => handleCountrySelect(country)}
+                                  className={`flex items-center py-3 px-4 rounded-lg cursor-pointer transition-all duration-150 ${selectedCountry.code === country.code
+                                    ? "bg-gradient-to-r from-[#4DF2BE]/10 to-[#4DF2BE]/5 border-l-2 border-[#4DF2BE]"
+                                    : "bg-[#2D2D2D] hover:bg-[#3A3A3A]"
+                                    }`}
+                                >
+                                  <div className="flex items-center gap-3">
+                                    <div className={`w-8 h-6 rounded-md flex items-center justify-center text-xs font-semibold shadow-sm ${selectedCountry.code === country.code
+                                      ? "bg-gradient-to-br from-[#4DF2BE] to-[#3DE0AD] text-[#0F1012]"
+                                      : "bg-gradient-to-br from-[#3A3A3A] to-[#2D2D2D] text-[#DBDBDB]"
+                                      }`}>
+                                      {country.code}
+                                    </div>
+                                    <div className={`text-sm font-medium ${selectedCountry.code === country.code ? "text-white" : "text-[#DBDBDB]"}`}>
+                                      {country.name}
+                                    </div>
                                   </div>
                                 </div>
-                                <span className="text-[#4DF2BE] text-sm font-medium">
-                                  {country.dial_code}
-                                </span>
+                              ))
+                            ) : (
+                              <div className="text-center py-6">
+                                <div className="w-12 h-12 mx-auto mb-3 rounded-full bg-[#2D2D2D] flex items-center justify-center">
+                                  <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                    <path d="M10 19C14.9706 19 19 14.9706 19 10C19 5.02944 14.9706 1 10 1C5.02944 1 1 5.02944 1 10C1 14.9706 5.02944 19 10 19Z" stroke="#8F8F8F" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                                    <path d="M10 6V10" stroke="#8F8F8F" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                                    <path d="M10 14H10.01" stroke="#8F8F8F" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                                  </svg>
+                                </div>
+                                <p className="text-[#999] text-sm">No countries found</p>
                               </div>
-                            ))
-                          ) : (
-                            <p className="text-center text-[#999] py-4">No results found</p>
-                          )}
+                            )}
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  )}
+                    )}
+                  </div>
                 </div>
               </div>
 
               {/* Date of Birth - Editable */}
-              <div className="relative">
+              <div className="relative" ref={dateRef}>
                 <label className="text-sm font-medium text-[#C7C7C7] mb-1 block">
                   Date of Birth
                 </label>
 
                 <div
-                  className="relative h-12 lg:h-14 bg-[#222222] rounded-lg border-none px-4 flex items-center cursor-pointer"
+                  className="relative h-12 lg:h-14 bg-gradient-to-b from-[#1F1F1F] to-[#222222] border border-[#3A3A3A] hover:border-[#4DF2BE]/50 transition-all duration-200 rounded-lg px-4 flex items-center cursor-pointer group hover:shadow-lg hover:shadow-[#4DF2BE]/10"
                   onClick={() => setOpenDate(!openDate)}
                 >
                   <div className="absolute left-3 top-1/2 -translate-y-1/2">
@@ -1038,67 +1206,76 @@ const Profile = () => {
                       : "DD/MM/YYYY"}
                   </span>
 
-                  <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                    <Image src={ArrowD} alt="arrow" className="w-4 h-4" />
+                  <div className={`absolute right-3 top-1/2 -translate-y-1/2 transition-transform duration-200 ${openDate ? "rotate-180" : ""}`}>
+                    <Image src={ArrowD} alt="arrow" className="w-4 h-4 opacity-70 group-hover:opacity-100" />
                   </div>
                 </div>
 
                 {openDate && (
-                  <div className="absolute mt-2 w-full bg-[#222222] rounded-lg shadow-lg p-4 z-50">
-                    <div className="flex gap-3">
-                      <select
-                        className="flex-1 bg-[#222222] text-[#C7C7C7] text-sm font-normal focus:outline-none p-2 rounded border border-[#3A3A3A]"
-                        value={day}
-                        onChange={(e) => setDay(e.target.value)}
-                      >
-                        <option value="">Day</option>
-                        {days.map((d) => (
-                          <option key={d} value={d.toString().padStart(2, "0")}>
-                            {d.toString().padStart(2, "0")}
-                          </option>
-                        ))}
-                      </select>
+                  <div className="absolute mt-2 w-full bg-gradient-to-b from-[#1A1A1A] to-[#222222] rounded-lg shadow-xl p-4 z-50 border border-[#2D2D2D] backdrop-blur-sm">
+                    <div className="flex flex-col sm:flex-row gap-3">
+                      <div className="flex-1">
+                        <label className="text-xs text-[#8F8F8F] mb-1 block">Day</label>
+                        <select
+                          className="w-full h-10 bg-[#2D2D2D] text-[#C7C7C7] text-sm font-normal focus:outline-none p-2 rounded border border-[#3A3A3A] focus:border-[#4DF2BE] transition-colors"
+                          value={day}
+                          onChange={(e) => setDay(e.target.value)}
+                        >
+                          <option value="" className="bg-[#2D2D2D]">Select</option>
+                          {days.map((d) => (
+                            <option key={d} value={d.toString().padStart(2, "0")} className="bg-[#2D2D2D]">
+                              {d.toString().padStart(2, "0")}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
 
-                      <select
-                        className="flex-1 bg-[#222222] text-[#C7C7C7] text-sm font-normal focus:outline-none p-2 rounded border border-[#3A3A3A]"
-                        value={month}
-                        onChange={(e) => setMonth(e.target.value)}
-                      >
-                        <option value="">Month</option>
-                        {months.map((m) => (
-                          <option key={m} value={m}>
-                            {m}
-                          </option>
-                        ))}
-                      </select>
+                      <div className="flex-1">
+                        <label className="text-xs text-[#8F8F8F] mb-1 block">Month</label>
+                        <select
+                          className="w-full h-10 bg-[#2D2D2D] text-[#C7C7C7] text-sm font-normal focus:outline-none p-2 rounded border border-[#3A3A3A] focus:border-[#4DF2BE] transition-colors"
+                          value={month}
+                          onChange={(e) => setMonth(e.target.value)}
+                        >
+                          <option value="" className="bg-[#2D2D2D]">Select</option>
+                          {months.map((m) => (
+                            <option key={m} value={m} className="bg-[#2D2D2D]">
+                              {m}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
 
-                      <select
-                        className="flex-1 bg-[#222222] text-[#C7C7C7] text-sm font-normal focus:outline-none p-2 rounded border border-[#3A3A3A]"
-                        value={year}
-                        onChange={(e) => setYear(e.target.value)}
-                      >
-                        <option value="">Year</option>
-                        {years.map((y) => (
-                          <option key={y} value={y}>
-                            {y}
-                          </option>
-                        ))}
-                      </select>
+                      <div className="flex-1">
+                        <label className="text-xs text-[#8F8F8F] mb-1 block">Year</label>
+                        <select
+                          className="w-full h-10 bg-[#2D2D2D] text-[#C7C7C7] text-sm font-normal focus:outline-none p-2 rounded border border-[#3A3A3A] focus:border-[#4DF2BE] transition-colors"
+                          value={year}
+                          onChange={(e) => setYear(e.target.value)}
+                        >
+                          <option value="" className="bg-[#2D2D2D]">Select</option>
+                          {years.map((y) => (
+                            <option key={y} value={y} className="bg-[#2D2D2D]">
+                              {y}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
                     </div>
                   </div>
                 )}
               </div>
 
-              <div className="h-px bg-[#3A3A3A] my-6" />
+              <div className="h-px bg-gradient-to-r from-transparent via-[#3A3A3A] to-transparent my-6" />
 
               {/* Others Section - Local Preferences Only */}
               <div>
                 <p className="text-sm font-medium text-[#C7C7C7] mb-4">Preferences (Local Only)</p>
 
                 <div className="space-y-3">
-                  {/* Preferred Currency */}
-                  <div className="relative">
-                    <div className="flex items-center justify-between h-11 bg-[#2D2D2D] px-4 rounded-lg">
+                  {/* Preferred Currency - Improved */}
+                  <div className="relative" ref={currencyRef}>
+                    <div className="flex items-center justify-between h-12 bg-gradient-to-r from-[#2D2D2D] to-[#222222] px-4 rounded-lg border border-[#3A3A3A]">
                       <div className="flex items-center gap-3">
                         <Image src={Currency} alt="currency" className="w-5 h-5" />
                         <p className="text-sm font-medium text-[#DBDBDB]">
@@ -1107,7 +1284,7 @@ const Profile = () => {
                       </div>
                       <div
                         onClick={() => setOpenCurrency(!openCurrency)}
-                        className="flex items-center w-16 h-6 bg-[#3A3A3A] px-2 rounded-2xl cursor-pointer"
+                        className="flex items-center gap-2 px-3 py-1.5 bg-[#3A3A3A] rounded-lg cursor-pointer hover:bg-[#4A4A4A] transition-colors group"
                       >
                         <p className="text-xs font-medium text-[#DBDBDB]">
                           {selectedCurrency?.code || "USD"}
@@ -1115,43 +1292,61 @@ const Profile = () => {
                         <Image
                           src={Barrow}
                           alt="arrow-down"
-                          className="ml-2 w-3 h-3"
+                          className={`w-3 h-3 transition-transform duration-200 ${openCurrency ? "rotate-180" : ""}`}
                         />
                       </div>
                     </div>
 
                     {openCurrency && (
-                      <div className="absolute top-12 left-0 right-0 bg-[#1A1A1A] rounded-lg shadow-lg max-h-80 overflow-y-auto z-50 border border-[#2D2D2D]">
+                      <div className="absolute top-14 left-0 right-0 bg-gradient-to-b from-[#1A1A1A] to-[#222222] rounded-lg shadow-xl max-h-80 overflow-y-auto z-50 border border-[#2D2D2D] backdrop-blur-sm">
                         <div className="p-4">
                           <div className="flex justify-between items-center mb-4">
-                            <p className="text-base font-bold text-white">Select preferred currency</p>
-                            <Image
-                              src={Times}
-                              alt="times"
-                              width={24}
-                              height={24}
-                              className="w-6 h-6 cursor-pointer"
+                            <p className="text-base font-bold text-white">Select Currency</p>
+                            <button
                               onClick={() => setOpenCurrency(false)}
-                            />
+                              className="w-6 h-6 rounded-full bg-[#2D2D2D] flex items-center justify-center hover:bg-[#3A3A3A] transition-colors"
+                            >
+                              <Image
+                                src={Times}
+                                alt="times"
+                                width={16}
+                                height={16}
+                                className="w-4 h-4"
+                              />
+                            </button>
                           </div>
 
-                          <input
-                            type="text"
-                            placeholder="Search currency..."
-                            value={currencySearch}
-                            onChange={(e) => setCurrencySearch(e.target.value)}
-                            className="w-full h-12 px-4 bg-[#2D2D2D] border-none text-white rounded-lg outline-none text-sm mb-4"
-                          />
+                          <div className="relative mb-4">
+                            <input
+                              type="text"
+                              placeholder="Search currency..."
+                              value={currencySearch}
+                              onChange={(e) => setCurrencySearch(e.target.value)}
+                              className="w-full h-12 px-4 pl-10 bg-[#2D2D2D] border border-[#3A3A3A] text-white rounded-lg outline-none text-sm focus:border-[#4DF2BE] transition-colors"
+                            />
+                            <div className="absolute left-3 top-1/2 -translate-y-1/2">
+                              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M7.33333 12.6667C10.2789 12.6667 12.6667 10.2789 12.6667 7.33333C12.6667 4.38781 10.2789 2 7.33333 2C4.38781 2 2 4.38781 2 7.33333C2 10.2789 4.38781 12.6667 7.33333 12.6667Z" stroke="#8F8F8F" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                                <path d="M14 14L11.1 11.1" stroke="#8F8F8F" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                              </svg>
+                            </div>
+                          </div>
 
-                          <div className="space-y-2 max-h-60 overflow-y-auto">
+                          <div className="space-y-1 max-h-60 overflow-y-auto">
                             {loadingCurrencies ? (
-                              <div className="text-center text-[#999] py-4">Loading currencies...</div>
+                              <div className="text-center py-6">
+                                <div className="w-8 h-8 mx-auto border-2 border-[#4DF2BE] border-t-transparent rounded-full animate-spin mb-3"></div>
+                                <p className="text-sm text-[#999]">Loading currencies...</p>
+                              </div>
                             ) : filteredCurrencies.length > 0 ? (
                               filteredCurrencies.map((currencyOption) => (
                                 <div
                                   key={currencyOption.code}
                                   onClick={() => handleCurrencySelect(currencyOption)}
-                                  className="flex items-center justify-between bg-[#3A3A3A] py-3 px-4 rounded-lg cursor-pointer hover:bg-[#4A4A4A]"
+                                  className={`flex items-center justify-between py-3 px-4 rounded-lg cursor-pointer transition-all duration-150 ${selectedCurrency?.code === currencyOption.code
+                                    ? "bg-gradient-to-r from-[#4DF2BE]/10 to-[#4DF2BE]/5 border-l-2 border-[#4DF2BE]"
+                                    : "bg-[#2D2D2D] hover:bg-[#3A3A3A]"
+                                    }`}
                                 >
                                   <div className="flex items-center gap-3">
                                     <img
@@ -1159,23 +1354,34 @@ const Profile = () => {
                                       alt={`${currencyOption.country} flag`}
                                       width={24}
                                       height={24}
-                                      className="rounded-full object-cover"
+                                      className="rounded-full object-cover border border-[#3A3A3A] shadow-sm"
                                       onError={(e) => {
                                         (e.target as HTMLImageElement).src = 'https://flagcdn.com/w320/us.png';
                                       }}
                                     />
                                     <div>
-                                      <div className="text-[#DBDBDB] text-sm font-medium">{currencyOption.name}</div>
-                                      <div className="text-[#8F8F8F] text-xs">{currencyOption.country}</div>
+                                      <div className={`text-sm font-medium ${selectedCurrency?.code === currencyOption.code ? "text-white" : "text-[#DBDBDB]"}`}>
+                                        {currencyOption.name}
+                                      </div>
+                                      <div className="text-xs text-[#8F8F8F]">{currencyOption.country}</div>
                                     </div>
                                   </div>
-                                  <span className="text-[#4DF2BE] text-sm font-medium">
+                                  <span className={`text-sm font-medium ${selectedCurrency?.code === currencyOption.code ? "text-[#4DF2BE]" : "text-[#8F8F8F]"}`}>
                                     {currencyOption.code}
                                   </span>
                                 </div>
                               ))
                             ) : (
-                              <p className="text-center text-[#999] py-4">No results found</p>
+                              <div className="text-center py-6">
+                                <div className="w-12 h-12 mx-auto mb-3 rounded-full bg-[#2D2D2D] flex items-center justify-center">
+                                  <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                    <path d="M10 19C14.9706 19 19 14.9706 19 10C19 5.02944 14.9706 1 10 1C5.02944 1 1 5.02944 1 10C1 14.9706 5.02944 19 10 19Z" stroke="#8F8F8F" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                                    <path d="M10 6V10" stroke="#8F8F8F" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                                    <path d="M10 14H10.01" stroke="#8F8F8F" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                                  </svg>
+                                </div>
+                                <p className="text-[#999] text-sm">No currencies found</p>
+                              </div>
                             )}
                           </div>
                         </div>
@@ -1184,7 +1390,7 @@ const Profile = () => {
                   </div>
 
                   {/* Dark Mode */}
-                  <div className="flex items-center justify-between h-11 bg-[#2D2D2D] px-4 rounded-lg">
+                  <div className="flex items-center justify-between h-12 bg-gradient-to-r from-[#2D2D2D] to-[#222222] px-4 rounded-lg border border-[#3A3A3A]">
                     <div className="flex items-center gap-3">
                       <Image src={Mode} alt="mode" className="w-5 h-5" />
                       <p className="text-sm font-medium text-[#DBDBDB]">
@@ -1197,32 +1403,32 @@ const Profile = () => {
                     />
                   </div>
 
-                  {/* App Language */}
-                  <div className="flex items-center justify-between h-11 bg-[#2D2D2D] px-4 rounded-lg">
-                    <div className="flex items-center gap-3">
-                      <Image src={Lang} alt="lang" className="w-5 h-5" />
-                      <p className="text-sm font-medium text-[#DBDBDB]">
-                        App Language
-                      </p>
-                    </div>
-
-                    <div
-                      onClick={() => setOpenLang(!openLang)}
-                      className="flex items-center w-20 h-6 bg-[#3A3A3A] px-2 rounded-2xl cursor-pointer"
-                    >
-                      <p className="text-xs font-medium text-[#DBDBDB] truncate">
-                        {selectedLang}
-                      </p>
-                      <Image
-                        src={Barrow}
-                        alt="arrow"
-                        className={`ml-2 w-3 h-3 transition-transform duration-200 ${openLang ? "rotate-180" : ""
-                          }`}
-                      />
+                  {/* App Language - Improved */}
+                  <div className="relative" ref={langRef}>
+                    <div className="flex items-center justify-between h-12 bg-gradient-to-r from-[#2D2D2D] to-[#222222] px-4 rounded-lg border border-[#3A3A3A]">
+                      <div className="flex items-center gap-3">
+                        <Image src={Lang} alt="lang" className="w-5 h-5" />
+                        <p className="text-sm font-medium text-[#DBDBDB]">
+                          App Language
+                        </p>
+                      </div>
+                      <div
+                        onClick={() => setOpenLang(!openLang)}
+                        className="flex items-center gap-2 px-3 py-1.5 bg-[#3A3A3A] rounded-lg cursor-pointer hover:bg-[#4A4A4A] transition-colors group"
+                      >
+                        <p className="text-xs font-medium text-[#DBDBDB] truncate max-w-[80px]">
+                          {selectedLang}
+                        </p>
+                        <Image
+                          src={Barrow}
+                          alt="arrow"
+                          className={`ml-2 w-3 h-3 transition-transform duration-200 ${openLang ? "rotate-180" : ""}`}
+                        />
+                      </div>
                     </div>
 
                     {openLang && (
-                      <div className="absolute top-12 right-0 left-0 mt-2 bg-[#222222] rounded-lg shadow-lg z-50">
+                      <div className="absolute top-14 left-0 right-0 bg-gradient-to-b from-[#1A1A1A] to-[#222222] rounded-lg shadow-xl z-50 border border-[#2D2D2D] backdrop-blur-sm">
                         <div className="py-2 max-h-48 overflow-y-auto">
                           {languages.map((lang) => (
                             <div
@@ -1231,14 +1437,16 @@ const Profile = () => {
                                 setSelectedLang(lang);
                                 setOpenLang(false);
                               }}
-                              className={`px-4 py-2 flex items-center justify-between cursor-pointer hover:bg-[#2D2D2D] text-sm font-medium ${selectedLang === lang
-                                ? "text-[#4DF2BE]"
-                                : "text-[#DBDBDB]"
+                              className={`px-4 py-3 flex items-center justify-between cursor-pointer transition-all duration-150 ${selectedLang === lang
+                                ? "bg-gradient-to-r from-[#4DF2BE]/10 to-[#4DF2BE]/5 border-l-2 border-[#4DF2BE]"
+                                : "hover:bg-[#2D2D2D]"
                                 }`}
                             >
-                              {lang}
+                              <span className={`text-sm font-medium ${selectedLang === lang ? "text-[#4DF2BE]" : "text-[#DBDBDB]"}`}>
+                                {lang}
+                              </span>
                               {selectedLang === lang && (
-                                <span className="w-2 h-2 rounded-full bg-[#4DF2BE]"></span>
+                                <span className="w-2 h-2 rounded-full bg-[#4DF2BE] shadow-sm"></span>
                               )}
                             </div>
                           ))}
@@ -1252,9 +1460,9 @@ const Profile = () => {
 
             {/* Account Management Notice */}
             <div className="mt-8">
-              <div className="flex items-center justify-between h-11 bg-[#2D2D2D] px-4 rounded-lg">
+              <div className="flex items-center justify-between h-12 bg-gradient-to-r from-[#2D2D2D] to-[#222222] px-4 rounded-lg border border-[#3A3A3A]">
                 <div className="flex items-center gap-3">
-                  <div className="w-5 h-5 bg-[#3A3A3A] rounded flex items-center justify-center">
+                  <div className="w-5 h-5 bg-gradient-to-br from-[#3A3A3A] to-[#2D2D2D] rounded flex items-center justify-center shadow-sm">
                     <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
                       <path d="M6 11C8.76142 11 11 8.76142 11 6C11 3.23858 8.76142 1 6 1C3.23858 1 1 3.23858 1 6C1 8.76142 3.23858 11 6 11Z" stroke="#8F8F8F" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
                       <path d="M6 8V6" stroke="#8F8F8F" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
@@ -1270,7 +1478,7 @@ const Profile = () => {
                 </p>
               </div>
 
-              <div className="mt-4 p-4 bg-[#222222] rounded-lg">
+              <div className="mt-4 p-4 bg-gradient-to-b from-[#222222] to-[#1F1F1F] rounded-lg border border-[#3A3A3A]">
                 <p className="text-sm font-medium text-[#DBDBDB] mb-2">
                   Account Security Notice
                 </p>
@@ -1284,11 +1492,11 @@ const Profile = () => {
           </div>
         </div>
 
-          <div className="w-[100%]  h-[1px] bg-[#fff] mt-[50%] opacity-20 my-8"></div>
+        <div className="w-full h-px bg-gradient-to-r from-transparent via-white/20 to-transparent my-8"></div>
         
-                <div className=" mb-[80px] whitespace-nowrap mt-[10%] ">
-                  <Footer />
-                </div>
+        <div className="mb-[80px] mt-8">
+          <Footer />
+        </div>
       </div>
     </main>
   );
