@@ -16,7 +16,7 @@ import Times from "../../public/Assets/Evolve2p_times/Icon container.png";
 import Footer from "../Footer/Footer";
 import { countryCurrencyService, CurrencyOption } from "../../utils/countryCurrencyService";
 import PhoneInput from 'react-phone-number-input';
-import { isValidPhoneNumber, isPossiblePhoneNumber } from 'react-phone-number-input';
+import { isValidPhoneNumber } from 'react-phone-number-input';
 import { E164Number } from 'libphonenumber-js';
 import 'react-phone-number-input/style.css';
 
@@ -140,6 +140,8 @@ const Profile = () => {
   const [phoneVerificationLoading, setPhoneVerificationLoading] = useState<boolean>(false);
   const [phoneValidationError, setPhoneValidationError] = useState<string>("");
   const [phoneFormatted, setPhoneFormatted] = useState<string>("");
+  const [isNewPhoneNumber, setIsNewPhoneNumber] = useState<boolean>(false);
+  const [originalPhoneNumber, setOriginalPhoneNumber] = useState<E164Number | undefined>();
   
   const [countries, setCountries] = useState<Country[]>([]);
   const [selectedCountry, setSelectedCountry] = useState<Country>({
@@ -211,9 +213,10 @@ const Profile = () => {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // Function to update phoneVerified in localStorage
-  const updatePhoneVerifiedInLocalStorage = (isVerified: boolean) => {
+  // Function to update phoneVerified in localStorage AND backend
+  const updatePhoneVerifiedInBackend = async (isVerified: boolean): Promise<boolean> => {
     try {
+      // First update localStorage
       const stored = localStorage.getItem("UserData");
       if (stored) {
         const parsed = JSON.parse(stored);
@@ -235,12 +238,40 @@ const Profile = () => {
         const userDataFromStorage = updatedData?.userData || updatedData;
         setClientUser(userDataFromStorage);
         
-        return true;
+        // Now update backend
+        const accessToken = parsed?.accessToken;
+        if (accessToken && phoneNumber) {
+          try {
+            const response = await fetch("https://evolve2p-backend.onrender.com/api/update-phone-verification", {
+              method: "PUT",
+              headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${accessToken}`
+              },
+              body: JSON.stringify({
+                phone: phoneNumber.toString(),
+                phoneVerified: isVerified
+              }),
+            });
+
+            if (!response.ok) {
+              console.error("Failed to update phone verification in backend");
+              return false; // Backend update failed
+            }
+            return true; // Both updates successful
+          } catch (backendError) {
+            console.error("Error updating backend:", backendError);
+            return false; // Backend update failed
+          }
+        }
+        
+        return true; // localStorage update successful (no backend update needed)
       }
+      return false; // No stored data
     } catch (error) {
-      console.error("Error updating phoneVerified in localStorage:", error);
+      console.error("Error updating phone verification:", error);
+      return false;
     }
-    return false;
   };
 
   // Phone validation using react-phone-number-input
@@ -295,39 +326,59 @@ const Profile = () => {
         setPhoneFormatted(validation.formattedNumber);
         setPhoneValidationError(validation.isValid ? "" : validation.message);
 
+        // Check if phone number has changed from original
+        if (originalPhoneNumber && phoneNumber.toString() !== originalPhoneNumber.toString()) {
+          setIsNewPhoneNumber(true);
+          setUserClickedVerified(false); // Reset verification for new number
+          updatePhoneVerifiedInBackend(false);
+        } else {
+          setIsNewPhoneNumber(false);
+        }
+
         if (!validation.isValid) {
           setUserClickedVerified(false);
-          updatePhoneVerifiedInLocalStorage(false);
+          updatePhoneVerifiedInBackend(false);
         }
         
         setPhoneVerificationLoading(false);
       } else if (phoneNumber && phoneNumber.toString().length > 0) {
         setIsPhoneVerified(false);
         setUserClickedVerified(false);
+        setIsNewPhoneNumber(originalPhoneNumber ? phoneNumber.toString() !== originalPhoneNumber.toString() : false);
         setPhoneFormatted("");
         setPhoneValidationError("Phone number is too short");
-        updatePhoneVerifiedInLocalStorage(false);
+        updatePhoneVerifiedInBackend(false);
       } else {
         setIsPhoneVerified(false);
+        setIsNewPhoneNumber(false);
         setPhoneValidationError("");
       }
     };
 
     validatePhone();
-  }, [phoneNumber]);
+  }, [phoneNumber, originalPhoneNumber]);
 
-  // Handle verified phone click
-  const handleVerifiedClick = () => {
+  // Handle verified phone click - FIXED WITH ASYNC/AWAIT
+  const handleVerifiedClick = async () => {
     if (isPhoneVerified) {
       setUserClickedVerified(true);
       
-      const updatedSuccessfully = updatePhoneVerifiedInLocalStorage(true);
-      
-      if (updatedSuccessfully) {
-        setSaveMessage("✅ Phone number verified! Don't forget to save changes.");
-        setTimeout(() => setSaveMessage(""), 3000);
-      } else {
-        setSaveMessage("⚠️ Could not update verification status. Please try again.");
+      try {
+        const updatedSuccessfully = await updatePhoneVerifiedInBackend(true);
+        
+        if (updatedSuccessfully) {
+          if (isNewPhoneNumber) {
+            setSaveMessage("✅ New phone number verified! Click 'Save Changes' to update your profile.");
+          } else {
+            setSaveMessage("✅ Phone number re-verified! Verification status updated.");
+          }
+          setTimeout(() => setSaveMessage(""), 3000);
+        } else {
+          setSaveMessage("⚠️ Could not update verification status. Please try again.");
+        }
+      } catch (error) {
+        console.error("Error in verification:", error);
+        setSaveMessage("⚠️ An error occurred during verification. Please try again.");
       }
     }
   };
@@ -373,7 +424,7 @@ const Profile = () => {
     loadCountries();
   }, []);
 
-  // Load user data and currencies - FIXED E.164 FORMATTING
+  // Load user data and currencies - FIXED E.164 FORMATTING with backend sync
   useEffect(() => {
     const loadUserData = async () => {
       if (typeof window === 'undefined') {
@@ -416,13 +467,72 @@ const Profile = () => {
           const formattedPhone = formatToE164(userDataObj.phone, selectedCountry.dial_code);
           
           setPhoneNumber(formattedPhone as E164Number || undefined);
+          setOriginalPhoneNumber(formattedPhone as E164Number || undefined); // Store original for comparison
           setSelectedCountry(selectedCountry);
           
-          const phoneVerifiedStatus = userDataObj.phoneVerified || false;
-          setUserClickedVerified(phoneVerifiedStatus);
-          
-          if (phoneVerifiedStatus && userDataObj.phone) {
-            setIsPhoneVerified(true);
+          // SYNC VERIFICATION STATUS FROM BACKEND
+          const accessToken = parsed?.accessToken;
+          if (accessToken && userDataObj.phone) {
+            try {
+              // Fetch fresh user data from backend to get current verification status
+              const response = await fetch("https://evolve2p-backend.onrender.com/api/get-user", {
+                method: "GET",
+                headers: {
+                  "Authorization": `Bearer ${accessToken}`
+                }
+              });
+              
+              if (response.ok) {
+                const freshUserData = await response.json();
+                const backendPhoneVerified = freshUserData?.phoneVerified || false;
+                
+                // Update local state with backend verification status
+                setUserClickedVerified(backendPhoneVerified);
+                
+                if (backendPhoneVerified && userDataObj.phone) {
+                  setIsPhoneVerified(true);
+                }
+                
+                // Update localStorage with backend verification status
+                const updatedParsed = {
+                  ...parsed,
+                  phoneVerified: backendPhoneVerified,
+                  ...(parsed.userData && {
+                    userData: {
+                      ...parsed.userData,
+                      phoneVerified: backendPhoneVerified
+                    }
+                  })
+                };
+                localStorage.setItem("UserData", JSON.stringify(updatedParsed));
+                
+              } else {
+                // If backend fetch fails, use localStorage value
+                const phoneVerifiedStatus = userDataObj.phoneVerified || false;
+                setUserClickedVerified(phoneVerifiedStatus);
+                
+                if (phoneVerifiedStatus && userDataObj.phone) {
+                  setIsPhoneVerified(true);
+                }
+              }
+            } catch (syncError) {
+              console.error("Error syncing verification status:", syncError);
+              // Use localStorage value if sync fails
+              const phoneVerifiedStatus = userDataObj.phoneVerified || false;
+              setUserClickedVerified(phoneVerifiedStatus);
+              
+              if (phoneVerifiedStatus && userDataObj.phone) {
+                setIsPhoneVerified(true);
+              }
+            }
+          } else {
+            // No access token, just use localStorage value
+            const phoneVerifiedStatus = userDataObj.phoneVerified || false;
+            setUserClickedVerified(phoneVerifiedStatus);
+            
+            if (phoneVerifiedStatus && userDataObj.phone) {
+              setIsPhoneVerified(true);
+            }
           }
           
           if (userDataObj.dayOfBirth) {
@@ -450,7 +560,7 @@ const Profile = () => {
             darkMode: userDataObj.darkMode || false,
             language: userDataObj.language || "English",
             currency: userDataObj.currency || "USD",
-            phoneVerified: phoneVerifiedStatus
+            phoneVerified: userClickedVerified
           };
           
           setOriginalData(originalDataObj);
@@ -502,7 +612,7 @@ const Profile = () => {
     setOpenCountry(false);
     setCountrySearch("");
     setUserClickedVerified(false);
-    updatePhoneVerifiedInLocalStorage(false);
+    updatePhoneVerifiedInBackend(false);
   };
 
   // Filter countries based on search
@@ -558,7 +668,7 @@ const Profile = () => {
     return "@User";
   };
 
-  // CORRECTED Save Changes function
+  // CORRECTED Save Changes function with backend persistence
   const handleSaveChanges = async () => {
     if (!userClickedVerified) {
       setSaveMessage("❌ Please verify your phone number before saving changes");
@@ -599,7 +709,8 @@ const Profile = () => {
 
       const updateData = {
         phone: phoneNumber || "",
-        country: selectedCountry.code
+        country: selectedCountry.code,
+        phoneVerified: true  // Include verification status in update
       };
 
       const res = await fetch("https://evolve2p-backend.onrender.com/api/update-user", {
@@ -644,7 +755,17 @@ const Profile = () => {
         return;
       }
 
-      setSaveMessage("✅ Profile updated successfully! Phone verification saved.");
+      // Success message based on what was changed
+      let successMessage = "✅ Profile updated successfully!";
+      if (isNewPhoneNumber) {
+        successMessage += " New phone number saved and verified.";
+        setOriginalPhoneNumber(phoneNumber); // Update original phone number
+        setIsNewPhoneNumber(false);
+      } else {
+        successMessage += " Phone verification status updated.";
+      }
+      
+      setSaveMessage(successMessage);
       
       const currentStored = localStorage.getItem("UserData");
       if (currentStored) {
@@ -702,7 +823,12 @@ const Profile = () => {
       setYear(originalData.year || "");
       setDarkModeEnabled(originalData.darkMode || false);
       setSelectedLang(originalData.language || "English");
-      setUserClickedVerified(originalData.phoneVerified || false);
+      
+      // Only update verification status if it's from original data
+      // Don't change verification if user is already verified
+      if (!userClickedVerified) {
+        setUserClickedVerified(originalData.phoneVerified || false);
+      }
       
       const currentStored = localStorage.getItem("UserData");
       if (currentStored && userData) {
@@ -711,10 +837,11 @@ const Profile = () => {
           ...currentParsed,
           phone: originalData.phone || "",
           country: originalData.country || { name: "Nigeria", code: "NG", dial_code: "+234" },
-          phoneVerified: originalData.phoneVerified || false,
+          // Don't override verification if already verified
+          phoneVerified: userClickedVerified || originalData.phoneVerified || false,
           userData: currentParsed.userData ? {
             ...currentParsed.userData,
-            phoneVerified: originalData.phoneVerified || false
+            phoneVerified: userClickedVerified || originalData.phoneVerified || false
           } : currentParsed.userData
         };
         
@@ -729,11 +856,12 @@ const Profile = () => {
         }
       }
 
-      setIsPhoneVerified(originalData.phoneVerified || false);
+      setIsPhoneVerified(userClickedVerified || originalData.phoneVerified || false);
       setPhoneValidationError("");
       setPhoneFormatted("");
+      setIsNewPhoneNumber(false);
 
-      setSaveMessage("✅ Changes discarded");
+      setSaveMessage("✅ Changes discarded (verification status preserved)");
       setTimeout(() => setSaveMessage(""), 3000);
     }
   };
@@ -948,12 +1076,18 @@ const Profile = () => {
                   <p className={`text-sm font-medium ${
                     userClickedVerified ? "text-[#4DF2BE]" : "text-blue-400"
                   }`}>
-                    {userClickedVerified ? "Phone Verified ✓" : "Phone Verification Required"}
+                    {userClickedVerified 
+                      ? (isNewPhoneNumber ? "New Phone Number Ready for Verification" : "Phone Verified ✓ (Saved to Database)") 
+                      : "Phone Verification Required"}
                   </p>
                   <p className="text-xs text-gray-300 mt-1">
                     {userClickedVerified 
-                      ? `Your phone number ${phoneFormatted || phoneNumber} is verified. Changes are saved locally.`
-                      : "Enter your phone number, then click 'Click to Verify' above. Finally, save changes to complete verification."}
+                      ? isNewPhoneNumber
+                        ? `New number ${phoneFormatted || phoneNumber} is valid. Click 'Save Changes' to update your profile.`
+                        : `Your phone number ${phoneFormatted || phoneNumber} is verified and saved to your account.`
+                      : isNewPhoneNumber
+                        ? "You've entered a new phone number. Please verify it before saving changes."
+                        : "Enter your phone number, then click 'Click to Verify' above. Finally, save changes to complete verification."}
                   </p>
                 </div>
               </div>
@@ -1012,7 +1146,7 @@ const Profile = () => {
                             {isPhoneVerified ? (
                               userClickedVerified ? (
                                 <span className="text-sm font-bold text-[#4DF2BE] flex items-center gap-1">
-                                  ✓ Verified
+                                  {isNewPhoneNumber ? "✓ New Number Verified" : "✓ Verified (Database)"}
                                 </span>
                               ) : (
                                 <button
@@ -1020,7 +1154,7 @@ const Profile = () => {
                                   onClick={handleVerifiedClick}
                                   className="text-sm font-bold text-[#4DF2BE] flex items-center gap-1 cursor-pointer hover:underline bg-transparent border-none"
                                 >
-                                  ✓ Click to Verify
+                                  {isNewPhoneNumber ? "✓ Verify New Number" : "✓ Click to Verify"}
                                 </button>
                               )
                             ) : (
@@ -1077,7 +1211,8 @@ const Profile = () => {
                   {isPhoneVerified && phoneFormatted && (
                     <div className="mt-2 text-xs text-[#4DF2BE] font-medium">
                       Formatted: {phoneFormatted}
-                      {!userClickedVerified && " - Click 'Click to Verify' above"}
+                      {isNewPhoneNumber && !userClickedVerified && " - Click 'Verify New Number' above"}
+                      {!isNewPhoneNumber && !userClickedVerified && " - Click 'Click to Verify' above"}
                     </div>
                   )}
                 </div>
