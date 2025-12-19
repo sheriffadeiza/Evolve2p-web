@@ -388,8 +388,15 @@ const Profile = () => {
 
   // Check if save should be disabled
   const isSaveDisabled = () => {
-    return !userClickedVerified || isSaving;
+    return !userClickedVerified || isSaving || saveMessage.includes("❌");
   };
+
+  // Clear error messages when user makes changes
+  useEffect(() => {
+    if (saveMessage.includes("❌")) {
+      setSaveMessage("");
+    }
+  }, [phoneNumber, selectedCountry, day, month, year, darkModeEnabled, selectedLang]);
 
   // Load countries from API
   useEffect(() => {
@@ -426,6 +433,302 @@ const Profile = () => {
 
     loadCountries();
   }, []);
+
+  // Handle country selection
+  const handleCountrySelect = (country: Country) => {
+    setSelectedCountry(country);
+    setOpenCountry(false);
+    setCountrySearch("");
+    setUserClickedVerified(false);
+    updatePhoneVerifiedInBackend(false);
+  };
+
+  // Filter countries based on search
+  const filteredCountries = countrySearch
+    ? countries.filter(country =>
+      country.name.toLowerCase().includes(countrySearch.toLowerCase()) ||
+      country.code.toLowerCase().includes(countrySearch.toLowerCase())
+    )
+    : countries;
+
+  // Handle currency selection
+  const handleCurrencySelect = (currencyOption: CurrencyOption) => {
+    setSelectedCurrency(currencyOption);
+    setOpenCurrency(false);
+    setCurrencySearch("");
+  };
+
+  // Filter currencies based on search
+  const filteredCurrencies = currencySearch
+    ? countryCurrencyService.searchCurrencies(currencySearch)
+    : currencyOptions;
+
+  // Helper function to get display email
+  const getDisplayEmail = () => {
+    if (loading) return "Loading...";
+    
+    if (clientUser?.email) {
+      return clientUser.email;
+    }
+    
+    if (userData?.email) {
+      return userData.email;
+    }
+    
+    return "No email found";
+  };
+
+  // Helper function to get display username
+  const getDisplayUsername = () => {
+    if (loading) return "@User";
+    
+    let rawUsername = "";
+    
+    if (clientUser?.username) {
+      rawUsername = clientUser.username;
+    }
+    
+    if (rawUsername) {
+      const cleanUsername = rawUsername.replace(/@/g, '');
+      return `@${cleanUsername}`;
+    }
+    
+    return "@User";
+  };
+
+  // CORRECTED Save Changes function with proper error handling
+  const handleSaveChanges = async () => {
+    if (!userClickedVerified) {
+      setSaveMessage("❌ Please verify your phone number before saving changes");
+      setTimeout(() => setSaveMessage(""), 3000);
+      return;
+    }
+
+    if (!userData) {
+      setSaveMessage("❌ Error: User data not found");
+      return;
+    }
+
+    try {
+      setIsSaving(true);
+      setSaveMessage("");
+
+      const storedUser = typeof window !== "undefined" ? localStorage.getItem("UserData") : null;
+      if (!storedUser) {
+        setSaveMessage("❌ Error: User data not found in localStorage");
+        setIsSaving(false);
+        return;
+      }
+
+      const parsedStoredUser = JSON.parse(storedUser);
+      const accessToken = parsedStoredUser?.accessToken;
+
+      if (!accessToken) {
+        setSaveMessage("❌ Error: No access token found. Please log in again.");
+        setIsSaving(false);
+        return;
+      }
+
+      let formattedDateOfBirth = null;
+      if (day && month && year) {
+        const formattedDay = day.padStart(2, '0');
+        const formattedMonth = month.padStart(2, '0');
+        formattedDateOfBirth = `${year}-${formattedMonth}-${formattedDay}`;
+        
+        const dateObj = new Date(formattedDateOfBirth);
+        if (isNaN(dateObj.getTime())) {
+          setSaveMessage("❌ Invalid date of birth");
+          setIsSaving(false);
+          return;
+        }
+      }
+
+      // Ensure phone number is a string
+      const phoneToSave = phoneNumber || "";
+      
+      const updateData = {
+        phone: phoneToSave,
+        country: selectedCountry.code,
+        phoneVerified: true  // Include verification status in update
+      };
+
+      console.log("Sending update data:", updateData);
+
+      const response = await fetch("https://evolve2p-backend.onrender.com/api/update-user", {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${accessToken}`
+        },
+        body: JSON.stringify(updateData),
+      });
+
+      // Check if response is OK
+      if (!response.ok) {
+        let errorMessage = "Failed to update profile";
+        
+        try {
+          // Try to parse error response as JSON first
+          const errorData = await response.json();
+          errorMessage = errorData.message || errorData.error || errorMessage;
+          
+          // If errorMessage is an object, stringify it
+          if (typeof errorMessage === 'object') {
+            errorMessage = JSON.stringify(errorMessage);
+          }
+        } catch {
+          // If JSON parsing fails, try to get text
+          try {
+            const errorText = await response.text();
+            if (errorText && errorText.trim()) {
+              errorMessage = errorText;
+            }
+          } catch {
+            // Use default error message
+          }
+        }
+        
+        setSaveMessage(`❌ ${errorMessage}`);
+        setIsSaving(false);
+        return;
+      }
+
+      // Try to parse successful response
+      let responseData;
+      try {
+        responseData = await response.json();
+      } catch (parseError) {
+        console.warn("Could not parse response as JSON, but request succeeded");
+        responseData = {};
+      }
+
+      // Success message based on what was changed
+      let successMessage = "✅ Profile updated successfully!";
+      if (isNewPhoneNumber) {
+        successMessage += " New phone number saved and verified.";
+        setOriginalPhoneNumber(phoneToSave); // Update original phone number
+        setIsNewPhoneNumber(false);
+      } else {
+        successMessage += " Phone verification status updated.";
+      }
+      
+      setSaveMessage(successMessage);
+      
+      // Update localStorage with new data
+      const currentStored = localStorage.getItem("UserData");
+      if (currentStored) {
+        const currentParsed = JSON.parse(currentStored);
+        const updatedUserData = { 
+          ...currentParsed, 
+          phone: phoneToSave,
+          country: selectedCountry,
+          phoneVerified: true,
+          ...(formattedDateOfBirth && { dayOfBirth: formattedDateOfBirth }),
+          darkMode: darkModeEnabled,
+          language: selectedLang,
+          currency: selectedCurrency?.code || "USD",
+          ...(responseData.user && { userData: responseData.user }),
+          userData: currentParsed.userData ? {
+            ...currentParsed.userData,
+            phone: phoneToSave,
+            phoneVerified: true,
+            ...(responseData.user && responseData.user)
+          } : {
+            ...currentParsed,
+            phone: phoneToSave,
+            phoneVerified: true
+          }
+        };
+        
+        localStorage.setItem("UserData", JSON.stringify(updatedUserData));
+        setUserData(updatedUserData);
+        
+        const userDataFromStorage = updatedUserData?.userData || updatedUserData;
+        setClientUser(userDataFromStorage);
+      }
+
+      // Update original data
+      setOriginalData({
+        phone: phoneToSave,
+        country: selectedCountry,
+        day,
+        month,
+        year,
+        darkMode: darkModeEnabled,
+        language: selectedLang,
+        currency: selectedCurrency?.code || "USD",
+        phoneVerified: true
+      });
+
+      // Reset save message after 3 seconds
+      setTimeout(() => setSaveMessage(""), 3000);
+
+    } catch (error) {
+      console.error("Save error:", error);
+      
+      let errorMessage = "❌ Network error: Failed to connect to server";
+      if (error instanceof Error) {
+        errorMessage = `❌ Error: ${error.message}`;
+      }
+      
+      setSaveMessage(errorMessage);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  // Discard Changes function
+  const handleDiscardChanges = () => {
+    if (originalData) {
+      setPhoneNumber(originalData.phone || "");
+      setSelectedCountry(originalData.country || { name: "Nigeria", code: "NG", dial_code: "+234" });
+      setDay(originalData.day || "");
+      setMonth(originalData.month || "");
+      setYear(originalData.year || "");
+      setDarkModeEnabled(originalData.darkMode || false);
+      setSelectedLang(originalData.language || "English");
+      
+      // Only update verification status if it's from original data
+      // Don't change verification if user is already verified
+      if (!userClickedVerified) {
+        setUserClickedVerified(originalData.phoneVerified || false);
+      }
+      
+      const currentStored = localStorage.getItem("UserData");
+      if (currentStored && userData) {
+        const currentParsed = JSON.parse(currentStored);
+        const updatedUserData = {
+          ...currentParsed,
+          phone: originalData.phone || "",
+          country: originalData.country || { name: "Nigeria", code: "NG", dial_code: "+234" },
+          // Don't override verification if already verified
+          phoneVerified: userClickedVerified || originalData.phoneVerified || false,
+          userData: currentParsed.userData ? {
+            ...currentParsed.userData,
+            phoneVerified: userClickedVerified || originalData.phoneVerified || false
+          } : currentParsed.userData
+        };
+        
+        localStorage.setItem("UserData", JSON.stringify(updatedUserData));
+        setUserData(updatedUserData);
+      }
+
+      if (originalData.currency) {
+        const currency = currencyOptions.find(c => c.code === originalData.currency);
+        if (currency) {
+          setSelectedCurrency(currency);
+        }
+      }
+
+      setIsPhoneVerified(userClickedVerified || originalData.phoneVerified || false);
+      setPhoneValidationError("");
+      setPhoneFormatted("");
+      setIsNewPhoneNumber(false);
+
+      setSaveMessage("✅ Changes discarded (verification status preserved)");
+      setTimeout(() => setSaveMessage(""), 3000);
+    }
+  };
 
   // Load user data and currencies
   useEffect(() => {
@@ -608,273 +911,6 @@ const Profile = () => {
     loadUserData();
     loadCurrencies();
   }, []);
-
-  // Handle country selection
-  const handleCountrySelect = (country: Country) => {
-    setSelectedCountry(country);
-    setOpenCountry(false);
-    setCountrySearch("");
-    setUserClickedVerified(false);
-    updatePhoneVerifiedInBackend(false);
-  };
-
-  // Filter countries based on search
-  const filteredCountries = countrySearch
-    ? countries.filter(country =>
-      country.name.toLowerCase().includes(countrySearch.toLowerCase()) ||
-      country.code.toLowerCase().includes(countrySearch.toLowerCase())
-    )
-    : countries;
-
-  // Handle currency selection
-  const handleCurrencySelect = (currencyOption: CurrencyOption) => {
-    setSelectedCurrency(currencyOption);
-    setOpenCurrency(false);
-    setCurrencySearch("");
-  };
-
-  // Filter currencies based on search
-  const filteredCurrencies = currencySearch
-    ? countryCurrencyService.searchCurrencies(currencySearch)
-    : currencyOptions;
-
-  // Helper function to get display email
-  const getDisplayEmail = () => {
-    if (loading) return "Loading...";
-    
-    if (clientUser?.email) {
-      return clientUser.email;
-    }
-    
-    if (userData?.email) {
-      return userData.email;
-    }
-    
-    return "No email found";
-  };
-
-  // Helper function to get display username
-  const getDisplayUsername = () => {
-    if (loading) return "@User";
-    
-    let rawUsername = "";
-    
-    if (clientUser?.username) {
-      rawUsername = clientUser.username;
-    }
-    
-    if (rawUsername) {
-      const cleanUsername = rawUsername.replace(/@/g, '');
-      return `@${cleanUsername}`;
-    }
-    
-    return "@User";
-  };
-
-  // CORRECTED Save Changes function with proper phone number handling
-  const handleSaveChanges = async () => {
-    if (!userClickedVerified) {
-      setSaveMessage("❌ Please verify your phone number before saving changes");
-      setTimeout(() => setSaveMessage(""), 3000);
-      return;
-    }
-
-    if (!userData) {
-      setSaveMessage("❌ Error: User data not found");
-      return;
-    }
-
-    try {
-      setIsSaving(true);
-      setSaveMessage("");
-
-      const storedUser = typeof window !== "undefined" ? localStorage.getItem("UserData") : null;
-      const accessToken = storedUser ? JSON.parse(storedUser)?.accessToken : null;
-
-      if (!accessToken) {
-        setSaveMessage("❌ Error: No access token found. Please log in again.");
-        return;
-      }
-
-      let formattedDateOfBirth = null;
-      if (day && month && year) {
-        const formattedDay = day.padStart(2, '0');
-        const formattedMonth = month.padStart(2, '0');
-        formattedDateOfBirth = `${year}-${formattedMonth}-${formattedDay}`;
-        
-        const dateObj = new Date(formattedDateOfBirth);
-        if (isNaN(dateObj.getTime())) {
-          setSaveMessage("❌ Invalid date of birth");
-          setIsSaving(false);
-          return;
-        }
-      }
-
-      // Ensure phone number is a string
-      const phoneToSave = phoneNumber || "";
-      
-      const updateData = {
-        phone: phoneToSave,
-        country: selectedCountry.code,
-        phoneVerified: true  // Include verification status in update
-      };
-
-      console.log("Sending update data:", updateData); // Debug log
-
-      const res = await fetch("https://evolve2p-backend.onrender.com/api/update-user", {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${accessToken}`
-        },
-        body: JSON.stringify(updateData),
-      });
-
-      let responseData;
-      let responseText = "";
-      
-      try {
-        responseText = await res.text();
-        if (responseText && responseText.trim() !== "") {
-          responseData = JSON.parse(responseText);
-        } else {
-          responseData = {};
-        }
-      } catch (parseError) {
-        responseData = { rawResponse: responseText };
-      }
-
-      if (!res.ok) {
-        let errorMessage = "Failed to update profile";
-        
-        if (responseData) {
-          if (typeof responseData === 'string') {
-            errorMessage = responseData;
-          } else if (responseData.message) {
-            errorMessage = responseData.message;
-          } else if (responseData.error) {
-            errorMessage = typeof responseData.error === 'string' 
-              ? responseData.error 
-              : JSON.stringify(responseData.error);
-          }
-        }
-        
-        setSaveMessage(`❌ ${errorMessage}`);
-        return;
-      }
-
-      // Success message based on what was changed
-      let successMessage = "✅ Profile updated successfully!";
-      if (isNewPhoneNumber) {
-        successMessage += " New phone number saved and verified.";
-        setOriginalPhoneNumber(phoneToSave); // Update original phone number
-        setIsNewPhoneNumber(false);
-      } else {
-        successMessage += " Phone verification status updated.";
-      }
-      
-      setSaveMessage(successMessage);
-      
-      const currentStored = localStorage.getItem("UserData");
-      if (currentStored) {
-        const currentParsed = JSON.parse(currentStored);
-        const updatedUserData = { 
-          ...currentParsed, 
-          phone: phoneToSave,
-          country: selectedCountry,
-          phoneVerified: true,
-          ...(formattedDateOfBirth && { dayOfBirth: formattedDateOfBirth }),
-          darkMode: darkModeEnabled,
-          language: selectedLang,
-          currency: selectedCurrency?.code || "USD",
-          userData: currentParsed.userData ? {
-            ...currentParsed.userData,
-            phone: phoneToSave,
-            phoneVerified: true
-          } : currentParsed.userData
-        };
-        
-        localStorage.setItem("UserData", JSON.stringify(updatedUserData));
-        setUserData(updatedUserData);
-        
-        const userDataFromStorage = updatedUserData?.userData || updatedUserData;
-        setClientUser(userDataFromStorage);
-      }
-
-      setOriginalData({
-        phone: phoneToSave,
-        country: selectedCountry,
-        day,
-        month,
-        year,
-        darkMode: darkModeEnabled,
-        language: selectedLang,
-        currency: selectedCurrency?.code || "USD",
-        phoneVerified: true
-      });
-
-      setTimeout(() => setSaveMessage(""), 3000);
-
-    } catch (error) {
-      console.error("Save error:", error);
-      setSaveMessage("❌ Network error: Failed to connect to server");
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-  // Discard Changes function
-  const handleDiscardChanges = () => {
-    if (originalData) {
-      setPhoneNumber(originalData.phone || "");
-      setSelectedCountry(originalData.country || { name: "Nigeria", code: "NG", dial_code: "+234" });
-      setDay(originalData.day || "");
-      setMonth(originalData.month || "");
-      setYear(originalData.year || "");
-      setDarkModeEnabled(originalData.darkMode || false);
-      setSelectedLang(originalData.language || "English");
-      
-      // Only update verification status if it's from original data
-      // Don't change verification if user is already verified
-      if (!userClickedVerified) {
-        setUserClickedVerified(originalData.phoneVerified || false);
-      }
-      
-      const currentStored = localStorage.getItem("UserData");
-      if (currentStored && userData) {
-        const currentParsed = JSON.parse(currentStored);
-        const updatedUserData = {
-          ...currentParsed,
-          phone: originalData.phone || "",
-          country: originalData.country || { name: "Nigeria", code: "NG", dial_code: "+234" },
-          // Don't override verification if already verified
-          phoneVerified: userClickedVerified || originalData.phoneVerified || false,
-          userData: currentParsed.userData ? {
-            ...currentParsed.userData,
-            phoneVerified: userClickedVerified || originalData.phoneVerified || false
-          } : currentParsed.userData
-        };
-        
-        localStorage.setItem("UserData", JSON.stringify(updatedUserData));
-        setUserData(updatedUserData);
-      }
-
-      if (originalData.currency) {
-        const currency = currencyOptions.find(c => c.code === originalData.currency);
-        if (currency) {
-          setSelectedCurrency(currency);
-        }
-      }
-
-      setIsPhoneVerified(userClickedVerified || originalData.phoneVerified || false);
-      setPhoneValidationError("");
-      setPhoneFormatted("");
-      setIsNewPhoneNumber(false);
-
-      setSaveMessage("✅ Changes discarded (verification status preserved)");
-      setTimeout(() => setSaveMessage(""), 3000);
-    }
-  };
 
   // Show loading state
   if (loading) {
@@ -1184,7 +1220,7 @@ const Profile = () => {
                       countryCallingCodeEditable={false}
                       defaultCountry="NG"
                       value={phoneNumber}
-                      onChange={handlePhoneNumberChange} // FIXED: Using wrapper function
+                      onChange={handlePhoneNumberChange}
                       className="custom-phone-input"
                       style={{
                         '--PhoneInput-color--focus': '#4DF2BE',
