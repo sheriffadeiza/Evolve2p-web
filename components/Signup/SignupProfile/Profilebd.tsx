@@ -274,7 +274,7 @@ const Profilebd = () => {
 
   return (
     <div className="w-full lg:mx-0">
-      <div className="flex flex-col px-4 lg:px-4 mx-auto py-16 lg:ml-[100px] gap-2 w-full max-w-[400px] text-white">
+      <div className="flex flex-col px-4 lg:px-4 mx-auto py-16 lg:ml-[100px] gap-2 w-full border-none max-w-[400px] text-white">
 
         {/* Success Modal */}
         {showSuccessModal && (
