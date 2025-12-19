@@ -15,6 +15,10 @@ import Lang from "../../public/Assets/Evolve2p_Lang/Profile/globe.svg";
 import Times from "../../public/Assets/Evolve2p_times/Icon container.png";
 import Footer from "../Footer/Footer";
 import { countryCurrencyService, CurrencyOption } from "../../utils/countryCurrencyService";
+import PhoneInput from 'react-phone-number-input';
+import { isValidPhoneNumber, isPossiblePhoneNumber } from 'react-phone-number-input';
+import { E164Number } from 'libphonenumber-js';
+import 'react-phone-number-input/style.css';
 
 // Add blue tick icon
 const BlueTick = () => (
@@ -93,14 +97,14 @@ const Profile = () => {
   const [currencySearch, setCurrencySearch] = useState("");
   const [loadingCurrencies, setLoadingCurrencies] = useState(true);
 
-  // Phone and Country states
-  const [phone, setPhone] = useState<string>("");
-  const debouncedPhone = useDebounce(phone, 800);
+  // Phone and Country states - USING REACT-PHONE-NUMBER-INPUT with correct type
+  const [phoneNumber, setPhoneNumber] = useState<E164Number | undefined>();
   const [isPhoneVerified, setIsPhoneVerified] = useState<boolean>(false);
   const [userClickedVerified, setUserClickedVerified] = useState<boolean>(false);
   const [phoneVerificationLoading, setPhoneVerificationLoading] = useState<boolean>(false);
   const [phoneValidationError, setPhoneValidationError] = useState<string>("");
   const [phoneFormatted, setPhoneFormatted] = useState<string>("");
+  
   const [countries, setCountries] = useState<Country[]>([]);
   const [selectedCountry, setSelectedCountry] = useState<Country>({
     name: "Nigeria",
@@ -184,17 +188,9 @@ const Profile = () => {
     return false;
   };
 
-  // Phone validation function using libphonenumber-js - WITH DYNAMIC IMPORT
-  const validatePhoneNumberWithLib = async (phoneNumber: string, countryDialCode: string, countryCode: string) => {
-    if (typeof window === 'undefined') {
-      return { 
-        isValid: false, 
-        message: "Validating...",
-        formattedNumber: ""
-      };
-    }
-
-    if (!phoneNumber || phoneNumber.length < 4) {
+  // Phone validation using react-phone-number-input
+  const validatePhoneNumber = (phone: E164Number | undefined) => {
+    if (!phone || phone.toString().length < 4) {
       return { 
         isValid: false, 
         message: "Phone number is too short",
@@ -202,33 +198,15 @@ const Profile = () => {
       };
     }
 
-    const fullNumber = `${countryDialCode}${phoneNumber}`;
-    
     try {
-      // DYNAMIC IMPORT: Only import on the client side
-      const lib = await import('libphonenumber-js/min');
-      const { parsePhoneNumberFromString, isValidPhoneNumber } = lib;
-      
-      const phoneNumberObj = parsePhoneNumberFromString(fullNumber);
-      
-      if (!phoneNumberObj) {
-        return { 
-          isValid: false, 
-          message: "Invalid phone number format",
-          formattedNumber: ""
-        };
-      }
-
-      const isValid = isValidPhoneNumber(fullNumber);
-      const formatted = phoneNumberObj.formatInternational();
-      const phoneCountry = phoneNumberObj.country;
+      // Convert to string for validation
+      const phoneString = phone.toString();
+      const isValid = isValidPhoneNumber(phoneString);
+      // Alternative: const isPossible = isPossiblePhoneNumber(phoneString); // Checks length only
       
       let message = "";
       if (!isValid) {
-        message = "Please enter a valid phone number";
-      } else if (phoneCountry && countryCode && 
-                 phoneCountry !== countryCode.toLowerCase()) {
-        message = `Number appears to be from ${phoneCountry.toUpperCase()}. Change country or update number.`;
+        message = "Please enter a valid international phone number";
       } else {
         message = "Valid phone number ✓";
       }
@@ -236,12 +214,12 @@ const Profile = () => {
       return {
         isValid,
         message,
-        formattedNumber: formatted,
-        detectedCountry: phoneCountry
+        formattedNumber: phoneString, // react-phone-number-input provides E.164 format
+        detectedCountry: undefined
       };
       
     } catch (error) {
-      console.error("libphonenumber-js validation error:", error);
+      console.error("Phone validation error:", error);
       return {
         isValid: false,
         message: "Error validating phone number",
@@ -251,38 +229,27 @@ const Profile = () => {
     }
   };
 
-  // Validation effect using debounced phone and libphonenumber-js
+  // Validate phone number on change
   useEffect(() => {
-    const validatePhone = async () => {
-      if (debouncedPhone && debouncedPhone.length >= 4) {
+    const validatePhone = () => {
+      if (phoneNumber && phoneNumber.toString().length >= 4) {
         setPhoneVerificationLoading(true);
         setPhoneValidationError("");
 
-        try {
-          const validation = await validatePhoneNumberWithLib(
-            debouncedPhone, 
-            selectedCountry.dial_code, 
-            selectedCountry.code
-          );
-          
-          setIsPhoneVerified(validation.isValid);
-          setPhoneFormatted(validation.formattedNumber);
-          setPhoneValidationError(validation.isValid ? "" : validation.message);
+        // Call validation function
+        const validation = validatePhoneNumber(phoneNumber);
+        
+        setIsPhoneVerified(validation.isValid);
+        setPhoneFormatted(validation.formattedNumber);
+        setPhoneValidationError(validation.isValid ? "" : validation.message);
 
-          if (!validation.isValid) {
-            setUserClickedVerified(false);
-            updatePhoneVerifiedInLocalStorage(false);
-          }
-        } catch (error) {
-          setIsPhoneVerified(false);
-          setPhoneValidationError("Error validating phone number");
+        if (!validation.isValid) {
           setUserClickedVerified(false);
           updatePhoneVerifiedInLocalStorage(false);
-        } finally {
-          setPhoneVerificationLoading(false);
         }
-
-      } else if (debouncedPhone && debouncedPhone.length > 0) {
+        
+        setPhoneVerificationLoading(false);
+      } else if (phoneNumber && phoneNumber.toString().length > 0) {
         setIsPhoneVerified(false);
         setUserClickedVerified(false);
         setPhoneFormatted("");
@@ -295,7 +262,7 @@ const Profile = () => {
     };
 
     validatePhone();
-  }, [debouncedPhone, selectedCountry]);
+  }, [phoneNumber]);
 
   // Handle verified phone click
   const handleVerifiedClick = () => {
@@ -394,8 +361,8 @@ const Profile = () => {
           
           setUserData(userDataObj);
           
-          // Set initial data
-          setPhone(userDataObj.phone || "");
+          // Set initial data - convert string to E164Number
+          setPhoneNumber(userDataObj.phone as E164Number || undefined);
           setSelectedCountry(userDataObj.country || { name: "Nigeria", code: "NG", dial_code: "+234" });
           
           // CRITICAL: Set verification status based on saved state
@@ -404,19 +371,6 @@ const Profile = () => {
           
           if (phoneVerifiedStatus && userDataObj.phone) {
             setIsPhoneVerified(true);
-            // Also validate the phone if it's marked as verified
-            if (userDataObj.phone && userDataObj.phone.length >= 4 && userDataObj.country) {
-              try {
-                const validation = await validatePhoneNumberWithLib(
-                  userDataObj.phone,
-                  userDataObj.country.dial_code,
-                  userDataObj.country.code
-                );
-                setPhoneFormatted(validation.formattedNumber);
-              } catch (error) {
-                console.error("Initial phone validation error:", error);
-              }
-            }
           }
           
           // Set date of birth if available
@@ -491,20 +445,6 @@ const Profile = () => {
     loadCurrencies();
   }, []);
 
-  // Handle phone number change
-  const handlePhoneChange = (value: string) => {
-    const numericValue = value.replace(/\D/g, "");
-    setPhone(numericValue);
-
-    if (numericValue.length < 4) {
-      setIsPhoneVerified(false);
-      setPhoneFormatted("");
-      setPhoneValidationError("Phone number is too short");
-    } else {
-      setPhoneValidationError("");
-    }
-  };
-
   // Handle country selection
   const handleCountrySelect = (country: Country) => {
     setSelectedCountry(country);
@@ -512,19 +452,6 @@ const Profile = () => {
     setCountrySearch("");
     setUserClickedVerified(false);
     updatePhoneVerifiedInLocalStorage(false);
-
-    if (phone.length >= 4) {
-      // Trigger validation asynchronously
-      validatePhoneNumberWithLib(phone, country.dial_code, country.code)
-        .then(validation => {
-          setIsPhoneVerified(validation.isValid);
-          setPhoneFormatted(validation.formattedNumber);
-          setPhoneValidationError(validation.isValid ? "" : validation.message);
-        })
-        .catch(error => {
-          console.error("Country change validation error:", error);
-        });
-    }
   };
 
   // Filter countries based on search
@@ -609,9 +536,6 @@ const Profile = () => {
         return;
       }
 
-      // Prepare update data
-      const composedPhone = phoneFormatted || `${selectedCountry.dial_code}${phone}`;
-      
       // Format date of birth for localStorage
       let formattedDateOfBirth = null;
       if (day && month && year) {
@@ -628,7 +552,7 @@ const Profile = () => {
       }
 
       const updateData = {
-        phone: composedPhone,
+        phone: phoneNumber || "",
         country: selectedCountry.code
       };
 
@@ -683,7 +607,7 @@ const Profile = () => {
         const currentParsed = JSON.parse(currentStored);
         const updatedUserData = { 
           ...currentParsed, 
-          phone: phone,
+          phone: phoneNumber || "",
           country: selectedCountry,
           phoneVerified: true,
           ...(formattedDateOfBirth && { dayOfBirth: formattedDateOfBirth }),
@@ -705,7 +629,7 @@ const Profile = () => {
 
       // Update original data
       setOriginalData({
-        phone,
+        phone: phoneNumber || "",
         country: selectedCountry,
         day,
         month,
@@ -728,7 +652,7 @@ const Profile = () => {
   // Discard Changes function
   const handleDiscardChanges = () => {
     if (originalData) {
-      setPhone(originalData.phone || "");
+      setPhoneNumber(originalData.phone as E164Number || undefined);
       setSelectedCountry(originalData.country || { name: "Nigeria", code: "NG", dial_code: "+234" });
       setDay(originalData.day || "");
       setMonth(originalData.month || "");
@@ -856,7 +780,7 @@ const Profile = () => {
                   </p>
                   <p className="text-xs text-gray-300 mt-1">
                     {userClickedVerified 
-                      ? `Your phone number ${phoneFormatted || phone} is verified. Changes are saved locally.`
+                      ? `Your phone number ${phoneFormatted || phoneNumber} is verified. Changes are saved locally.`
                       : "Enter your phone number, then click 'Click to Verify' above. Finally, save changes to complete verification."}
                   </p>
                 </div>
@@ -910,7 +834,7 @@ const Profile = () => {
                       Phone number
                     </p>
                     <div className="flex items-center gap-2">
-                      {phone && phone.length >= 4 && (
+                      {phoneNumber && phoneNumber.toString().length >= 4 && (
                         phoneVerificationLoading ? (
                           <span className="text-sm text-[#8F8F8F]">Checking...</span>
                         ) : (
@@ -942,19 +866,50 @@ const Profile = () => {
 
                   <div className="flex items-center mt-2">
                     <div className="relative w-full">
-                      <span className="flex items-center justify-center absolute w-16 h-6 bg-[#3A3A3A] left-3 top-1/2 -translate-y-1/2 rounded-2xl text-xs font-medium text-[#DBDBDB]">
-                        {selectedCountry.dial_code}
-                      </span>
-                      <input
-                        type="tel"
-                        inputMode="numeric"
-                        value={phone}
-                        onChange={(e) => handlePhoneChange(e.target.value)}
-                        className="w-full h-12 lg:h-14 bg-[#222222] rounded-lg border-none pl-20 pr-10 text-sm font-normal text-[#C7C7C7]"
-                        placeholder="Enter phone number"
+                      <PhoneInput
+                        international
+                        countryCallingCodeEditable={false}
+                        defaultCountry="NG"
+                        value={phoneNumber}
+                        onChange={setPhoneNumber}
+                        className="custom-phone-input"
+                        style={{
+                          '--PhoneInput-color--focus': '#4DF2BE',
+                          '--PhoneInputCountrySelectArrow-color': '#C7C7C7',
+                          '--PhoneInputCountryFlag-borderColor': 'transparent',
+                        } as React.CSSProperties}
                       />
+                      <style jsx global>{`
+                        .custom-phone-input .PhoneInputInput {
+                          background: #222222;
+                          color: #C7C7C7;
+                          border: none;
+                          border-radius: 0.5rem;
+                          padding: 1rem;
+                          height: 3.5rem;
+                          font-size: 0.875rem;
+                          width: 100%;
+                        }
+                        .custom-phone-input .PhoneInputInput:focus {
+                          outline: none;
+                          box-shadow: 0 0 0 2px #4DF2BE;
+                        }
+                        .custom-phone-input .PhoneInputCountry {
+                          background: #3A3A3A;
+                          padding: 0.5rem;
+                          border-radius: 0.5rem 0 0 0.5rem;
+                          margin-right: 0.5rem;
+                        }
+                        .custom-phone-input .PhoneInputCountrySelectArrow {
+                          color: #C7C7C7;
+                        }
+                        .PhoneInputCountryIcon {
+                          border-radius: 0.25rem;
+                        }
+                      `}</style>
+                      
                       <span className="absolute right-3 top-1/2 -translate-y-1/2">
-                        {phone && phone.length >= 4 && isPhoneVerified && userClickedVerified ? (
+                        {phoneNumber && phoneNumber.toString().length >= 4 && isPhoneVerified && userClickedVerified ? (
                           <BlueTick />
                         ) : (
                           <Image
