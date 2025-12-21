@@ -13,7 +13,7 @@ const page = () => {
       <div className="flex flex-1 justify-center lg:flex lg:flex-1 lg:justify-start">
         {/* Left side content */}
 
-        <div className=" w-full lg:w-1/2 min-h-[calc(150vh-64px)] lg:border-2 lg:border-red-50">
+        <div className=" w-full lg:w-1/2 min-h-[calc(150vh-64px)]  lg:border-red-50">
           <Profilenav />
           <Profilebd />
         </div>

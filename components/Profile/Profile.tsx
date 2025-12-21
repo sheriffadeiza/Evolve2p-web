@@ -16,7 +16,8 @@ import Times from "../../public/Assets/Evolve2p_times/Icon container.png";
 import Footer from "../Footer/Footer";
 import { countryCurrencyService, CurrencyOption } from "../../utils/countryCurrencyService";
 import PhoneInput from 'react-phone-number-input';
-import { isValidPhoneNumber } from 'react-phone-number-input';
+import { isValidPhoneNumber, isPossiblePhoneNumber } from 'react-phone-number-input';
+import { E164Number } from 'libphonenumber-js';
 import 'react-phone-number-input/style.css';
 
 // Add blue tick icon
@@ -132,15 +133,13 @@ const Profile = () => {
   const [currencySearch, setCurrencySearch] = useState("");
   const [loadingCurrencies, setLoadingCurrencies] = useState(true);
 
-  // Phone and Country states - FIXED: Handle both string and undefined
-  const [phoneNumber, setPhoneNumber] = useState<string | undefined>("");
+  // Phone and Country states
+  const [phoneNumber, setPhoneNumber] = useState<E164Number | undefined>();
   const [isPhoneVerified, setIsPhoneVerified] = useState<boolean>(false);
   const [userClickedVerified, setUserClickedVerified] = useState<boolean>(false);
   const [phoneVerificationLoading, setPhoneVerificationLoading] = useState<boolean>(false);
   const [phoneValidationError, setPhoneValidationError] = useState<string>("");
   const [phoneFormatted, setPhoneFormatted] = useState<string>("");
-  const [isNewPhoneNumber, setIsNewPhoneNumber] = useState<boolean>(false);
-  const [originalPhoneNumber, setOriginalPhoneNumber] = useState<string>("");
   
   const [countries, setCountries] = useState<Country[]>([]);
   const [selectedCountry, setSelectedCountry] = useState<Country>({
@@ -212,15 +211,9 @@ const Profile = () => {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // Handle phone number change - FIXED: Accept string or undefined
-  const handlePhoneNumberChange = (value: string | undefined) => {
-    setPhoneNumber(value || "");
-  };
-
-  // Function to update phoneVerified in localStorage AND backend
-  const updatePhoneVerifiedInBackend = async (isVerified: boolean): Promise<boolean> => {
+  // Function to update phoneVerified in localStorage
+  const updatePhoneVerifiedInLocalStorage = (isVerified: boolean) => {
     try {
-      // First update localStorage
       const stored = localStorage.getItem("UserData");
       if (stored) {
         const parsed = JSON.parse(stored);
@@ -242,45 +235,17 @@ const Profile = () => {
         const userDataFromStorage = updatedData?.userData || updatedData;
         setClientUser(userDataFromStorage);
         
-        // Now update backend
-        const accessToken = parsed?.accessToken;
-        if (accessToken && phoneNumber) {
-          try {
-            const response = await fetch("https://evolve2p-backend.onrender.com/api/update-phone-verification", {
-              method: "PUT",
-              headers: {
-                "Content-Type": "application/json",
-                "Authorization": `Bearer ${accessToken}`
-              },
-              body: JSON.stringify({
-                phone: phoneNumber,
-                phoneVerified: isVerified
-              }),
-            });
-
-            if (!response.ok) {
-              console.error("Failed to update phone verification in backend");
-              return false; // Backend update failed
-            }
-            return true; // Both updates successful
-          } catch (backendError) {
-            console.error("Error updating backend:", backendError);
-            return false; // Backend update failed
-          }
-        }
-        
-        return true; // localStorage update successful (no backend update needed)
+        return true;
       }
-      return false; // No stored data
     } catch (error) {
-      console.error("Error updating phone verification:", error);
-      return false;
+      console.error("Error updating phoneVerified in localStorage:", error);
     }
+    return false;
   };
 
   // Phone validation using react-phone-number-input
-  const validatePhoneNumber = (phone: string | undefined) => {
-    if (!phone || phone.length < 4) {
+  const validatePhoneNumber = (phone: E164Number | undefined) => {
+    if (!phone || phone.toString().length < 4) {
       return { 
         isValid: false, 
         message: "Phone number is too short",
@@ -289,7 +254,8 @@ const Profile = () => {
     }
 
     try {
-      const isValid = isValidPhoneNumber(phone);
+      const phoneString = phone.toString();
+      const isValid = isValidPhoneNumber(phoneString);
       
       let message = "";
       if (!isValid) {
@@ -301,7 +267,7 @@ const Profile = () => {
       return {
         isValid,
         message,
-        formattedNumber: phone,
+        formattedNumber: phoneString,
         detectedCountry: undefined
       };
       
@@ -319,7 +285,7 @@ const Profile = () => {
   // Validate phone number on change
   useEffect(() => {
     const validatePhone = () => {
-      if (phoneNumber && phoneNumber.length >= 4) {
+      if (phoneNumber && phoneNumber.toString().length >= 4) {
         setPhoneVerificationLoading(true);
         setPhoneValidationError("");
 
@@ -329,74 +295,47 @@ const Profile = () => {
         setPhoneFormatted(validation.formattedNumber);
         setPhoneValidationError(validation.isValid ? "" : validation.message);
 
-        // Check if phone number has changed from original
-        if (originalPhoneNumber && phoneNumber !== originalPhoneNumber) {
-          setIsNewPhoneNumber(true);
-          setUserClickedVerified(false); // Reset verification for new number
-          updatePhoneVerifiedInBackend(false);
-        } else {
-          setIsNewPhoneNumber(false);
-        }
-
         if (!validation.isValid) {
           setUserClickedVerified(false);
-          updatePhoneVerifiedInBackend(false);
+          updatePhoneVerifiedInLocalStorage(false);
         }
         
         setPhoneVerificationLoading(false);
-      } else if (phoneNumber && phoneNumber.length > 0) {
+      } else if (phoneNumber && phoneNumber.toString().length > 0) {
         setIsPhoneVerified(false);
         setUserClickedVerified(false);
-        setIsNewPhoneNumber(originalPhoneNumber ? phoneNumber !== originalPhoneNumber : false);
         setPhoneFormatted("");
         setPhoneValidationError("Phone number is too short");
-        updatePhoneVerifiedInBackend(false);
+        updatePhoneVerifiedInLocalStorage(false);
       } else {
         setIsPhoneVerified(false);
-        setIsNewPhoneNumber(false);
         setPhoneValidationError("");
       }
     };
 
     validatePhone();
-  }, [phoneNumber, originalPhoneNumber]);
+  }, [phoneNumber]);
 
   // Handle verified phone click
-  const handleVerifiedClick = async () => {
+  const handleVerifiedClick = () => {
     if (isPhoneVerified) {
       setUserClickedVerified(true);
       
-      try {
-        const updatedSuccessfully = await updatePhoneVerifiedInBackend(true);
-        
-        if (updatedSuccessfully) {
-          if (isNewPhoneNumber) {
-            setSaveMessage("✅ New phone number verified! Click 'Save Changes' to update your profile.");
-          } else {
-            setSaveMessage("✅ Phone number re-verified! Verification status updated.");
-          }
-          setTimeout(() => setSaveMessage(""), 3000);
-        } else {
-          setSaveMessage("⚠️ Could not update verification status. Please try again.");
-        }
-      } catch (error) {
-        console.error("Error in verification:", error);
-        setSaveMessage("⚠️ An error occurred during verification. Please try again.");
+      const updatedSuccessfully = updatePhoneVerifiedInLocalStorage(true);
+      
+      if (updatedSuccessfully) {
+        setSaveMessage("✅ Phone number verified! Don't forget to save changes.");
+        setTimeout(() => setSaveMessage(""), 3000);
+      } else {
+        setSaveMessage("⚠️ Could not update verification status. Please try again.");
       }
     }
   };
 
   // Check if save should be disabled
   const isSaveDisabled = () => {
-    return !userClickedVerified || isSaving || saveMessage.includes("❌");
+    return !userClickedVerified || isSaving;
   };
-
-  // Clear error messages when user makes changes
-  useEffect(() => {
-    if (saveMessage.includes("❌")) {
-      setSaveMessage("");
-    }
-  }, [phoneNumber, selectedCountry, day, month, year, darkModeEnabled, selectedLang]);
 
   // Load countries from API
   useEffect(() => {
@@ -434,13 +373,136 @@ const Profile = () => {
     loadCountries();
   }, []);
 
+  // Load user data and currencies - FIXED E.164 FORMATTING
+  useEffect(() => {
+    const loadUserData = async () => {
+      if (typeof window === 'undefined') {
+        setLoading(false);
+        return;
+      }
+      
+      setLoading(true);
+      
+      const stored = localStorage.getItem("UserData");
+      if (stored) {
+        try {
+          const parsed = JSON.parse(stored);
+          
+          const userDataFromStorage = parsed?.userData || parsed;
+          
+          setClientUser(userDataFromStorage);
+          
+          const userDataObj: UserData = {
+            email: userDataFromStorage.email || parsed.email || "",
+            username: userDataFromStorage.username || parsed.username || "",
+            phone: parsed.phone || userDataFromStorage.phone || "",
+            country: parsed.country || userDataFromStorage.country || { name: "Nigeria", code: "NG", dial_code: "+234" },
+            verified: parsed.verified || userDataFromStorage.verified || true,
+            phoneVerified: parsed.phoneVerified || userDataFromStorage.phoneVerified || false,
+            accessToken: parsed.accessToken || userDataFromStorage.accessToken || "",
+            dayOfBirth: parsed.dayOfBirth || userDataFromStorage.DOB || userDataFromStorage.dayOfBirth,
+            darkMode: parsed.darkMode || userDataFromStorage.darkMode,
+            language: parsed.language || userDataFromStorage.language,
+            currency: parsed.currency || userDataFromStorage.currency,
+            userData: userDataFromStorage
+          };
+          
+          setUserData(userDataObj);
+          
+          // FIX: Convert local number to E.164 format
+          const selectedCountry = userDataObj.country || { name: "Nigeria", code: "NG", dial_code: "+234" };
+          
+          // Format phone to E.164
+          const formattedPhone = formatToE164(userDataObj.phone, selectedCountry.dial_code);
+          
+          setPhoneNumber(formattedPhone as E164Number || undefined);
+          setSelectedCountry(selectedCountry);
+          
+          const phoneVerifiedStatus = userDataObj.phoneVerified || false;
+          setUserClickedVerified(phoneVerifiedStatus);
+          
+          if (phoneVerifiedStatus && userDataObj.phone) {
+            setIsPhoneVerified(true);
+          }
+          
+          if (userDataObj.dayOfBirth) {
+            try {
+              const birthDate = new Date(userDataObj.dayOfBirth);
+              if (!isNaN(birthDate.getTime())) {
+                setDay(birthDate.getDate().toString().padStart(2, "0"));
+                setMonth((birthDate.getMonth() + 1).toString().padStart(2, "0"));
+                setYear(birthDate.getFullYear().toString());
+              }
+            } catch (dateError) {
+              console.error("Error parsing date of birth:", dateError);
+            }
+          }
+          
+          setDarkModeEnabled(userDataObj.darkMode || false);
+          setSelectedLang(userDataObj.language || "English");
+
+          const originalDataObj = {
+            phone: formattedPhone || "",
+            country: selectedCountry,
+            day: userDataObj.dayOfBirth ? new Date(userDataObj.dayOfBirth).getDate().toString().padStart(2, "0") : "",
+            month: userDataObj.dayOfBirth ? (new Date(userDataObj.dayOfBirth).getMonth() + 1).toString().padStart(2, "0") : "",
+            year: userDataObj.dayOfBirth ? new Date(userDataObj.dayOfBirth).getFullYear().toString() : "",
+            darkMode: userDataObj.darkMode || false,
+            language: userDataObj.language || "English",
+            currency: userDataObj.currency || "USD",
+            phoneVerified: phoneVerifiedStatus
+          };
+          
+          setOriginalData(originalDataObj);
+          
+        } catch (error) {
+          console.error("Error loading user data:", error);
+          setSaveMessage("Error loading user data. Please refresh the page.");
+        }
+      }
+      
+      setLoading(false);
+    };
+
+    const loadCurrencies = async () => {
+      if (typeof window === 'undefined') {
+        setLoadingCurrencies(false);
+        return;
+      }
+      
+      setLoadingCurrencies(true);
+      try {
+        await countryCurrencyService.initialize();
+        const currencies = countryCurrencyService.getAllCurrencies();
+        setCurrencyOptions(currencies);
+
+        const savedCurrency = localStorage.getItem('selectedCurrency');
+        const currencyCode = savedCurrency || 'USD';
+
+        const defaultCurrency = countryCurrencyService.getCurrencyByCode(currencyCode) ||
+          currencies.find(c => c.code === 'USD') ||
+          currencies[0];
+
+        setSelectedCurrency(defaultCurrency);
+
+      } catch (error) {
+        console.error('Error loading currencies:', error);
+      } finally {
+        setLoadingCurrencies(false);
+      }
+    };
+
+    loadUserData();
+    loadCurrencies();
+  }, []);
+
   // Handle country selection
   const handleCountrySelect = (country: Country) => {
     setSelectedCountry(country);
     setOpenCountry(false);
     setCountrySearch("");
     setUserClickedVerified(false);
-    updatePhoneVerifiedInBackend(false);
+    updatePhoneVerifiedInLocalStorage(false);
   };
 
   // Filter countries based on search
@@ -496,7 +558,7 @@ const Profile = () => {
     return "@User";
   };
 
-  // CORRECTED Save Changes function with proper error handling
+  // CORRECTED Save Changes function
   const handleSaveChanges = async () => {
     if (!userClickedVerified) {
       setSaveMessage("❌ Please verify your phone number before saving changes");
@@ -514,18 +576,10 @@ const Profile = () => {
       setSaveMessage("");
 
       const storedUser = typeof window !== "undefined" ? localStorage.getItem("UserData") : null;
-      if (!storedUser) {
-        setSaveMessage("❌ Error: User data not found in localStorage");
-        setIsSaving(false);
-        return;
-      }
-
-      const parsedStoredUser = JSON.parse(storedUser);
-      const accessToken = parsedStoredUser?.accessToken;
+      const accessToken = storedUser ? JSON.parse(storedUser)?.accessToken : null;
 
       if (!accessToken) {
         setSaveMessage("❌ Error: No access token found. Please log in again.");
-        setIsSaving(false);
         return;
       }
 
@@ -543,18 +597,12 @@ const Profile = () => {
         }
       }
 
-      // Ensure phone number is a string
-      const phoneToSave = phoneNumber || "";
-      
       const updateData = {
-        phone: phoneToSave,
-        country: selectedCountry.code,
-        phoneVerified: true  // Include verification status in update
+        phone: phoneNumber || "",
+        country: selectedCountry.code
       };
 
-      console.log("Sending update data:", updateData);
-
-      const response = await fetch("https://evolve2p-backend.onrender.com/api/update-user", {
+      const res = await fetch("https://evolve2p-backend.onrender.com/api/update-user", {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
@@ -563,81 +611,57 @@ const Profile = () => {
         body: JSON.stringify(updateData),
       });
 
-      // Check if response is OK
-      if (!response.ok) {
+      let responseData;
+      let responseText = "";
+      
+      try {
+        responseText = await res.text();
+        if (responseText && responseText.trim() !== "") {
+          responseData = JSON.parse(responseText);
+        } else {
+          responseData = {};
+        }
+      } catch (parseError) {
+        responseData = { rawResponse: responseText };
+      }
+
+      if (!res.ok) {
         let errorMessage = "Failed to update profile";
         
-        try {
-          // Try to parse error response as JSON first
-          const errorData = await response.json();
-          errorMessage = errorData.message || errorData.error || errorMessage;
-          
-          // If errorMessage is an object, stringify it
-          if (typeof errorMessage === 'object') {
-            errorMessage = JSON.stringify(errorMessage);
-          }
-        } catch {
-          // If JSON parsing fails, try to get text
-          try {
-            const errorText = await response.text();
-            if (errorText && errorText.trim()) {
-              errorMessage = errorText;
-            }
-          } catch {
-            // Use default error message
+        if (responseData) {
+          if (typeof responseData === 'string') {
+            errorMessage = responseData;
+          } else if (responseData.message) {
+            errorMessage = responseData.message;
+          } else if (responseData.error) {
+            errorMessage = typeof responseData.error === 'string' 
+              ? responseData.error 
+              : JSON.stringify(responseData.error);
           }
         }
         
         setSaveMessage(`❌ ${errorMessage}`);
-        setIsSaving(false);
         return;
       }
 
-      // Try to parse successful response
-      let responseData;
-      try {
-        responseData = await response.json();
-      } catch (parseError) {
-        console.warn("Could not parse response as JSON, but request succeeded");
-        responseData = {};
-      }
-
-      // Success message based on what was changed
-      let successMessage = "✅ Profile updated successfully!";
-      if (isNewPhoneNumber) {
-        successMessage += " New phone number saved and verified.";
-        setOriginalPhoneNumber(phoneToSave); // Update original phone number
-        setIsNewPhoneNumber(false);
-      } else {
-        successMessage += " Phone verification status updated.";
-      }
+      setSaveMessage("✅ Profile updated successfully! Phone verification saved.");
       
-      setSaveMessage(successMessage);
-      
-      // Update localStorage with new data
       const currentStored = localStorage.getItem("UserData");
       if (currentStored) {
         const currentParsed = JSON.parse(currentStored);
         const updatedUserData = { 
           ...currentParsed, 
-          phone: phoneToSave,
+          phone: phoneNumber || "",
           country: selectedCountry,
           phoneVerified: true,
           ...(formattedDateOfBirth && { dayOfBirth: formattedDateOfBirth }),
           darkMode: darkModeEnabled,
           language: selectedLang,
           currency: selectedCurrency?.code || "USD",
-          ...(responseData.user && { userData: responseData.user }),
           userData: currentParsed.userData ? {
             ...currentParsed.userData,
-            phone: phoneToSave,
-            phoneVerified: true,
-            ...(responseData.user && responseData.user)
-          } : {
-            ...currentParsed,
-            phone: phoneToSave,
             phoneVerified: true
-          }
+          } : currentParsed.userData
         };
         
         localStorage.setItem("UserData", JSON.stringify(updatedUserData));
@@ -647,9 +671,8 @@ const Profile = () => {
         setClientUser(userDataFromStorage);
       }
 
-      // Update original data
       setOriginalData({
-        phone: phoneToSave,
+        phone: phoneNumber || "",
         country: selectedCountry,
         day,
         month,
@@ -660,18 +683,10 @@ const Profile = () => {
         phoneVerified: true
       });
 
-      // Reset save message after 3 seconds
       setTimeout(() => setSaveMessage(""), 3000);
 
     } catch (error) {
-      console.error("Save error:", error);
-      
-      let errorMessage = "❌ Network error: Failed to connect to server";
-      if (error instanceof Error) {
-        errorMessage = `❌ Error: ${error.message}`;
-      }
-      
-      setSaveMessage(errorMessage);
+      setSaveMessage("❌ Network error: Failed to connect to server");
     } finally {
       setIsSaving(false);
     }
@@ -680,19 +695,14 @@ const Profile = () => {
   // Discard Changes function
   const handleDiscardChanges = () => {
     if (originalData) {
-      setPhoneNumber(originalData.phone || "");
+      setPhoneNumber(originalData.phone as E164Number || undefined);
       setSelectedCountry(originalData.country || { name: "Nigeria", code: "NG", dial_code: "+234" });
       setDay(originalData.day || "");
       setMonth(originalData.month || "");
       setYear(originalData.year || "");
       setDarkModeEnabled(originalData.darkMode || false);
       setSelectedLang(originalData.language || "English");
-      
-      // Only update verification status if it's from original data
-      // Don't change verification if user is already verified
-      if (!userClickedVerified) {
-        setUserClickedVerified(originalData.phoneVerified || false);
-      }
+      setUserClickedVerified(originalData.phoneVerified || false);
       
       const currentStored = localStorage.getItem("UserData");
       if (currentStored && userData) {
@@ -701,11 +711,10 @@ const Profile = () => {
           ...currentParsed,
           phone: originalData.phone || "",
           country: originalData.country || { name: "Nigeria", code: "NG", dial_code: "+234" },
-          // Don't override verification if already verified
-          phoneVerified: userClickedVerified || originalData.phoneVerified || false,
+          phoneVerified: originalData.phoneVerified || false,
           userData: currentParsed.userData ? {
             ...currentParsed.userData,
-            phoneVerified: userClickedVerified || originalData.phoneVerified || false
+            phoneVerified: originalData.phoneVerified || false
           } : currentParsed.userData
         };
         
@@ -720,197 +729,14 @@ const Profile = () => {
         }
       }
 
-      setIsPhoneVerified(userClickedVerified || originalData.phoneVerified || false);
+      setIsPhoneVerified(originalData.phoneVerified || false);
       setPhoneValidationError("");
       setPhoneFormatted("");
-      setIsNewPhoneNumber(false);
 
-      setSaveMessage("✅ Changes discarded (verification status preserved)");
+      setSaveMessage("✅ Changes discarded");
       setTimeout(() => setSaveMessage(""), 3000);
     }
   };
-
-  // Load user data and currencies
-  useEffect(() => {
-    const loadUserData = async () => {
-      if (typeof window === 'undefined') {
-        setLoading(false);
-        return;
-      }
-      
-      setLoading(true);
-      
-      const stored = localStorage.getItem("UserData");
-      if (stored) {
-        try {
-          const parsed = JSON.parse(stored);
-          
-          const userDataFromStorage = parsed?.userData || parsed;
-          
-          setClientUser(userDataFromStorage);
-          
-          const userDataObj: UserData = {
-            email: userDataFromStorage.email || parsed.email || "",
-            username: userDataFromStorage.username || parsed.username || "",
-            phone: parsed.phone || userDataFromStorage.phone || "",
-            country: parsed.country || userDataFromStorage.country || { name: "Nigeria", code: "NG", dial_code: "+234" },
-            verified: parsed.verified || userDataFromStorage.verified || true,
-            phoneVerified: parsed.phoneVerified || userDataFromStorage.phoneVerified || false,
-            accessToken: parsed.accessToken || userDataFromStorage.accessToken || "",
-            dayOfBirth: parsed.dayOfBirth || userDataFromStorage.DOB || userDataFromStorage.dayOfBirth,
-            darkMode: parsed.darkMode || userDataFromStorage.darkMode,
-            language: parsed.language || userDataFromStorage.language,
-            currency: parsed.currency || userDataFromStorage.currency,
-            userData: userDataFromStorage
-          };
-          
-          setUserData(userDataObj);
-          
-          // FIX: Convert local number to E.164 format
-          const selectedCountry = userDataObj.country || { name: "Nigeria", code: "NG", dial_code: "+234" };
-          
-          // Format phone to E.164
-          const formattedPhone = formatToE164(userDataObj.phone, selectedCountry.dial_code);
-          
-          setPhoneNumber(formattedPhone || "");
-          setOriginalPhoneNumber(formattedPhone || ""); // Store original for comparison
-          setSelectedCountry(selectedCountry);
-          
-          // SYNC VERIFICATION STATUS FROM BACKEND
-          const accessToken = parsed?.accessToken;
-          if (accessToken && userDataObj.phone) {
-            try {
-              // Fetch fresh user data from backend to get current verification status
-              const response = await fetch("https://evolve2p-backend.onrender.com/api/get-user", {
-                method: "GET",
-                headers: {
-                  "Authorization": `Bearer ${accessToken}`
-                }
-              });
-              
-              if (response.ok) {
-                const freshUserData = await response.json();
-                const backendPhoneVerified = freshUserData?.user?.phoneVerified || freshUserData?.phoneVerified || false;
-                
-                // Update local state with backend verification status
-                setUserClickedVerified(backendPhoneVerified);
-                
-                if (backendPhoneVerified && userDataObj.phone) {
-                  setIsPhoneVerified(true);
-                }
-                
-                // Update localStorage with backend verification status
-                const updatedParsed = {
-                  ...parsed,
-                  phoneVerified: backendPhoneVerified,
-                  ...(parsed.userData && {
-                    userData: {
-                      ...parsed.userData,
-                      phoneVerified: backendPhoneVerified
-                    }
-                  })
-                };
-                localStorage.setItem("UserData", JSON.stringify(updatedParsed));
-                
-              } else {
-                // If backend fetch fails, use localStorage value
-                const phoneVerifiedStatus = userDataObj.phoneVerified || false;
-                setUserClickedVerified(phoneVerifiedStatus);
-                
-                if (phoneVerifiedStatus && userDataObj.phone) {
-                  setIsPhoneVerified(true);
-                }
-              }
-            } catch (syncError) {
-              console.error("Error syncing verification status:", syncError);
-              // Use localStorage value if sync fails
-              const phoneVerifiedStatus = userDataObj.phoneVerified || false;
-              setUserClickedVerified(phoneVerifiedStatus);
-              
-              if (phoneVerifiedStatus && userDataObj.phone) {
-                setIsPhoneVerified(true);
-              }
-            }
-          } else {
-            // No access token, just use localStorage value
-            const phoneVerifiedStatus = userDataObj.phoneVerified || false;
-            setUserClickedVerified(phoneVerifiedStatus);
-            
-            if (phoneVerifiedStatus && userDataObj.phone) {
-              setIsPhoneVerified(true);
-            }
-          }
-          
-          if (userDataObj.dayOfBirth) {
-            try {
-              const birthDate = new Date(userDataObj.dayOfBirth);
-              if (!isNaN(birthDate.getTime())) {
-                setDay(birthDate.getDate().toString().padStart(2, "0"));
-                setMonth((birthDate.getMonth() + 1).toString().padStart(2, "0"));
-                setYear(birthDate.getFullYear().toString());
-              }
-            } catch (dateError) {
-              console.error("Error parsing date of birth:", dateError);
-            }
-          }
-          
-          setDarkModeEnabled(userDataObj.darkMode || false);
-          setSelectedLang(userDataObj.language || "English");
-
-          const originalDataObj = {
-            phone: formattedPhone || "",
-            country: selectedCountry,
-            day: userDataObj.dayOfBirth ? new Date(userDataObj.dayOfBirth).getDate().toString().padStart(2, "0") : "",
-            month: userDataObj.dayOfBirth ? (new Date(userDataObj.dayOfBirth).getMonth() + 1).toString().padStart(2, "0") : "",
-            year: userDataObj.dayOfBirth ? new Date(userDataObj.dayOfBirth).getFullYear().toString() : "",
-            darkMode: userDataObj.darkMode || false,
-            language: userDataObj.language || "English",
-            currency: userDataObj.currency || "USD",
-            phoneVerified: userClickedVerified
-          };
-          
-          setOriginalData(originalDataObj);
-          
-        } catch (error) {
-          console.error("Error loading user data:", error);
-          setSaveMessage("Error loading user data. Please refresh the page.");
-        }
-      }
-      
-      setLoading(false);
-    };
-
-    const loadCurrencies = async () => {
-      if (typeof window === 'undefined') {
-        setLoadingCurrencies(false);
-        return;
-      }
-      
-      setLoadingCurrencies(true);
-      try {
-        await countryCurrencyService.initialize();
-        const currencies = countryCurrencyService.getAllCurrencies();
-        setCurrencyOptions(currencies);
-
-        const savedCurrency = localStorage.getItem('selectedCurrency');
-        const currencyCode = savedCurrency || 'USD';
-
-        const defaultCurrency = countryCurrencyService.getCurrencyByCode(currencyCode) ||
-          currencies.find(c => c.code === 'USD') ||
-          currencies[0];
-
-        setSelectedCurrency(defaultCurrency);
-
-      } catch (error) {
-        console.error('Error loading currencies:', error);
-      } finally {
-        setLoadingCurrencies(false);
-      }
-    };
-
-    loadUserData();
-    loadCurrencies();
-  }, []);
 
   // Show loading state
   if (loading) {
@@ -1122,18 +948,12 @@ const Profile = () => {
                   <p className={`text-sm font-medium ${
                     userClickedVerified ? "text-[#4DF2BE]" : "text-blue-400"
                   }`}>
-                    {userClickedVerified 
-                      ? (isNewPhoneNumber ? "New Phone Number Ready for Verification" : "Phone Verified ✓ (Saved to Database)") 
-                      : "Phone Verification Required"}
+                    {userClickedVerified ? "Phone Verified ✓" : "Phone Verification Required"}
                   </p>
                   <p className="text-xs text-gray-300 mt-1">
                     {userClickedVerified 
-                      ? isNewPhoneNumber
-                        ? `New number ${phoneFormatted || phoneNumber} is valid. Click 'Save Changes' to update your profile.`
-                        : `Your phone number ${phoneFormatted || phoneNumber} is verified and saved to your account.`
-                      : isNewPhoneNumber
-                        ? "You've entered a new phone number. Please verify it before saving changes."
-                        : "Enter your phone number, then click 'Click to Verify' above. Finally, save changes to complete verification."}
+                      ? `Your phone number ${phoneFormatted || phoneNumber} is verified. Changes are saved locally.`
+                      : "Enter your phone number, then click 'Click to Verify' above. Finally, save changes to complete verification."}
                   </p>
                 </div>
               </div>
@@ -1184,7 +1004,7 @@ const Profile = () => {
                       Phone number
                     </p>
                     <div className="flex items-center gap-2">
-                      {phoneNumber && phoneNumber.length >= 4 && (
+                      {phoneNumber && phoneNumber.toString().length >= 4 && (
                         phoneVerificationLoading ? (
                           <span className="text-sm text-[#8F8F8F]">Checking...</span>
                         ) : (
@@ -1192,7 +1012,7 @@ const Profile = () => {
                             {isPhoneVerified ? (
                               userClickedVerified ? (
                                 <span className="text-sm font-bold text-[#4DF2BE] flex items-center gap-1">
-                                  {isNewPhoneNumber ? "✓ New Number Verified" : "✓ Verified (Database)"}
+                                  ✓ Verified
                                 </span>
                               ) : (
                                 <button
@@ -1200,7 +1020,7 @@ const Profile = () => {
                                   onClick={handleVerifiedClick}
                                   className="text-sm font-bold text-[#4DF2BE] flex items-center gap-1 cursor-pointer hover:underline bg-transparent border-none"
                                 >
-                                  {isNewPhoneNumber ? "✓ Verify New Number" : "✓ Click to Verify"}
+                                  ✓ Click to Verify
                                 </button>
                               )
                             ) : (
@@ -1219,8 +1039,8 @@ const Profile = () => {
                       international
                       countryCallingCodeEditable={false}
                       defaultCountry="NG"
-                      value={phoneNumber}
-                      onChange={handlePhoneNumberChange}
+                      value={phoneNumber || ""}
+                      onChange={setPhoneNumber}
                       className="custom-phone-input"
                       style={{
                         '--PhoneInput-color--focus': '#4DF2BE',
@@ -1232,7 +1052,7 @@ const Profile = () => {
                     />
                     
                     <span className="absolute right-3 top-1/2 -translate-y-1/2">
-                      {phoneNumber && phoneNumber.length >= 4 && isPhoneVerified && userClickedVerified ? (
+                      {phoneNumber && phoneNumber.toString().length >= 4 && isPhoneVerified && userClickedVerified ? (
                         <BlueTick />
                       ) : (
                         <Image
@@ -1257,8 +1077,7 @@ const Profile = () => {
                   {isPhoneVerified && phoneFormatted && (
                     <div className="mt-2 text-xs text-[#4DF2BE] font-medium">
                       Formatted: {phoneFormatted}
-                      {isNewPhoneNumber && !userClickedVerified && " - Click 'Verify New Number' above"}
-                      {!isNewPhoneNumber && !userClickedVerified && " - Click 'Click to Verify' above"}
+                      {!userClickedVerified && " - Click 'Click to Verify' above"}
                     </div>
                   )}
                 </div>

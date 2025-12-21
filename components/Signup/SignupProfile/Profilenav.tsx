@@ -13,7 +13,7 @@ const Profilenav = () => {
   };
 
   return (
-    <div className="flex gap-[54%] ml-[8px]  mt-[100px] sm:justify-between sm:w-[400px] sm:ml-[120px] items-center lg:ml-[100px] p-[12px_20px]  md:border-2 md:ml-[188px] lg:gap-[48%]">
+    <div className="flex gap-[54%] ml-[8px]  mt-[100px] sm:justify-between sm:w-[400px] sm:ml-[120px] items-center lg:ml-[100px] p-[12px_20px]   md:ml-[188px] lg:gap-[48%]">
       <button
         onClick={handleGoBack}
         className="border-0 bg-transparent cursor-pointer"
