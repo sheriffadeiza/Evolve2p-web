@@ -24,15 +24,12 @@ const Profilebd = () => {
   const [phoneVerificationLoading, setPhoneVerificationLoading] = useState(false);
 
   const [countries, setCountries] = useState<any[]>([]);
-  const [countrySearch, setCountrySearch] = useState("");
   const [usernameStatus, setUsernameStatus] = useState("");
   const [isValidUsername, setIsValidUsername] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingCountries, setIsLoadingCountries] = useState(true);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
-  const [error, setError] = useState("");
-  const [errorMessage, setErrorMessage] = useState("");
-  const [showCountrySearch, setShowCountrySearch] = useState(false);
+  const [errorMessage, setErrorMessage] = useState(""); // combined error display
 
   // Phone validation using react-phone-number-input
   const validatePhoneNumber = (phone: E164Number | undefined) => {
@@ -147,6 +144,7 @@ const Profilebd = () => {
         }
       } catch (error) {
         console.error("Failed to fetch countries:", error);
+        setErrorMessage("Failed to load country data. Please refresh.");
       } finally {
         setIsLoadingCountries(false);
       }
@@ -199,11 +197,13 @@ const Profilebd = () => {
     router.push("/Signups/Secpin");
   };
 
+  // Submit with timeout and better error handling
   const handleSubmit = async () => {
     setIsLoading(true);
+    setErrorMessage("");
 
     if (!allFieldsValid()) {
-      setErrorMessage("Please fill in all fields correctly");
+      setErrorMessage("Please fill in all fields correctly.");
       setIsLoading(false);
       return;
     }
@@ -213,60 +213,79 @@ const Profilebd = () => {
         ? JSON.parse(localStorage.getItem("UserReg") as string)
         : null;
 
+      if (!currentData?.email || !currentData?.password) {
+        throw new Error("Missing email or password from previous step.");
+      }
+
       const UserData = {
-        email: currentData?.email,
+        email: currentData.email,
         username: formData.username,
-        password: currentData?.password,
+        password: currentData.password,
         country: formData.country,
-        emailVerified: currentData?.isEmailVerified,
+        emailVerified: currentData.isEmailVerified || false,
         phone: phoneNumber?.toString() || "",
       };
 
+      // Use AbortController for timeout
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 15000); // 15s timeout
+
       const SignupResponse = await fetch(BASE_URL + "auth/register", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(UserData),
+        signal: controller.signal,
       });
+
+      clearTimeout(timeoutId);
 
       const data = await SignupResponse.json();
 
-      if (data?.error) {
-        alert(data?.message);
-        return;
+      if (!SignupResponse.ok) {
+        throw new Error(data.message || "Registration failed. Please try again.");
       }
 
-      let token = data?.accessToken;
-
-      if (token) {
-        const userResponse = await fetch(BASE_URL + "get-user", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: "Bearer " + token,
-          },
-        });
-
-        const userData = await userResponse.json();
-
-        if (userData?.success) {
-          localStorage.removeItem("UserReg");
-          localStorage.setItem(
-            "UserData",
-            JSON.stringify({
-              accessToken: token,
-              userData: userData?.user,
-            })
-          );
-          setShowSuccessModal(true);
-        }
+      const token = data?.accessToken || data?.token;
+      if (!token) {
+        throw new Error("No access token received.");
       }
-    } catch (error: any) {
-      setError(
-        error.message ||
-          "An error occurred during registration. Please try again."
+
+      // Fetch user data with token
+      const userResponse = await fetch(BASE_URL + "get-user", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: "Bearer " + token,
+        },
+      });
+
+      const userData = await userResponse.json();
+
+      // Check if response contains user object (adjust based on actual API)
+      const user = userData?.user || userData?.data || userData;
+      if (!user) {
+        throw new Error("Failed to fetch user data.");
+      }
+
+      // Store user data
+      localStorage.removeItem("UserReg");
+      localStorage.setItem(
+        "UserData",
+        JSON.stringify({
+          accessToken: token,
+          userData: user,
+        })
       );
+
+      // Show success modal
+      setShowSuccessModal(true);
+    } catch (error: any) {
+      console.error("Registration error:", error);
+      if (error.name === 'AbortError') {
+        setErrorMessage("Request timed out. Please check your connection and try again.");
+      } else {
+        setErrorMessage(error.message || "An unexpected error occurred.");
+      }
     } finally {
       setIsLoading(false);
     }
@@ -276,19 +295,20 @@ const Profilebd = () => {
     <div className="w-full lg:mx-0">
       <div className="flex flex-col px-4 lg:px-4 mx-auto py-16 lg:ml-[100px] gap-2 w-full border-none max-w-[400px] text-white">
 
-        {/* Success Modal */}
+        {/* Success Modal - improved styling */}
         {showSuccessModal && (
-          <div className="fixed inset-0 bg-black bg-opacity-70  flex items-center justify-center z-50">
-            <div className="bg-[#222222] h-[40vh] p-6 rounded-[10px] ml-[-10px] w-[300px] text-center">
-              <h3 className="text-[#4DF2BE] text-[18px] font-bold mb-2">
-                Success!
-              </h3>
-              <p className="text-[#FCFCFC] mt-[50px]">
-                Registration completed successfully
-              </p>
+          <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50">
+            <div className="bg-[#222222] p-8 rounded-xl w-[350px] text-center shadow-2xl border border-[#4DF2BE]/30">
+              <div className="w-16 h-16 mx-auto mb-4 bg-[#1B362B] rounded-full flex items-center justify-center border-2 border-[#1ECB84]">
+                <svg className="w-8 h-8 text-[#1ECB84]" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                </svg>
+              </div>
+              <h3 className="text-[#4DF2BE] text-2xl font-bold mb-4">Success!</h3>
+              <p className="text-[#FCFCFC] mb-8">Registration completed successfully.</p>
               <button
                 onClick={handleContinueToSecurityPin}
-                className="w-[250px] h-[50px] mt-[50px] border-none bg-[#4DF2BE] text-[#000] py-2 rounded-[100px] font-bold hover:bg-[#3dd9ab] transition"
+                className="w-full h-12 bg-[#4DF2BE] text-[#0F1012] font-bold rounded-full hover:bg-[#3DD2A5] transition-colors"
               >
                 Continue to Security Pin
               </button>
@@ -296,77 +316,64 @@ const Profilebd = () => {
           </div>
         )}
 
-        <h1 className="text-[24px] text-[#FCFCFC] font-[700]">
-          Complete Your Profile
-        </h1>
-        <p className="text-[16px] font-[400] mt-[-5px] text-[#8F8F8F] mb-6">
-          This helps personalize your experience.
-        </p>
+        <h1 className="text-2xl text-[#FCFCFC] font-bold">Complete Your Profile</h1>
+        <p className="text-base text-[#8F8F8F] mb-6">This helps personalize your experience.</p>
 
+        {/* Error display */}
         {errorMessage && (
-          <div className="w-[370px] p-3 mb-4 text-[#F5918A] text-sm">
+          <div className="bg-[#342827] border border-[#FE857D] text-[#FE857D] px-4 py-3 rounded-lg mb-4 text-sm">
             {errorMessage}
           </div>
         )}
 
         {/* Username */}
-        <div className="mt-[20px] w-full">
-          <label className="text-[14px] mt-2 font-[500] text-[#8F8F8F]">
-            Username
-          </label>
+        <div className="mt-4 w-full">
+          <label className="text-sm font-medium text-[#8F8F8F]">Username</label>
           <div
-            className={`relative w-full rounded-t-[10px] border-2 ${
+            className={`relative w-full rounded-t-lg border-2 ${
               usernameStatus === "invalid"
                 ? "border-[#F5918A]"
                 : "border-[#2E2E2E]"
             }`}
           >
-            <span className="text-[#DBDBDB] absolute ml-[10px] mt-[18px]">@</span>
+            <span className="text-[#DBDBDB] absolute left-3 top-1/2 -translate-y-1/2">@</span>
             <input
               type="text"
               value={formData.username}
               onChange={handleUsernameChange}
-              className="w-full h-[56px] text-[#FCFCFC] rounded-t-[10px] px-4 py-3 bg-[#222222] border-none pl-[25px] focus:outline-none"
+              className="w-full h-14 text-[#FCFCFC] rounded-t-lg pl-8 pr-4 py-3 bg-[#222222] border-none focus:outline-none"
             />
           </div>
           <div
-            className={`w-full h-[30px] pl-[20px] flex items-center bg-[#222222] rounded-b-[10px] ${
+            className={`w-full h-8 flex items-center pl-4 bg-[#222222] rounded-b-lg text-xs ${
               usernameStatus === "invalid"
                 ? "border border-[#F5918A] border-t-0"
                 : "border border-[#2E2E2E] border-t-0"
             }`}
           >
             {usernameStatus === "checking" && (
-              <span className="text-[12px] text-[#8F8F8F]">
-                Checking username...
-              </span>
+              <span className="text-[#8F8F8F]">Checking username...</span>
             )}
             {usernameStatus === "valid" && (
-              <span className="text-[12px] text-[#1ECB84]">
-                Username available
-              </span>
+              <span className="text-[#1ECB84]">Username available</span>
             )}
             {usernameStatus === "invalid" && (
-              <span className="text-[12px] text-[#F5918A]">
+              <span className="text-[#F5918A]">
                 {formData.username.length < 4
                   ? "Minimum 4 characters"
                   : "Username not available"}
               </span>
             )}
             {usernameStatus === "" && formData.username.trim() === "" && (
-              <span className="text-[12px] text-[#8F8F8F]">
-                Enter a username
-              </span>
+              <span className="text-[#8F8F8F]">Enter a username</span>
             )}
           </div>
         </div>
 
-        {/* Phone Input using react-phone-number-input */}
-        <div className="mt-[20px] w-full">
-          <label className="text-[14px] font-[500] text-[#8F8F8F] mb-2 block">
-            Phone number
-          </label>
-          <div className={`relative w-full rounded-[10px] ${
+        {/* Phone Input */}
+        <div className="mt-4 w-full">
+          <label className="text-sm font-medium text-[#8F8F8F] mb-2 block">Phone number</label>
+          <div className={`relative w-full rounded-lg ${
             phoneValidationError && !isPhoneValid
               ? "border-2 border-[#F5918A]"
               : isPhoneValid
@@ -380,25 +387,19 @@ const Profilebd = () => {
               value={phoneNumber || ""}
               onChange={setPhoneNumber}
               className="custom-phone-input-register"
-              style={{
-                '--PhoneInput-color--focus': '#4DF2BE',
-                '--PhoneInputCountrySelectArrow-color': '#C7C7C7',
-                '--PhoneInputCountryFlag-borderColor': 'transparent',
-              } as React.CSSProperties}
             />
             
-            {/* Phone validation indicator */}
             {phoneNumber && phoneNumber.toString().length >= 4 && (
               <div className="absolute right-3 top-1/2 -translate-y-1/2">
                 {phoneVerificationLoading ? (
                   <div className="w-5 h-5 border-2 border-[#4DF2BE] border-t-transparent rounded-full animate-spin"></div>
                 ) : isPhoneValid ? (
-                  <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
                     <circle cx="10" cy="10" r="10" fill="#1ECB84" />
                     <path d="M5 10L8.5 13.5L15 7" stroke="#0F1012" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                   </svg>
                 ) : (
-                  <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
                     <circle cx="10" cy="10" r="10" fill="#F5918A" />
                     <path d="M13 7L7 13" stroke="#0F1012" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                     <path d="M7 7L13 13" stroke="#0F1012" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
@@ -408,7 +409,6 @@ const Profilebd = () => {
             )}
           </div>
           
-          {/* Phone validation messages */}
           {phoneValidationError && (
             <div className={`mt-2 text-xs font-medium ${
               isPhoneValid ? "text-[#1ECB84]" : "text-[#F5918A]"
@@ -417,7 +417,6 @@ const Profilebd = () => {
             </div>
           )}
           
-          {/* Country info */}
           {isPhoneValid && formData.country && (
             <div className="mt-2 text-xs text-[#1ECB84] flex items-center gap-2">
               ✓ Detected country: {formData.country}
@@ -425,13 +424,13 @@ const Profilebd = () => {
           )}
         </div>
 
-        {/* Country Display (read-only, auto-filled from phone) */}
-        <div className="mt-[20px]">
-          <label className="text-[14px] font-[500] text-[#8F8F8F] mb-2 block">
+        {/* Country Display (auto-detected) */}
+        <div className="mt-4">
+          <label className="text-sm font-medium text-[#8F8F8F] mb-2 block">
             Country (auto-detected from phone)
           </label>
           <div className="relative w-full">
-            <div className="absolute left-4 top-1/2 mt-[5px] -translate-y-1/2 flex items-center pointer-events-none">
+            <div className="absolute left-4 top-1/2 -translate-y-1/2 flex items-center pointer-events-none">
               {formData.countryCode && (
                 <img
                   src={`https://flagcdn.com/w20/${formData.countryCode.toLowerCase()}.png`}
@@ -445,7 +444,7 @@ const Profilebd = () => {
             <input
               type="text"
               readOnly
-              className="w-full h-[56px] bg-[#222222] mt-[10px] pl-[60px] pr-12 border border-[#2E2E2E] rounded-[10px] text-[14px] font-[500] text-[#FCFCFC] focus:outline-none cursor-not-allowed"
+              className="w-full h-14 bg-[#222222] pl-14 pr-4 border border-[#2E2E2E] rounded-lg text-sm font-medium text-[#FCFCFC] cursor-not-allowed"
               value={formData.country || "Will be auto-detected from phone"}
             />
           </div>
@@ -454,10 +453,8 @@ const Profilebd = () => {
         {/* Continue Button */}
         <button
           onClick={handleSubmit}
-          className={`w-full h-[48px] border-none bg-[#2DE3A3] text-[#0F1012] text-[14px] font-[700] mt-[40px] py-3 rounded-full flex items-center justify-center ${
-            !allFieldsValid() || isLoading
-              ? "opacity-50 cursor-not-allowed"
-              : ""
+          className={`w-full h-12 bg-[#4DF2BE] text-[#0F1012] font-bold rounded-full mt-8 flex items-center justify-center transition-colors ${
+            !allFieldsValid() || isLoading ? "opacity-50 cursor-not-allowed" : "hover:bg-[#3DD2A5]"
           }`}
           disabled={!allFieldsValid() || isLoading}
         >
@@ -478,7 +475,7 @@ const Profilebd = () => {
           
           .custom-phone-input-register .PhoneInputCountry {
             background: #3A3A3A;
-            padding: 1rem;
+            padding: 0 1rem;
             border-radius: 0.625rem 0 0 0.625rem;
             margin-right: 0;
             height: 56px;
@@ -518,10 +515,6 @@ const Profilebd = () => {
             outline: none;
           }
           
-          .custom-phone-input-register .PhoneInputInput:focus {
-            outline: none;
-          }
-          
           .PhoneInputCountryDropdown {
             background: #1A1A1A !important;
             border: 1px solid #3A3A3A !important;
@@ -532,37 +525,16 @@ const Profilebd = () => {
             z-index: 9999 !important;
           }
           
-          .PhoneInputCountryDropdown::-webkit-scrollbar {
-            width: 6px;
-          }
-          
-          .PhoneInputCountryDropdown::-webkit-scrollbar-track {
-            background: #2D2D2D;
-            border-radius: 3px;
-          }
-          
-          .PhoneInputCountryDropdown::-webkit-scrollbar-thumb {
-            background: #4DF2BE;
-            border-radius: 3px;
-          }
-          
           .PhoneInputCountryDropdown option {
             background: #1A1A1A !important;
             color: #FFFFFF !important;
             padding: 0.75rem 1rem !important;
             border-bottom: 1px solid #2D2D2D !important;
             cursor: pointer !important;
-            transition: all 0.2s ease !important;
           }
           
           .PhoneInputCountryDropdown option:hover {
             background: #2D2D2D !important;
-          }
-          
-          .PhoneInputCountryDropdown option:checked,
-          .PhoneInputCountryDropdown option:focus {
-            background: #4DF2BE !important;
-            color: #0F1012 !important;
           }
           
           .loader-small {
@@ -583,12 +555,8 @@ const Profilebd = () => {
             animation: spin 0.8s linear infinite;
           }
           @keyframes spin {
-            0% {
-              transform: rotate(0deg);
-            }
-            100% {
-              transform: rotate(360deg);
-            }
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
           }
         `}</style>
       </div> 

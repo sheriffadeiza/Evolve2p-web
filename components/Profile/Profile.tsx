@@ -135,8 +135,7 @@ const Profile = () => {
 
   // Phone and Country states
   const [phoneNumber, setPhoneNumber] = useState<E164Number | undefined>();
-  const [isPhoneVerified, setIsPhoneVerified] = useState<boolean>(false);
-  const [userClickedVerified, setUserClickedVerified] = useState<boolean>(false);
+  const [isPhoneValid, setIsPhoneValid] = useState<boolean>(false);
   const [phoneVerificationLoading, setPhoneVerificationLoading] = useState<boolean>(false);
   const [phoneValidationError, setPhoneValidationError] = useState<string>("");
   const [phoneFormatted, setPhoneFormatted] = useState<string>("");
@@ -211,8 +210,8 @@ const Profile = () => {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // Function to update phoneVerified in localStorage
-  const updatePhoneVerifiedInLocalStorage = (isVerified: boolean) => {
+  // Function to update phoneVerified in localStorage after save
+  const markPhoneVerified = () => {
     try {
       const stored = localStorage.getItem("UserData");
       if (stored) {
@@ -220,11 +219,11 @@ const Profile = () => {
         
         const updatedData = {
           ...parsed,
-          phoneVerified: isVerified,
+          phoneVerified: true,
           ...(parsed.userData && {
             userData: {
               ...parsed.userData,
-              phoneVerified: isVerified
+              phoneVerified: true
             }
           })
         };
@@ -291,24 +290,17 @@ const Profile = () => {
 
         const validation = validatePhoneNumber(phoneNumber);
         
-        setIsPhoneVerified(validation.isValid);
+        setIsPhoneValid(validation.isValid);
         setPhoneFormatted(validation.formattedNumber);
         setPhoneValidationError(validation.isValid ? "" : validation.message);
-
-        if (!validation.isValid) {
-          setUserClickedVerified(false);
-          updatePhoneVerifiedInLocalStorage(false);
-        }
         
         setPhoneVerificationLoading(false);
       } else if (phoneNumber && phoneNumber.toString().length > 0) {
-        setIsPhoneVerified(false);
-        setUserClickedVerified(false);
+        setIsPhoneValid(false);
         setPhoneFormatted("");
         setPhoneValidationError("Phone number is too short");
-        updatePhoneVerifiedInLocalStorage(false);
       } else {
-        setIsPhoneVerified(false);
+        setIsPhoneValid(false);
         setPhoneValidationError("");
       }
     };
@@ -316,25 +308,34 @@ const Profile = () => {
     validatePhone();
   }, [phoneNumber]);
 
-  // Handle verified phone click
-  const handleVerifiedClick = () => {
-    if (isPhoneVerified) {
-      setUserClickedVerified(true);
-      
-      const updatedSuccessfully = updatePhoneVerifiedInLocalStorage(true);
-      
-      if (updatedSuccessfully) {
-        setSaveMessage("✅ Phone number verified! Don't forget to save changes.");
-        setTimeout(() => setSaveMessage(""), 3000);
-      } else {
-        setSaveMessage("⚠️ Could not update verification status. Please try again.");
-      }
-    }
+  // Check if changes exist compared to originalData
+  const hasChanges = () => {
+    if (!originalData) return false;
+    
+    const currentPhone = phoneNumber || "";
+    const currentCountry = selectedCountry;
+    const currentDay = day;
+    const currentMonth = month;
+    const currentYear = year;
+    const currentDarkMode = darkModeEnabled;
+    const currentLang = selectedLang;
+    const currentCurrency = selectedCurrency?.code || "USD";
+
+    return (
+      currentPhone !== originalData.phone ||
+      currentCountry.code !== originalData.country?.code ||
+      currentDay !== originalData.day ||
+      currentMonth !== originalData.month ||
+      currentYear !== originalData.year ||
+      currentDarkMode !== originalData.darkMode ||
+      currentLang !== originalData.language ||
+      currentCurrency !== originalData.currency
+    );
   };
 
   // Check if save should be disabled
   const isSaveDisabled = () => {
-    return !userClickedVerified || isSaving;
+    return !isPhoneValid || !hasChanges() || isSaving;
   };
 
   // Load countries from API
@@ -409,21 +410,12 @@ const Profile = () => {
           
           setUserData(userDataObj);
           
-          // FIX: Convert local number to E.164 format
-          const selectedCountry = userDataObj.country || { name: "Nigeria", code: "NG", dial_code: "+234" };
-          
           // Format phone to E.164
+          const selectedCountry = userDataObj.country || { name: "Nigeria", code: "NG", dial_code: "+234" };
           const formattedPhone = formatToE164(userDataObj.phone, selectedCountry.dial_code);
           
           setPhoneNumber(formattedPhone as E164Number || undefined);
           setSelectedCountry(selectedCountry);
-          
-          const phoneVerifiedStatus = userDataObj.phoneVerified || false;
-          setUserClickedVerified(phoneVerifiedStatus);
-          
-          if (phoneVerifiedStatus && userDataObj.phone) {
-            setIsPhoneVerified(true);
-          }
           
           if (userDataObj.dayOfBirth) {
             try {
@@ -450,7 +442,7 @@ const Profile = () => {
             darkMode: userDataObj.darkMode || false,
             language: userDataObj.language || "English",
             currency: userDataObj.currency || "USD",
-            phoneVerified: phoneVerifiedStatus
+            phoneVerified: userDataObj.phoneVerified
           };
           
           setOriginalData(originalDataObj);
@@ -501,8 +493,7 @@ const Profile = () => {
     setSelectedCountry(country);
     setOpenCountry(false);
     setCountrySearch("");
-    setUserClickedVerified(false);
-    updatePhoneVerifiedInLocalStorage(false);
+    // Clear phone validation when country changes? The phone input will handle revalidation.
   };
 
   // Filter countries based on search
@@ -558,10 +549,10 @@ const Profile = () => {
     return "@User";
   };
 
-  // CORRECTED Save Changes function
+  // Save Changes function
   const handleSaveChanges = async () => {
-    if (!userClickedVerified) {
-      setSaveMessage("❌ Please verify your phone number before saving changes");
+    if (!isPhoneValid) {
+      setSaveMessage("❌ Please enter a valid phone number before saving changes");
       setTimeout(() => setSaveMessage(""), 3000);
       return;
     }
@@ -644,7 +635,10 @@ const Profile = () => {
         return;
       }
 
-      setSaveMessage("✅ Profile updated successfully! Phone verification saved.");
+      // After successful API call, mark phone as verified in localStorage
+      markPhoneVerified();
+
+      setSaveMessage("✅ Profile updated successfully! Phone number verified.");
       
       const currentStored = localStorage.getItem("UserData");
       if (currentStored) {
@@ -702,26 +696,7 @@ const Profile = () => {
       setYear(originalData.year || "");
       setDarkModeEnabled(originalData.darkMode || false);
       setSelectedLang(originalData.language || "English");
-      setUserClickedVerified(originalData.phoneVerified || false);
       
-      const currentStored = localStorage.getItem("UserData");
-      if (currentStored && userData) {
-        const currentParsed = JSON.parse(currentStored);
-        const updatedUserData = {
-          ...currentParsed,
-          phone: originalData.phone || "",
-          country: originalData.country || { name: "Nigeria", code: "NG", dial_code: "+234" },
-          phoneVerified: originalData.phoneVerified || false,
-          userData: currentParsed.userData ? {
-            ...currentParsed.userData,
-            phoneVerified: originalData.phoneVerified || false
-          } : currentParsed.userData
-        };
-        
-        localStorage.setItem("UserData", JSON.stringify(updatedUserData));
-        setUserData(updatedUserData);
-      }
-
       if (originalData.currency) {
         const currency = currencyOptions.find(c => c.code === originalData.currency);
         if (currency) {
@@ -729,7 +704,7 @@ const Profile = () => {
         }
       }
 
-      setIsPhoneVerified(originalData.phoneVerified || false);
+      // Clear any validation errors
       setPhoneValidationError("");
       setPhoneFormatted("");
 
@@ -776,7 +751,6 @@ const Profile = () => {
           margin-right: 0.5rem;
           border: 1px solid #3A3A3A;
           height: 44px;
-          gap:40%;
           min-width: 80px;
         }
         
@@ -913,7 +887,7 @@ const Profile = () => {
                 <button
                   onClick={handleSaveChanges}
                   disabled={isSaveDisabled()}
-                  className="flex items-center  justify-center w-28 lg:w-32 h-9 text-sm text-[#0F1012] whitespace-nowrap font-bold border border-[#4DF2BE] bg-[#4DF2BE] px-4 rounded-full hover:bg-[#3DE0AD] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="flex items-center justify-center w-28 lg:w-32 h-9 text-sm text-[#0F1012] whitespace-nowrap font-bold border border-[#4DF2BE] bg-[#4DF2BE] px-4 rounded-full hover:bg-[#3DE0AD] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {isSaving ? "Saving..." : "Save Changes"}
                 </button>
@@ -929,35 +903,6 @@ const Profile = () => {
                 {saveMessage}
               </div>
             )}
-
-            {/* Phone Verification Status */}
-            <div className="mb-6 p-4 bg-[#2D2D2D] rounded-lg border border-[#4DF2BE]/30">
-              <div className="flex items-center gap-3">
-                <div className={`w-6 h-6 rounded-full flex items-center justify-center ${
-                  userClickedVerified ? "bg-[#4DF2BE]" : "bg-blue-500"
-                }`}>
-                  <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    {userClickedVerified ? (
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                    ) : (
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
-                    )}
-                  </svg>
-                </div>
-                <div>
-                  <p className={`text-sm font-medium ${
-                    userClickedVerified ? "text-[#4DF2BE]" : "text-blue-400"
-                  }`}>
-                    {userClickedVerified ? "Phone Verified ✓" : "Phone Verification Required"}
-                  </p>
-                  <p className="text-xs text-gray-300 mt-1">
-                    {userClickedVerified 
-                      ? `Your phone number ${phoneFormatted || phoneNumber} is verified. Changes are saved locally.`
-                      : "Enter your phone number, then click 'Click to Verify' above. Finally, save changes to complete verification."}
-                  </p>
-                </div>
-              </div>
-            </div>
 
             <form className="space-y-6" onSubmit={(e) => e.preventDefault()}>
               {/* Email - Locked */}
@@ -982,7 +927,6 @@ const Profile = () => {
                   Username
                 </label>
                 <div className="relative">
-                  
                   <input
                     type="text"
                     readOnly
@@ -1003,35 +947,17 @@ const Profile = () => {
                     <p className="text-sm font-medium text-[#C7C7C7]">
                       Phone number
                     </p>
-                    <div className="flex items-center gap-2">
-                      {phoneNumber && phoneNumber.toString().length >= 4 && (
-                        phoneVerificationLoading ? (
+                    {phoneNumber && phoneNumber.toString().length >= 4 && (
+                      <div className="flex items-center gap-2">
+                        {phoneVerificationLoading ? (
                           <span className="text-sm text-[#8F8F8F]">Checking...</span>
                         ) : (
-                          <div className="flex items-center gap-2">
-                            {isPhoneVerified ? (
-                              userClickedVerified ? (
-                                <span className="text-sm font-bold text-[#4DF2BE] flex items-center gap-1">
-                                  ✓ Verified
-                                </span>
-                              ) : (
-                                <button
-                                  type="button"
-                                  onClick={handleVerifiedClick}
-                                  className="text-sm font-bold text-[#4DF2BE] flex items-center gap-1 cursor-pointer hover:underline bg-transparent border-none"
-                                >
-                                  ✓ Click to Verify
-                                </button>
-                              )
-                            ) : (
-                              <span className="text-sm font-bold text-[#FE857D] flex items-center gap-1">
-                                ✗ Not Verified
-                              </span>
-                            )}
-                          </div>
-                        )
-                      )}
-                    </div>
+                          <span className={`text-sm font-bold flex items-center gap-1 ${isPhoneValid ? "text-[#4DF2BE]" : "text-[#FE857D]"}`}>
+                            {isPhoneValid ? "✓ Valid" : "✗ Invalid"}
+                          </span>
+                        )}
+                      </div>
+                    )}
                   </div>
 
                   <div className="relative w-full">
@@ -1052,7 +978,7 @@ const Profile = () => {
                     />
                     
                     <span className="absolute right-3 top-1/2 -translate-y-1/2">
-                      {phoneNumber && phoneNumber.toString().length >= 4 && isPhoneVerified && userClickedVerified ? (
+                      {phoneNumber && phoneNumber.toString().length >= 4 && isPhoneValid ? (
                         <BlueTick />
                       ) : (
                         <Image
@@ -1074,10 +1000,9 @@ const Profile = () => {
                   )}
 
                   {/* Phone formatted preview */}
-                  {isPhoneVerified && phoneFormatted && (
+                  {isPhoneValid && phoneFormatted && (
                     <div className="mt-2 text-xs text-[#4DF2BE] font-medium">
                       Formatted: {phoneFormatted}
-                      {!userClickedVerified && " - Click 'Click to Verify' above"}
                     </div>
                   )}
                 </div>
@@ -1492,8 +1417,7 @@ const Profile = () => {
           </div>
         </div>
 
-       
-        <div className="w-[100%]  h-[1px] bg-[#fff] mt-[50%] opacity-20 my-8"></div>
+        <div className="w-[100%] h-[1px] bg-[#fff] mt-[50%] opacity-20 my-8"></div>
         
         <div className="mb-[80px] whitespace-nowrap mt-[10%]">
           <Footer />

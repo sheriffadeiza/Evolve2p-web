@@ -17,7 +17,7 @@ const VerifyEmailbd: React.FC = () => {
   const [resendTimer, setResendTimer] = useState(30);
   const [canResend, setCanResend] = useState(false);
 
-  // ✅ On mount: get email from localStorage (UserReg) and send OTP
+  // ✅ On mount: only get email from localStorage – NO automatic OTP send
   useEffect(() => {
     if (typeof window !== "undefined") {
       const stored = localStorage.getItem("UserReg");
@@ -26,7 +26,6 @@ const VerifyEmailbd: React.FC = () => {
           const parsed = JSON.parse(stored);
           if (parsed?.email) {
             setEmail(parsed.email);
-            sendOTP(parsed.email);
           } else {
             router.push("/Signups/Email");
           }
@@ -56,7 +55,7 @@ const VerifyEmailbd: React.FC = () => {
     }
   }, [canResend, resendTimer]);
 
-  // Send OTP
+  // Send OTP – called only when user clicks "Resend code"
   const sendOTP = async (email: string) => {
     setIsLoading(true);
     setError("");
