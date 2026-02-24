@@ -2,8 +2,11 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import Elogo from "../public/Assets/Evolve2p_elogo/Fav Icon/Logo.svg";
 import Image from 'next/image';
+import Elogo from "../public/Assets/Evolve2p_elogo/Fav Icon/Logo.svg";
+
+// Import icons from lucide-react
+import { ArrowUpDown, Repeat, ClipboardList } from 'lucide-react';
 
 const FloatingParticles = () => {
   const [particles, setParticles] = useState<Array<{id: number; x: number; y: number; size: number; duration: number}>>([]);
@@ -108,7 +111,8 @@ const AnimatedTitle = ({ onColorChange }: { onColorChange: (color: string) => vo
   );
 };
 
-const FeatureCard = ({ icon, title, description, delay }: { icon: string; title: string; description: string; delay: number }) => (
+// Updated FeatureCard to accept a React node for the icon
+const FeatureCard = ({ icon, title, description, delay }: { icon: React.ReactNode; title: string; description: string; delay: number }) => (
   <div 
     className="group bg-gradient-to-br from-[#4DF2BE]/10 to-black/10 backdrop-blur-sm border border-white/10 rounded-2xl p-6 hover:from-[#4DF2BE]/20 hover:to-black/20 hover:border-[#4DF2BE]/30 transition-all duration-500 hover:scale-105 hover:-translate-y-2"
     style={{ animationDelay: `${delay}ms` }}
@@ -180,19 +184,20 @@ export default function Home() {
     setBgGradient(gradients[color as keyof typeof gradients] || gradients['#4DF2BE']);
   };
 
+  // Features with real icons
   const features = [
     {
-      icon: "↔️",
+      icon: <ArrowUpDown size={32} />,
       title: "Send & Receive Crypto",
       description: "Seamlessly send and receive cryptocurrencies with friends, family, or businesses instantly with low fees"
     },
     {
-      icon: "🔄",
+      icon: <Repeat size={32} />,
       title: "Swap Any Token",
       description: "Instantly swap between hundreds of cryptocurrencies with competitive rates and minimal slippage"
     },
     {
-      icon: "📊",
+      icon: <ClipboardList size={32} />,
       title: "Create & Find Offers",
       description: "Create buy/sell offers or discover existing offers to trade directly with other users at your preferred rates"
     }
@@ -230,7 +235,7 @@ export default function Home() {
           </div>
         </div>
 
-        {/* Features Grid - Updated for crypto app features */}
+        {/* Features Grid */}
         <div className={`grid grid-cols-1 md:grid-cols-3 gap-8 mb-16 transition-all duration-1000 ${
           featuresVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'
         }`}>
@@ -245,7 +250,7 @@ export default function Home() {
           ))}
         </div>
 
-        {/* Stats Section - Updated for crypto app */}
+        {/* Stats Section */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-8 mb-16">
           {[
             { number: "50K+", label: "Active Users" },
@@ -264,7 +269,7 @@ export default function Home() {
           ))}
         </div>
 
-        {/* Trust Badges - Updated Elogo with #4DF2BE bg and #0F1012 text */}
+        {/* Trust Badges */}
         <div className="flex flex-wrap justify-center items-center gap-8 opacity-0 animate-fade-in" style={{ animationDelay: '1800ms', animationFillMode: 'forwards' }}>
           <div className="text-[#4DF2BE] text-sm">Trusted by crypto users worldwide</div>
           <div className="flex gap-6">
