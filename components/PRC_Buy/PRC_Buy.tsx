@@ -2,12 +2,16 @@
 
 import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import Image from "next/image";
+import { useRouter, useParams, useSearchParams } from "next/navigation";
 import Less_than from "../../public/Assets/Evolve2p_lessthan/Makretplace/arrow-left-01.svg";
 import Nav from "../../components/NAV/Nav";
 import Timer from "../../public/Assets/Evolve2p_time/P2P Marketplace/elements.svg";
 import Ochat from "../../public/Assets/Evolve2p_Ochat/P2P Marketplace/elements.svg";
 import GreatT from "../../public/Assets/Evolve2p_Larrow/arrow-right-01.svg";
 import BTC from "../../public/Assets/Evolve2p_BTC/Bitcoin (BTC).svg";
+import ETH from "../../public/Assets/Evolve2p_ETH/Ethereum (ETH).svg";
+import USDT from "../../public/Assets/Evolve2p_USDT/Tether (USDT).svg";
+import USDC from "../../public/Assets/Evolve2p_USDC/USD Coin (USDC).svg";
 import Yellow_i from "../../public/Assets/Evolve2p_yellowi/elements.svg";
 import UPa from "../../public/Assets/Evolve2p_upA/Makretplace/elements.svg";
 import Book from "../../public/Assets/Evolve2p_book/P2P Marketplace/book-open-02.svg";
@@ -18,9 +22,17 @@ import Gtime from "../../public/Assets/Evolve2p_Gtime/P2P Marketplace/elements.s
 import Message from "../../public/Assets/Evolve2p_message/P2P Marketplace/elements.svg";
 import Mink from "../../public/Assets/Evolve2p_mink/P2P Marketplace/Group.svg";
 import Footer from "../../components/Footer/Footer";
-import { useRouter } from "next/navigation";
 import Check from "../../public/Assets/Evolve2p_checklist/Checklist card.png";
+import CopyIcon from "../../public/Assets/Evolve2p_paycopy/P2P Marketplace/copy-01.svg";
 import io, { Socket } from "socket.io-client";
+
+// Mapping of crypto symbols to their icon images
+const cryptoIcons: Record<string, any> = {
+  BTC,
+  ETH,
+  USDT,
+  USDC,
+};
 
 interface TradeData {
   id: string;
@@ -46,6 +58,12 @@ interface TradeData {
       id: string;
       name: string;
       type: string;
+      details?: {
+        bank_name?: string;
+        account_name?: string;
+        account_number?: string;
+        [key: string]: any;
+      };
     };
     paymentTerms: string;
   };
@@ -137,6 +155,8 @@ interface CancelTradeResponse {
 
 const PRC_Buy = () => {
   const router = useRouter();
+  const params = useParams();
+  const searchParams = useSearchParams();
   const [isHelpOpen, setIsHelpOpen] = useState(false);
   const [isTermsOpen, setIsTermsOpen] = useState(false);
   const [tradeData, setTradeData] = useState<TradeData | null>(null);
@@ -159,7 +179,7 @@ const PRC_Buy = () => {
   const [uploadingFile, setUploadingFile] = useState(false);
   const [socket, setSocket] = useState<Socket | null>(null);
   const [isSocketConnected, setIsSocketConnected] = useState(false);
-  
+
   // Dispute modal state
   const [showDisputeModal, setShowDisputeModal] = useState(false);
   const [disputeReason, setDisputeReason] = useState("");
@@ -168,13 +188,13 @@ const PRC_Buy = () => {
   const [submittingDispute, setSubmittingDispute] = useState(false);
   const [otherReason, setOtherReason] = useState("");
   const [showDisputeSuccessModal, setShowDisputeSuccessModal] = useState(false);
-  
+
   // Crypto release state
   const [isCryptoReleased, setIsCryptoReleased] = useState(false);
   const [releaseTime, setReleaseTime] = useState<Date | null>(null);
   const [checkingRelease, setCheckingRelease] = useState(false);
   const [releaseMessageSent, setReleaseMessageSent] = useState(false);
-  
+
   const chatContainerRef = useRef<HTMLDivElement>(null);
 
   // Get current user data from localStorage
@@ -185,21 +205,22 @@ const PRC_Buy = () => {
         try {
           return JSON.parse(userData);
         } catch (e) {
-          console.error("Error parsing user data:", e);
+          // ignore parsing error
         }
       }
     }
     return null;
   }, []);
 
-  // Get trade ID from URL parameters
+  // Get trade ID from URL (query param or dynamic route)
   const getTradeIdFromUrl = useCallback(() => {
-    if (typeof window === 'undefined') return null;
-    const urlParams = new URLSearchParams(window.location.search);
-    return urlParams.get('tradeId');
-  }, []);
+    const queryId = searchParams.get('tradeId');
+    if (queryId) return queryId;
+    if (params?.id) return params.id as string;
+    return null;
+  }, [searchParams, params]);
 
-  const tradeId = useMemo(() => getTradeIdFromUrl() || "c1a8d7f9-3b3a-4a8a-9b8c-5d7b4e2d4c9f", [getTradeIdFromUrl]);
+  const tradeId = useMemo(() => getTradeIdFromUrl(), [getTradeIdFromUrl]);
 
   // Get authentication token
   const getAuthToken = useCallback(() => {
@@ -215,6 +236,13 @@ const PRC_Buy = () => {
     return '📎';
   }, []);
 
+  // Copy to clipboard function
+  const copyToClipboard = useCallback((text: string) => {
+    navigator.clipboard.writeText(text).catch(() => {
+      // fallback – do nothing
+    });
+  }, []);
+
   // Get current user data
   const currentUser = useMemo(() => getCurrentUser(), [getCurrentUser]);
 
@@ -224,28 +252,37 @@ const PRC_Buy = () => {
     return tradeData.buyer.id === currentUser.id;
   }, [tradeData, currentUser]);
 
-  // Calculate derived values
+  // ========== Payment details extraction with correct price per unit ==========
   const {
     fiatAmount,
     quantity,
-    pricePerBtc,
+    pricePerUnit,
     sellerUsername,
     buyerUsername,
     currentUserUsername,
     paymentMethod,
+    paymentDetails,
     fiatCurrency,
     cryptoType
-  } = useMemo(() => ({
-    fiatAmount: tradeData?.amountFiat || 200.00,
-    quantity: tradeData?.amountCrypto || 0.00417,
-    pricePerBtc: tradeData?.offer?.price || 48000,
-    sellerUsername: tradeData?.seller?.username || "CryptoBos",
-    buyerUsername: tradeData?.buyer?.username || "Buyer123",
-    currentUserUsername: currentUser?.username || (tradeData?.buyer?.id === currentUser?.id ? tradeData?.buyer?.username : tradeData?.seller?.username) || "User",
-    paymentMethod: tradeData?.offer?.paymentMethod?.name || "Bank Transfer",
-    fiatCurrency: tradeData?.fiatCurrency || tradeData?.offer?.currency || "USD",
-    cryptoType: tradeData?.cryptoType || tradeData?.offer?.crypto || "BTC"
-  }), [tradeData, currentUser]);
+  } = useMemo(() => {
+    // Calculate price per unit if not directly provided
+    let pricePerUnit = tradeData?.offer?.price;
+    if (!pricePerUnit && tradeData?.amountFiat && tradeData?.amountCrypto) {
+      pricePerUnit = tradeData.amountFiat / tradeData.amountCrypto;
+    }
+    return {
+      fiatAmount: tradeData?.amountFiat || 0,
+      quantity: tradeData?.amountCrypto || 0,
+      pricePerUnit: pricePerUnit || 0,
+      sellerUsername: tradeData?.seller?.username || "",
+      buyerUsername: tradeData?.buyer?.username || "",
+      currentUserUsername: currentUser?.username || (tradeData?.buyer?.id === currentUser?.id ? tradeData?.buyer?.username : tradeData?.seller?.username) || "",
+      paymentMethod: tradeData?.offer?.paymentMethod?.name || "",
+      paymentDetails: tradeData?.offer?.paymentMethod?.details || offerDetails?.paymentMethod?.details,
+      fiatCurrency: tradeData?.fiatCurrency || tradeData?.offer?.currency || "USD",
+      cryptoType: tradeData?.cryptoType || tradeData?.offer?.crypto || "BTC"
+    };
+  }, [tradeData, currentUser, offerDetails]);
 
   // Check if trade is disputed
   const isTradeDisputed = useMemo(() => {
@@ -254,27 +291,26 @@ const PRC_Buy = () => {
 
   // Check if trade is completed (crypto released)
   const isTradeCompleted = useMemo(() => {
-    return tradeData?.status === "COMPLETED" || tradeData?.status === "RELEASED" || 
+    return tradeData?.status === "COMPLETED" || tradeData?.status === "RELEASED" ||
            tradeData?.escrow?.status === "RELEASED" || isCryptoReleased;
   }, [tradeData?.status, tradeData?.escrow?.status, isCryptoReleased]);
 
   // Check if trade is in review (paid but not released)
   const isTradeInReview = useMemo(() => {
-    return (tradeData?.status === "IN_REVIEW" || tradeData?.status === "PAID") && 
+    return (tradeData?.status === "IN_REVIEW" || tradeData?.status === "PAID") &&
            !isTradeCompleted && !isTradeDisputed;
   }, [tradeData?.status, isTradeCompleted, isTradeDisputed]);
+
+  // Check if timer has expired
+  const isExpired = useMemo(() => timeLeft <= 0, [timeLeft]);
 
   // Initialize Socket.IO connection
   useEffect(() => {
     if (!tradeData?.chat?.id || socket) return;
 
     const authToken = getAuthToken();
-    if (!authToken) {
-      console.log("No auth token for socket connection");
-      return;
-    }
+    if (!authToken) return;
 
-    // Initialize socket connection
     const socketUrl = process.env.NEXT_PUBLIC_SOCKET_URL || "https://evolve2p-backend.onrender.com";
     const newSocket = io(socketUrl, {
       query: {
@@ -285,34 +321,23 @@ const PRC_Buy = () => {
     });
 
     const handleConnect = () => {
-      console.log("✅ Socket.IO connected");
       setIsSocketConnected(true);
       newSocket.emit('join-chat', tradeData.chat.id);
     };
 
     const handleDisconnect = () => {
-      console.log("🔌 Socket.IO disconnected");
       setIsSocketConnected(false);
     };
 
-    const handleError = (error: any) => {
-      console.error("❌ Socket.IO error:", error);
-    };
-
     const handleNewMessage = (message: ChatMessage) => {
-      console.log("📨 New message received via Socket.IO:", message);
-      
-      // Check if message already exists
       const messageExists = chatMessages.some(msg => msg.id === message.id);
       if (messageExists) return;
-      
-      // Determine if sender is current user
+
       const isCurrentUserMsg = message.senderId === currentUser?.id;
-      const senderName = isCurrentUserMsg ? currentUserUsername : 
+      const senderName = isCurrentUserMsg ? currentUserUsername :
                          (message.senderId === tradeData?.buyer.id ? buyerUsername : sellerUsername);
       const senderRole = message.senderId === tradeData?.buyer.id ? "Buyer" : "Seller";
-      
-      // Format message with sender info
+
       const formattedMessage: ChatMessage = {
         ...message,
         sender: {
@@ -322,13 +347,11 @@ const PRC_Buy = () => {
           isCurrentUser: isCurrentUserMsg
         }
       };
-      
-      // Add message to chat
+
       setChatMessages(prev => {
         const newMessages = [...prev, formattedMessage];
-        // Sort by date (ascending) only if needed
         if (newMessages.length > 1) {
-          return newMessages.sort((a, b) => 
+          return newMessages.sort((a, b) =>
             new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
           );
         }
@@ -337,29 +360,24 @@ const PRC_Buy = () => {
     };
 
     const handleTradeUpdated = (updatedTrade: TradeData) => {
-      console.log("🔄 Trade updated via Socket.IO:", updatedTrade);
-      
-      // Check for crypto release
-      if ((updatedTrade.status === "COMPLETED" || updatedTrade.status === "RELEASED" || 
+      if ((updatedTrade.status === "COMPLETED" || updatedTrade.status === "RELEASED" ||
            updatedTrade.escrow?.status === "RELEASED") && !isCryptoReleased) {
         setIsCryptoReleased(true);
         setReleaseTime(new Date(updatedTrade.releasedAt || updatedTrade.updatedAt || new Date()));
         sendCryptoReleasedMessage();
       }
-      
-      // Check for paid status
+
       if ((updatedTrade.status === "PAID" || updatedTrade.status === "IN_REVIEW") && !paidConfirmed) {
         setPaidConfirmed(true);
         const paidTimeFromApi = updatedTrade.updatedAt || updatedTrade.markedPaidAt || updatedTrade.createdAt;
         setPaidTime(paidTimeFromApi ? new Date(paidTimeFromApi) : new Date());
       }
-      
+
       setTradeData(updatedTrade);
     };
 
     const handleCryptoReleased = (data: { tradeId: string; releasedAt: string }) => {
       if (data.tradeId === tradeData.id) {
-        console.log("🎉 Crypto released notification received:", data);
         setIsCryptoReleased(true);
         setReleaseTime(new Date(data.releasedAt));
         setTradeData(prev => prev ? {
@@ -378,7 +396,6 @@ const PRC_Buy = () => {
 
     newSocket.on('connect', handleConnect);
     newSocket.on('disconnect', handleDisconnect);
-    newSocket.on('error', handleError);
     newSocket.on('new-message', handleNewMessage);
     newSocket.on('trade-updated', handleTradeUpdated);
     newSocket.on('crypto-released', handleCryptoReleased);
@@ -389,13 +406,11 @@ const PRC_Buy = () => {
       if (newSocket) {
         newSocket.off('connect', handleConnect);
         newSocket.off('disconnect', handleDisconnect);
-        newSocket.off('error', handleError);
         newSocket.off('new-message', handleNewMessage);
         newSocket.off('trade-updated', handleTradeUpdated);
         newSocket.off('crypto-released', handleCryptoReleased);
         newSocket.emit('leave-chat', tradeData.chat.id);
         newSocket.disconnect();
-        console.log("🧹 Socket.IO disconnected on cleanup");
       }
     };
   }, [tradeData?.chat?.id, tradeData?.buyer?.id, getAuthToken, currentUser?.id]);
@@ -430,7 +445,7 @@ const PRC_Buy = () => {
       const now = new Date();
       const timeSincePaid = now.getTime() - paidTime.getTime();
       const tenMinutes = 10 * 60 * 1000;
-      
+
       if (timeSincePaid >= tenMinutes && !isTradeDisputed) {
         setShowDispute(true);
       }
@@ -438,7 +453,7 @@ const PRC_Buy = () => {
 
     checkDispute();
     const interval = setInterval(checkDispute, 60000);
-    
+
     return () => clearInterval(interval);
   }, [paidTime, isTradeInReview, isTradeDisputed]);
 
@@ -450,7 +465,7 @@ const PRC_Buy = () => {
       try {
         setCheckingRelease(true);
         const authToken = getAuthToken();
-        
+
         if (!authToken) return;
 
         const response = await fetch(
@@ -467,16 +482,14 @@ const PRC_Buy = () => {
         if (response.ok) {
           const result = await response.json();
           const updatedTrade = result.data;
-          
-          // Check if crypto has been released
-          if (updatedTrade.escrow?.status === "RELEASED" || 
+
+          if (updatedTrade.escrow?.status === "RELEASED" ||
               updatedTrade.status === "COMPLETED" ||
               updatedTrade.status === "RELEASED") {
-            
+
             setIsCryptoReleased(true);
             setReleaseTime(new Date(updatedTrade.releasedAt || updatedTrade.updatedAt || new Date()));
-            
-            // Update local trade data
+
             setTradeData(prev => prev ? {
               ...prev,
               status: "COMPLETED",
@@ -487,40 +500,34 @@ const PRC_Buy = () => {
               },
               releasedAt: updatedTrade.releasedAt || updatedTrade.updatedAt
             } : prev);
-            
-            // Send success notification via chat
+
             if (!releaseMessageSent) {
               sendCryptoReleasedMessage();
             }
           }
         }
       } catch (error) {
-        console.error("Error checking crypto release:", error);
+        // silently ignore polling errors
       } finally {
         setCheckingRelease(false);
       }
     };
 
-    // Check immediately when component mounts
     checkForCryptoRelease();
-    
-    // Then check every 30 seconds
     const interval = setInterval(checkForCryptoRelease, 30000);
-    
     return () => clearInterval(interval);
   }, [tradeData?.id, isTradeInReview, tradeId, getAuthToken, releaseMessageSent]);
 
   // Send crypto released message to chat
   const sendCryptoReleasedMessage = useCallback(async () => {
     if (releaseMessageSent) return;
-    
+
     try {
       const authToken = getAuthToken();
       if (!authToken || !tradeData?.chat?.id) return;
 
       const messageContent = `✅ ${cryptoType} RELEASED!\n\nYour ${quantity.toFixed(5)} ${cryptoType} has been released from escrow and is now in your wallet! Trade completed successfully.`;
 
-      // Send message via API
       const response = await fetch('https://evolve2p-backend.onrender.com/api/send-chat', {
         method: 'POST',
         headers: {
@@ -535,8 +542,7 @@ const PRC_Buy = () => {
 
       if (response.ok) {
         setReleaseMessageSent(true);
-        
-        // Add to local chat
+
         const systemMessage: ChatMessage = {
           id: `release_${Date.now()}`,
           senderId: "system",
@@ -549,10 +555,9 @@ const PRC_Buy = () => {
             role: "System"
           }
         };
-        
+
         setChatMessages(prev => [...prev, systemMessage]);
-        
-        // Emit via socket
+
         if (socket?.connected) {
           socket.emit('send-message', {
             chatId: tradeData.chat.id,
@@ -561,12 +566,13 @@ const PRC_Buy = () => {
         }
       }
     } catch (error) {
-      console.error("Error sending crypto released message:", error);
+      // ignore
     }
   }, [tradeData?.chat?.id, cryptoType, quantity, getAuthToken, socket, releaseMessageSent]);
 
-  // Format time as MM:SS
+  // Format time as MM:SS or "Expired"
   const formatTime = useCallback((seconds: number) => {
+    if (seconds <= 0) return "Expired";
     const minutes = Math.floor(seconds / 60);
     const remainingSeconds = seconds % 60;
     return `${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
@@ -577,7 +583,7 @@ const PRC_Buy = () => {
     const isPaid = isTradeInReview || paidConfirmed;
     const isDisputed = isTradeDisputed;
     const isCompleted = isTradeCompleted;
-    
+
     if (isCompleted) {
       return {
         title: "Trade Completed",
@@ -628,14 +634,13 @@ const PRC_Buy = () => {
     } else {
       return {
         title: "Service Message",
-        message: `You're buying ${quantity.toFixed(5)} ${cryptoType} (${fiatAmount.toFixed(2)} ${fiatCurrency}) via ${paymentMethod}. Make your payment to the seller to proceed.`,
+        message: `You're buying ${quantity.toFixed(5)} ${cryptoType} (${fiatAmount.toFixed(2)} ${fiatCurrency}) via ${paymentMethod}. Make your payment to the seller using the details below.`,
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         bgColor: "bg-[#2D2D2D]",
         borderColor: "border-[#4DF2BE]",
         textColor: "text-white",
         listItems: [
-          "Wait for the seller to share payment details in the trade chat",
-          "Make your payment using the provided details",
+          "Make your payment using the seller's bank details below",
           "Mark the trade as paid and upload proof of payment",
           `The ${cryptoType} will be held in escrow once you mark as paid`,
           "Seller will confirm payment and release crypto from escrow"
@@ -649,7 +654,7 @@ const PRC_Buy = () => {
     const isPaid = isTradeInReview || paidConfirmed;
     const isDisputed = isTradeDisputed;
     const isCompleted = isTradeCompleted;
-    
+
     if (isCompleted) {
       return {
         title: "Transaction Complete",
@@ -685,18 +690,18 @@ const PRC_Buy = () => {
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    
+
     if (file.size > 5 * 1024 * 1024) {
       alert('File size must be less than 5MB');
       return;
     }
-    
+
     const allowedTypes = ['image/jpeg', 'image/png', 'image/jpg', 'application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
     if (!allowedTypes.includes(file.type)) {
       alert('Please upload only images (JPEG, PNG) or PDF/DOC files');
       return;
     }
-    
+
     setSelectedFile(file);
     e.target.value = '';
   };
@@ -705,18 +710,18 @@ const PRC_Buy = () => {
   const handleDisputeFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    
+
     if (file.size > 10 * 1024 * 1024) {
       alert('File size must be less than 10MB');
       return;
     }
-    
+
     const allowedTypes = ['image/jpeg', 'image/png', 'image/jpg', 'application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
     if (!allowedTypes.includes(file.type)) {
       alert('Please upload only images (JPEG, PNG) or PDF/DOC files');
       return;
     }
-    
+
     setDisputeFile(file);
     e.target.value = '';
   };
@@ -724,10 +729,10 @@ const PRC_Buy = () => {
   // Fetch chat messages
   const fetchChatMessages = useCallback(async () => {
     if (!tradeData?.chat?.id || !currentUser) return;
-    
+
     try {
       const authToken = getAuthToken();
-      
+
       const headers: HeadersInit = {
         'Content-Type': 'application/json',
       };
@@ -743,25 +748,22 @@ const PRC_Buy = () => {
           headers: headers,
         }
       );
-      
+
       if (response.ok) {
         const messages = await response.json();
-        
+
         if (Array.isArray(messages)) {
-          // Sort by date (ascending = oldest first)
           const sortedMessages = messages.sort((a: any, b: any) => {
             return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
           });
-          
-          // Format messages with proper sender names and roles
+
           const formattedMessages: ChatMessage[] = sortedMessages.map((msg: any) => {
-            // Determine if sender is buyer or seller
             const isBuyer = msg.senderId === tradeData?.buyer.id;
             const isCurrentUserMsg = msg.senderId === currentUser.id;
-            
+
             let senderName = isBuyer ? buyerUsername : sellerUsername;
             let senderRole = isBuyer ? "Buyer" : "Seller";
-            
+
             return {
               id: msg.id,
               senderId: msg.senderId,
@@ -779,12 +781,12 @@ const PRC_Buy = () => {
               }
             };
           });
-          
+
           setChatMessages(formattedMessages);
         }
       }
     } catch (err) {
-      console.error("❌ Error fetching chat messages:", err);
+      // ignore
     }
   }, [tradeData?.chat?.id, tradeData?.buyer?.id, currentUser?.id, buyerUsername, sellerUsername, getAuthToken]);
 
@@ -798,12 +800,18 @@ const PRC_Buy = () => {
   // Fetch trade data
   useEffect(() => {
     const fetchTradeData = async () => {
+      if (!tradeId) {
+        setError("No trade ID provided");
+        setLoading(false);
+        return;
+      }
+
       try {
         setLoading(true);
         setError(null);
-        
+
         const authToken = getAuthToken();
-        
+
         const headers: HeadersInit = {
           'Content-Type': 'application/json',
         };
@@ -819,53 +827,46 @@ const PRC_Buy = () => {
             headers: headers,
           }
         );
-        
+
         if (response.status === 401) {
           throw new Error('Unauthorized: Please login again');
         }
-        
+
         if (!response.ok) {
           const errorText = await response.text();
-          throw new Error(`Failed to fetch trade: ${response.status} - ${errorText}`);
+          throw new Error(`Failed to fetch trade: ${response.status}`);
         }
-        
+
         const apiResponse: ApiResponse = await response.json();
-        
+
         if (apiResponse.success && apiResponse.data) {
           const trade = apiResponse.data;
-          
+
           setTradeData(trade);
-          
-          // Check if crypto has been released
-          if (trade.escrow?.status === "RELEASED" || 
+
+          if (trade.escrow?.status === "RELEASED" ||
               trade.status === "COMPLETED" ||
               trade.status === "RELEASED") {
             setIsCryptoReleased(true);
             setReleaseTime(new Date(trade.releasedAt || trade.updatedAt || new Date()));
           }
-          
-          // Check if trade is paid/in review
+
           if (trade.status === "PAID" || trade.status === "IN_REVIEW") {
             setPaidConfirmed(true);
             const paidTimeFromApi = trade.updatedAt || trade.markedPaidAt || trade.createdAt;
             setPaidTime(paidTimeFromApi ? new Date(paidTimeFromApi) : new Date());
           }
-          
+
           if (trade.offer?.id) {
             await fetchOfferDetails(trade.offer.id, authToken);
           }
         } else {
           throw new Error('Invalid response format from server');
         }
-        
+
       } catch (err) {
-        console.error("❌ Error fetching trade data:", err);
         const errorMessage = err instanceof Error ? err.message : "Failed to fetch trade data";
         setError(errorMessage);
-        
-        if (process.env.NODE_ENV === 'development') {
-          setTradeData(getFallbackTradeData());
-        }
       } finally {
         setLoading(false);
       }
@@ -892,76 +893,33 @@ const PRC_Buy = () => {
           headers: headers,
         }
       );
-      
+
       if (response.ok) {
         const data = await response.json();
         setOfferDetails(data.data || data.offer || data);
       }
     } catch (err) {
-      console.error("❌ Error fetching offer details:", err);
+      // ignore
     }
-  };
-
-  // Get fallback trade data (for development only)
-  const getFallbackTradeData = (): TradeData => {
-    return {
-      id: tradeId,
-      status: "PENDING",
-      amountCrypto: 0.00417,
-      cryptoType: "BTC",
-      amountFiat: 200.00,
-      fiatCurrency: "USD",
-      buyer: {
-        id: "user_123",
-        username: "john_doe"
-      },
-      seller: {
-        id: "user_456",
-        username: "CryptoBos"
-      },
-      offer: {
-        id: "offer_789",
-        crypto: "BTC",
-        price: 48000,
-        currency: "USD",
-        paymentMethod: {
-          id: "pm_123",
-          name: "Bank Transfer",
-          type: "FIAT"
-        },
-        paymentTerms: "• Only first-party payments.\n• Bank-to-bank transfers only\n• May request extra KYC"
-      },
-      escrow: {
-        id: "escrow_001",
-        amount: 0.00417,
-        status: "HELD"
-      },
-      chat: {
-        id: "chat_001"
-      },
-      createdAt: new Date().toISOString()
-    };
   };
 
   // Send message
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!messageInput.trim() && !selectedFile) return;
-    
+
     try {
       setSendingMessage(true);
       const authToken = getAuthToken();
-      
+
       if (!authToken) {
         throw new Error('Authentication required');
       }
 
-      // Current user is the buyer in PRC_Buy
       const senderName = currentUserUsername;
       const senderRole = "Buyer";
       const senderId = currentUser?.id || tradeData?.buyer.id || '';
 
-      // 1. OPTIMISTIC UPDATE - Show message immediately
       const tempId = `temp_${Date.now()}`;
       const optimisticMessage: ChatMessage = {
         id: tempId,
@@ -976,32 +934,28 @@ const PRC_Buy = () => {
         }
       };
 
-      // Add to chat immediately
       setChatMessages(prev => {
         const newMessages = [...prev, optimisticMessage];
         if (newMessages.length > 1) {
-          return newMessages.sort((a, b) => 
+          return newMessages.sort((a, b) =>
             new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
           );
         }
         return newMessages;
       });
-      
+
       const savedInput = messageInput;
       setMessageInput("");
-      
-      // 2. Prepare FormData for API
+
       const formData = new FormData();
       formData.append('chatId', tradeData?.chat.id || '');
       formData.append('content', savedInput);
-      
-      // Add attachment as binary if exists
+
       if (selectedFile) {
         setUploadingFile(true);
         formData.append('attachment', selectedFile);
       }
 
-      // 3. Send to API
       const response = await fetch(
         'https://evolve2p-backend.onrender.com/api/send-chat',
         {
@@ -1015,17 +969,15 @@ const PRC_Buy = () => {
 
       if (!response.ok) {
         const errorText = await response.text();
-        // Remove optimistic message if API fails
         setChatMessages(prev => prev.filter(msg => msg.id !== tempId));
-        throw new Error(`Failed to send: ${response.status}`);
+        throw new Error(`Failed to send`);
       }
 
       const result = await response.json();
-      
-      // 4. Replace temp message with real one from API
+
       if (result && result.id) {
-        setChatMessages(prev => prev.map(msg => 
-          msg.id === tempId 
+        setChatMessages(prev => prev.map(msg =>
+          msg.id === tempId
             ? {
                 id: result.id,
                 senderId: result.senderId,
@@ -1043,11 +995,9 @@ const PRC_Buy = () => {
             : msg
         ));
       }
-      
-      // 5. Clear selected file
+
       setSelectedFile(null);
-      
-      // 6. Emit via Socket.IO for real-time
+
       if (socket && socket.connected && tradeData?.chat.id) {
         const finalMessage = result && result.id ? result : optimisticMessage;
         socket.emit('send-message', {
@@ -1055,12 +1005,9 @@ const PRC_Buy = () => {
           message: finalMessage
         });
       }
-      
+
     } catch (error) {
-      console.error('❌ Error sending message:', error);
-      if (error instanceof Error && !error.message.includes('Failed to fetch')) {
-        alert(error.message);
-      }
+      alert("Failed to send message. Please try again.");
     } finally {
       setSendingMessage(false);
       setUploadingFile(false);
@@ -1072,7 +1019,7 @@ const PRC_Buy = () => {
     try {
       setIsMarkingAsPaid(true);
       const authToken = getAuthToken();
-      
+
       if (!authToken) {
         throw new Error('Authentication required');
       }
@@ -1090,33 +1037,32 @@ const PRC_Buy = () => {
 
       if (!response.ok) {
         const errorText = await response.text();
-        throw new Error(`Failed to mark as paid: ${response.status} - ${errorText}`);
+        throw new Error(`Failed to mark as paid`);
       }
 
       const result = await response.json();
-      
+
       if (tradeData) {
         setTradeData({
           ...tradeData,
           status: "IN_REVIEW"
         });
       }
-      
+
       setPaidConfirmed(true);
       setPaidTime(new Date());
       alert('Trade marked as paid! The seller has been notified and payment is now in review.');
       setShowPaidModal(false);
-      
+
       if (socket && socket.connected) {
         socket.emit('trade-status-changed', {
           tradeId: tradeId,
           status: "IN_REVIEW"
         });
       }
-      
+
     } catch (error) {
-      console.error('❌ Error marking as paid:', error);
-      alert(error instanceof Error ? error.message : 'Error marking as paid. Please try again.');
+      alert('Error marking as paid. Please try again.');
     } finally {
       setIsMarkingAsPaid(false);
     }
@@ -1133,7 +1079,7 @@ const PRC_Buy = () => {
 
       setIsCancelling(true);
       const authToken = getAuthToken();
-      
+
       if (!authToken) {
         throw new Error('Authentication required');
       }
@@ -1151,14 +1097,12 @@ const PRC_Buy = () => {
 
       if (!response.ok) {
         const errorText = await response.text();
-        throw new Error(`Failed to cancel trade: ${response.status} - ${errorText}`);
+        throw new Error(`Failed to cancel trade`);
       }
 
       const result: CancelTradeResponse = await response.json();
-      
-      // Check for the new API response structure
+
       if (result.success) {
-        // Update trade data with the returned trade object
         if (result.trade) {
           setTradeData(prev => ({
             ...prev!,
@@ -1169,7 +1113,6 @@ const PRC_Buy = () => {
             seller: result.trade.seller || prev?.seller!
           }));
         } else {
-          // Fallback for backward compatibility
           if (tradeData) {
             setTradeData({
               ...tradeData,
@@ -1177,26 +1120,22 @@ const PRC_Buy = () => {
             });
           }
         }
-        
-        // Show success message with the new format
+
         const successMessage = result.message || `Trade cancelled successfully! Funds have been returned to @${sellerUsername}. Your trade has been cancelled and you won't be able to continue this transaction.`;
         alert(successMessage);
-        
+
       } else {
-        // Handle API error
         throw new Error(result.message || 'Failed to cancel trade');
       }
-      
+
       setShowCancelModal(false);
-      
-      // Redirect after delay
+
       setTimeout(() => {
         router.push('/market_place');
       }, 3000);
-      
+
     } catch (error) {
-      console.error('❌ Error cancelling trade:', error);
-      alert(error instanceof Error ? error.message : 'Error cancelling trade. Please try again.');
+      alert('Error cancelling trade. Please try again.');
     } finally {
       setIsCancelling(false);
     }
@@ -1212,7 +1151,6 @@ const PRC_Buy = () => {
 
   // Submit dispute
   const handleSubmitDispute = async () => {
-    // Validation
     if (!disputeReason) {
       alert("Please select a reason for the dispute.");
       return;
@@ -1230,20 +1168,18 @@ const PRC_Buy = () => {
         throw new Error('Authentication required');
       }
 
-      // Prepare FormData with correct field names
       const formData = new FormData();
-      formData.append('tradeId', tradeId);
+      formData.append('tradeId', tradeId ?? "");
       formData.append('reason', disputeReason === "other" ? otherReason : disputeReason);
-      
+
       if (disputeDescription.trim()) {
         formData.append('description', disputeDescription);
       }
-      
+
       if (disputeFile) {
         formData.append('evidence', disputeFile);
       }
 
-      // API call
       const response = await fetch('https://evolve2p-backend.onrender.com/api/open-dispute', {
         method: 'POST',
         headers: {
@@ -1255,15 +1191,12 @@ const PRC_Buy = () => {
       const result: DisputeData = await response.json();
 
       if (!response.ok) {
-        throw new Error(result.message || `Failed to submit dispute: ${response.status}`);
+        throw new Error(result.message || `Failed to submit dispute`);
       }
 
-      // Success handling
       if (result.success) {
-        // Show success modal instead of alert
         setShowDisputeSuccessModal(true);
-        
-        // Update trade status
+
         if (tradeData) {
           setTradeData({
             ...tradeData,
@@ -1276,21 +1209,18 @@ const PRC_Buy = () => {
             }
           });
         }
-        
-        // Reset and close dispute form modal
+
         setShowDisputeModal(false);
         resetDisputeForm();
         setShowDispute(false);
-        
-        // Socket notification
+
         if (socket?.connected) {
           socket.emit('trade-dispute-opened', { tradeId, status: "DISPUTED" });
         }
       }
 
     } catch (error) {
-      console.error('❌ Error submitting dispute:', error);
-      alert(error instanceof Error ? error.message : 'Error submitting dispute');
+      alert('Error submitting dispute. Please try again.');
     } finally {
       setSubmittingDispute(false);
     }
@@ -1299,11 +1229,9 @@ const PRC_Buy = () => {
   // Handle back to trade chat button
   const handleBackToTradeChat = () => {
     setShowDisputeSuccessModal(false);
-    // Ensure chat is open
     if (!showChat) {
       setShowChat(true);
     }
-    // Scroll to bottom of chat
     if (chatContainerRef.current) {
       setTimeout(() => {
         chatContainerRef.current!.scrollTop = chatContainerRef.current!.scrollHeight;
@@ -1313,27 +1241,32 @@ const PRC_Buy = () => {
 
   // Calculate derived values
   const status = tradeData?.status || "PENDING";
-  const orderId = tradeData?.id ? `E2P-${tradeData.id.slice(0, 8).toUpperCase()}` : "E2P-2453019273001180";
+  const orderId = tradeData?.id ? `E2P-${tradeData.id.slice(0, 8).toUpperCase()}` : "";
 
-  // Format payment terms from offer
+  // Format payment terms from offer, or use default
   const formatPaymentTerms = useCallback((terms: string): string[] => {
-    if (!terms) return [];
-    
-    return terms
-      .split(/[\n,]/)
-      .map(term => term.trim())
-      .filter(term => term.length > 0)
-      .map(term => term.startsWith('•') ? term : `• ${term}`);
+    if (terms) {
+      return terms
+        .split(/[\n,]/)
+        .map(term => term.trim())
+        .filter(term => term.length > 0)
+        .map(term => term.startsWith('•') ? term : `• ${term}`);
+    } else {
+      return [
+        "• Only first-party payments",
+        "• Bank-to-bank transfers only",
+        "• May request extra KYC"
+      ];
+    }
   }, []);
 
-  // Get payment terms
-  const paymentTerms = offerDetails?.paymentTerms || tradeData?.offer?.paymentTerms || "• Only first-party payments.\n• Bank-to-bank transfers only\n• May request extra KYC";
+  const paymentTerms = offerDetails?.paymentTerms || tradeData?.offer?.paymentTerms || "";
 
-  // Check if cancel button should be shown
-  const shouldShowCancelButton = !isTradeInReview && !isTradeCompleted && tradeData?.status !== 'CANCELLED' && !isTradeDisputed;
+  // Check if cancel button should be shown (not when expired)
+  const shouldShowCancelButton = !isTradeInReview && !isTradeCompleted && tradeData?.status !== 'CANCELLED' && !isTradeDisputed && !isExpired;
 
-  // Check if paid button should be shown
-  const shouldShowPaidButton = !isTradeInReview && !isTradeCompleted && !isTradeDisputed && tradeData?.status === 'PENDING';
+  // Check if paid button should be shown (not when expired)
+  const shouldShowPaidButton = !isTradeInReview && !isTradeCompleted && !isTradeDisputed && tradeData?.status === 'PENDING' && !isExpired;
 
   // Get dispute reason for display
   const getDisplayDisputeReason = useCallback(() => {
@@ -1364,20 +1297,20 @@ const PRC_Buy = () => {
     );
   }
 
-  if (error && !tradeData) {
+  if (error || !tradeData) {
     return (
       <main className="min-h-screen bg-[#0F1012] text-white flex items-center justify-center">
         <div className="text-center text-red-400 max-w-md mx-auto">
-          <p className="text-lg font-semibold mb-2">Authentication Required</p>
-          <p className="text-sm mb-4">{error}</p>
+          <p className="text-lg font-semibold mb-2">Error</p>
+          <p className="text-sm mb-4">{error || "Trade data not found"}</p>
           <div className="flex gap-4 justify-center">
-            <button 
-              onClick={() => router.push('/login')}
+            <button
+              onClick={() => router.push('/market_place')}
               className="px-6 py-2 bg-[#4DF2BE] text-[#0F1012] rounded-full font-bold hover:bg-[#3DD2A5] transition-colors"
             >
-              Login
+              Back to Marketplace
             </button>
-            <button 
+            <button
               onClick={() => window.location.reload()}
               className="px-6 py-2 bg-[#3A3A3A] text-white rounded-full font-bold hover:bg-[#4A4A4A] transition-colors"
             >
@@ -1399,23 +1332,6 @@ const PRC_Buy = () => {
           <Image src={Less_than} alt="lessthan" className="w-4 h-4" />
           <p>Buy {cryptoType}</p>
         </div>
-
-        {/* Demo data warning */}
-        {error && tradeData && (
-          <div className="mb-4 p-4 bg-yellow-500/20 border border-yellow-500 rounded-lg">
-            <div className="flex items-center justify-between">
-              <p className="text-yellow-400 text-sm">
-                Using demo data. Authentication required for real data.
-              </p>
-              <button 
-                onClick={() => router.push('/login')}
-                className="ml-4 px-3 py-1 bg-yellow-500 text-black text-xs rounded-full hover:bg-yellow-400"
-              >
-                Login
-              </button>
-            </div>
-          </div>
-        )}
 
         {/* Main content */}
         <div className={`flex gap-6 lg:gap-8 ${showChat ? 'flex-col xl:flex-row' : 'flex-col'}`}>
@@ -1451,9 +1367,10 @@ const PRC_Buy = () => {
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                 <div>
                   <p className="text-2xl font-normal text-white">
-                    {isTradeCompleted ? 'Trade Completed' : 
-                     isTradeDisputed ? 'Trade in Dispute' : 
-                     isTradeInReview ? 'Payment in Review' : 'Order Created'}
+                    {isTradeCompleted ? 'Trade Completed' :
+                     isTradeDisputed ? 'Trade in Dispute' :
+                     isTradeInReview ? 'Payment in Review' :
+                     isExpired ? 'Trade Expired' : 'Order Created'}
                   </p>
                   <p className="text-sm font-medium text-[#C7C7C7] mt-1">
                     Order ID: {orderId}
@@ -1472,18 +1389,27 @@ const PRC_Buy = () => {
                     <p className="text-sm font-normal text-[#DBDBDB] mt-2">
                       Your payment is being reviewed. The {cryptoType} is securely held in escrow and will be released to you once the seller confirms receipt of payment.
                     </p>
+                  ) : isExpired ? (
+                    <p className="text-sm font-normal text-[#DBDBDB] mt-2">
+                      This trade has expired because you did not complete the payment within the time limit.
+                    </p>
                   ) : (
                     <p className="text-sm font-normal text-[#DBDBDB] mt-2">
-                      Order created successfully. Make payment to the seller and mark as paid to proceed.
+                      Order created successfully. Make payment to the seller using the details below and mark as paid to proceed.
                     </p>
                   )}
                 </div>
-                {!isTradeCompleted && (
+                {!isTradeCompleted && !isExpired && (
                   <div className="flex items-center gap-2 px-3 py-1 bg-[#3A3A3A] rounded-2xl w-[100px]">
                     <Image src={Timer} alt="time" className="w-4 h-4" />
                     <p className={`text-sm font-medium ${timeLeft < 300 ? 'text-red-400' : 'text-[#DBDBDB]'}`}>
                       {formatTime(timeLeft)}
                     </p>
+                  </div>
+                )}
+                {isExpired && (
+                  <div className="flex items-center gap-2 px-3 py-1 bg-[#342827] rounded-2xl w-[100px] border border-red-500">
+                    <p className="text-sm font-medium text-red-400">Expired</p>
                   </div>
                 )}
               </div>
@@ -1493,40 +1419,37 @@ const PRC_Buy = () => {
                 <p className="text-base font-normal text-[#DBDBDB] mb-4">
                   {isTradeCompleted ? "Trade completed successfully. You can review the transaction in your wallet history." :
                    isTradeDisputed ? "Trade is under dispute. You can communicate with the seller and support team in the chat." :
-                   isTradeInReview 
-                    ? `Your ${cryptoType} is held in escrow by Evolve2p. It will be released once the seller confirms your payment.` 
+                   isTradeInReview
+                    ? `Your ${cryptoType} is held in escrow by Evolve2p. It will be released once the seller confirms your payment.`
+                    : isExpired
+                    ? "This trade has expired. You cannot proceed further."
                     : "Open chat to get payment details and pay the seller. Once done, mark as paid to continue."
                   }
                 </p>
-                <button 
+                <button
                   onClick={() => setShowChat(!showChat)}
                   className={`w-full max-w-2xl h-12 flex items-center justify-center gap-2 rounded-full transition-colors ${
                     isTradeCompleted
-                      ? "bg-[#1B362B] border border-[#1ECB84] cursor-pointer hover:bg-[#1A4030]" 
-                      : isTradeDisputed 
-                      ? "bg-[#342827] border border-[#FE857D] cursor-pointer hover:bg-[#3D2C2C]" 
-                      : isTradeInReview 
-                      ? "bg-[#1B362B] border border-[#1ECB84] cursor-pointer hover:bg-[#1A4030]" 
+                      ? "bg-[#1B362B] border border-[#1ECB84] cursor-pointer hover:bg-[#1A4030]"
+                      : isTradeDisputed
+                      ? "bg-[#342827] border border-[#FE857D] cursor-pointer hover:bg-[#3D2C2C]"
+                      : isTradeInReview
+                      ? "bg-[#1B362B] border border-[#1ECB84] cursor-pointer hover:bg-[#1A4030]"
                       : "bg-[#2D2D2D] hover:bg-[#3A3A3A]"
                   }`}
                 >
                   <Image src={Ochat} alt="chat" className="w-5 h-5" />
                   <p className={`text-sm font-bold ${
                     isTradeCompleted ? 'text-[#1ECB84]' :
-                    isTradeDisputed ? 'text-[#FE857D]' : 
+                    isTradeDisputed ? 'text-[#FE857D]' :
                     isTradeInReview ? 'text-[#1ECB84]' : 'text-white'
                   }`}>
                     {showChat ? 'Close Chat' : 'Open Chat'}
                   </p>
-                  <Image 
-                    src={GreatT} 
-                    alt="arrow" 
+                  <Image
+                    src={GreatT}
+                    alt="arrow"
                     className={`w-5 h-5 transition-transform ${showChat ? 'rotate-180' : ''}`}
-                    style={{
-                      ...(isTradeCompleted ? { filter: 'invert(58%) sepia(93%) saturate(372%) hue-rotate(100deg) brightness(94%) contrast(94%)' } : 
-                          isTradeDisputed ? { filter: 'invert(58%) sepia(19%) saturate(3785%) hue-rotate(334deg) brightness(105%) contrast(96%)' } : 
-                          isTradeInReview ? { filter: 'invert(58%) sepia(93%) saturate(372%) hue-rotate(100deg) brightness(94%) contrast(94%)' } : {})
-                    }}
                   />
                 </button>
               </div>
@@ -1539,7 +1462,11 @@ const PRC_Buy = () => {
                   <div className="flex items-center justify-between p-3 sm:p-4">
                     <p className="text-sm font-medium text-[#DBDBDB]">Buying</p>
                     <div className="flex items-center gap-2 px-2 py-1 rounded-2xl bg-[#3A3A3A]">
-                      <Image src={BTC} alt="btc" className="w-4 h-4" />
+                      <Image
+                        src={cryptoIcons[cryptoType] || BTC}
+                        alt={cryptoType}
+                        className="w-4 h-4"
+                      />
                       <p className="text-xs font-medium text-[#DBDBDB]">
                         {cryptoType}
                       </p>
@@ -1569,7 +1496,7 @@ const PRC_Buy = () => {
                   <div className="flex items-center justify-between p-3 sm:p-4 border-t border-[#3A3A3A]">
                     <p className="text-sm font-medium text-[#DBDBDB]">Price per 1 {cryptoType}</p>
                     <p className="text-sm font-medium text-white">
-                      1 {cryptoType} = {pricePerBtc.toLocaleString()} {fiatCurrency}
+                      1 {cryptoType} = {pricePerUnit.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 8 })} {fiatCurrency}
                     </p>
                   </div>
 
@@ -1581,13 +1508,45 @@ const PRC_Buy = () => {
                     </p>
                   </div>
 
-                  {/* Payment Method */}
-                  <div className="flex items-center justify-between p-3 sm:p-4 border-t border-l-2 border-l-[#FFFA66] border-[#3A3A3A]">
-                    <p className="text-sm font-medium text-[#DBDBDB]">Payment Method</p>
-                    <p className="text-sm font-medium text-white">
-                      {paymentMethod}
-                    </p>
-                  </div>
+                  {/* Payment Details (Bank Details) - using correct field names */}
+                  {paymentDetails && !isTradeCompleted && (
+                    <div className="border-t border-[#3A3A3A] p-3 sm:p-4 space-y-2">
+                      <p className="text-xs font-semibold text-[#8F8F8F] uppercase">Seller's Payment Details</p>
+                      {paymentDetails.bank_name && (
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm text-[#DBDBDB]">Bank Name</span>
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm text-white">{paymentDetails.bank_name}</span>
+                            <button onClick={() => copyToClipboard(paymentDetails.bank_name ?? "")} className="text-[#4DF2BE] hover:text-white">
+                              <Image src={CopyIcon} alt="copy" width={16} height={16} />
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                      {paymentDetails.account_name && (
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm text-[#DBDBDB]">Account Name</span>
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm text-white">{paymentDetails.account_name}</span>
+                            <button onClick={() => copyToClipboard(paymentDetails.account_name ?? "")} className="text-[#4DF2BE] hover:text-white">
+                              <Image src={CopyIcon} alt="copy" width={16} height={16} />
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                      {paymentDetails.account_number && (
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm text-[#DBDBDB]">Account Number</span>
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm text-white">{paymentDetails.account_number}</span>
+                            <button onClick={() => copyToClipboard(paymentDetails.account_number ?? "")} className="text-[#4DF2BE] hover:text-white">
+                              <Image src={CopyIcon} alt="copy" width={16} height={16} />
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
 
                   {/* Status */}
                   <div className="flex items-center justify-between p-3 sm:p-4 border-t border-[#3A3A3A]">
@@ -1595,7 +1554,8 @@ const PRC_Buy = () => {
                     <div className={`flex items-center gap-1 px-2 py-1 rounded-2xl ${
                       isTradeCompleted ? 'bg-[#1B362B]' :
                       isTradeDisputed ? 'bg-[#342827]' :
-                      isTradeInReview ? 'bg-[#1B362B]' : 
+                      isTradeInReview ? 'bg-[#1B362B]' :
+                      isExpired ? 'bg-[#342827]' :
                       tradeData?.status === 'CANCELLED' ? 'bg-[#342827]' : 'bg-[#352E21]'
                     }`}>
                       {isTradeCompleted ? (
@@ -1619,6 +1579,13 @@ const PRC_Buy = () => {
                           <Image src={Check} alt="check" className="w-3 h-3" />
                           <p className="text-xs font-medium text-[#1ECB84]">
                             IN REVIEW
+                          </p>
+                        </>
+                      ) : isExpired ? (
+                        <>
+                          <Image src={Yellow_i} alt="expired" className="w-3 h-3" />
+                          <p className="text-xs font-medium text-[#FE857D]">
+                            EXPIRED
                           </p>
                         </>
                       ) : tradeData?.status === 'CANCELLED' ? (
@@ -1845,13 +1812,13 @@ const PRC_Buy = () => {
                       />
                     </div>
                     <div>
-                      <p className="text-sm font-medium text-[#FCFCFC]">{sellerUsername}</p>
+                      <p className="text-sm font-medium text-[#FCFCFC]}">{sellerUsername}</p>
                       <p className="text-xs text-[#8F8F8F]">
                         Seller • Online
                       </p>
                     </div>
                   </div>
-                  {!isTradeCompleted && (
+                  {!isTradeCompleted && !isExpired && (
                     <div className="flex items-center gap-2 px-3 py-1 bg-[#3A3A3A] rounded-2xl">
                       <Image src={Timer} alt="time" className="w-4 h-4" />
                       <p className={`text-sm font-medium ${timeLeft < 300 ? 'text-red-400' : 'text-[#DBDBDB]'}`}>
@@ -1866,17 +1833,17 @@ const PRC_Buy = () => {
                   <div className="flex items-center justify-between mb-6">
                     <div className={`flex items-center gap-2 px-3 py-1 rounded-2xl ${
                       isTradeCompleted ? 'bg-[#1B362B]' :
-                      isTradeDisputed ? 'bg-[#342827]' : 
+                      isTradeDisputed ? 'bg-[#342827]' :
                       isTradeInReview ? 'bg-[#1B362B]' : 'bg-[#1B362B]'
                     }`}>
                       <Image src={Gtime} alt="gtime" className="w-4 h-4" />
                       <p className={`text-sm font-medium ${
                         isTradeCompleted ? 'text-[#1ECB84]' :
-                        isTradeDisputed ? 'text-[#FE857D]' : 
+                        isTradeDisputed ? 'text-[#FE857D]' :
                         isTradeInReview ? 'text-[#1ECB84]' : 'text-[#1ECB84]'
                       }`}>
-                        {isTradeCompleted ? 'Completed' : 
-                         isTradeDisputed ? 'In Dispute' : 
+                        {isTradeCompleted ? 'Completed' :
+                         isTradeDisputed ? 'In Dispute' :
                          isTradeInReview ? 'In Escrow' : 'Active'}
                       </p>
                     </div>
@@ -1898,9 +1865,10 @@ const PRC_Buy = () => {
                         <span>In Review</span>
                       </div>
                     ) : (
-                      <button 
+                      <button
                         onClick={() => setShowPaidModal(true)}
                         className="px-6 py-3 bg-[#4DF2BE] text-[#0F1012] font-medium rounded-full hover:bg-[#3DD2A5] transition-colors"
+                        disabled={isExpired}
                       >
                         Paid
                       </button>
@@ -1921,18 +1889,18 @@ const PRC_Buy = () => {
                     </div>
                     <div className={`rounded-2xl p-5 border shadow-lg ${
                       isTradeCompleted
-                        ? 'bg-gradient-to-r from-[#1B362B] to-[#143026] border-[#1ECB84]' 
-                        : isTradeDisputed 
-                        ? 'bg-gradient-to-r from-[#342827] to-[#2A1F1F] border-[#FE857D]' 
+                        ? 'bg-gradient-to-r from-[#1B362B] to-[#143026] border-[#1ECB84]'
+                        : isTradeDisputed
+                        ? 'bg-gradient-to-r from-[#342827] to-[#2A1F1F] border-[#FE857D]'
                         : 'bg-gradient-to-r from-[#1B362B] to-[#143026] border-[#1ECB84]'
                     }`}>
                       <div className="flex items-start gap-3 mb-3">
                         <div className={`w-10 h-10 ${
-                          isTradeCompleted ? 'bg-[#0F1012]/30' : 
+                          isTradeCompleted ? 'bg-[#0F1012]/30' :
                           isTradeDisputed ? 'bg-[#0F1012]/30' : 'bg-[#0F1012]/30'
                         } rounded-full flex items-center justify-center flex-shrink-0`}>
                           <svg className={`w-5 h-5 ${
-                            isTradeCompleted ? 'text-[#1ECB84]' : 
+                            isTradeCompleted ? 'text-[#1ECB84]' :
                             isTradeDisputed ? 'text-[#FE857D]' : 'text-[#1ECB84]'
                           }`} fill="currentColor" viewBox="0 0 20 20">
                             <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd"></path>
@@ -1943,7 +1911,7 @@ const PRC_Buy = () => {
                           <p className="text-sm text-white/90 leading-relaxed mb-4">
                             {serviceMessage.message}
                           </p>
-                          
+
                           {/* Warning box inside service message */}
                           {!isTradeCompleted && !isTradeDisputed && (
                             <div className="mt-4 p-4 bg-[#352E21]/80 rounded-xl border border-[#FFC051]/30">
@@ -1957,7 +1925,7 @@ const PRC_Buy = () => {
                               </div>
                             </div>
                           )}
-                          
+
                           {/* Steps list */}
                           <ul className="mt-4 space-y-3">
                             {serviceMessage.listItems.map((item, index) => (
@@ -1981,7 +1949,7 @@ const PRC_Buy = () => {
                       </div>
                     </div>
                   </div>
-                  
+
                   {/* SECOND Service Message */}
                   {secondServiceMessage && (
                     <div className="mb-6">
@@ -1996,18 +1964,18 @@ const PRC_Buy = () => {
                       </div>
                       <div className={`rounded-2xl p-5 border shadow-lg ${
                         isTradeCompleted
-                          ? 'bg-gradient-to-r from-[#1B362B] to-[#143026] border-[#1ECB84]' 
-                          : isTradeDisputed 
-                          ? 'bg-gradient-to-r from-[#342827] to-[#2A1F1F] border-[#FE857D]' 
+                          ? 'bg-gradient-to-r from-[#1B362B] to-[#143026] border-[#1ECB84]'
+                          : isTradeDisputed
+                          ? 'bg-gradient-to-r from-[#342827] to-[#2A1F1F] border-[#FE857D]'
                           : 'bg-gradient-to-r from-[#1B362B] to-[#143026] border-[#1ECB84]'
                       }`}>
                         <div className="flex items-start gap-3">
                           <div className={`w-10 h-10 ${
-                            isTradeCompleted ? 'bg-[#0F1012]/30' : 
+                            isTradeCompleted ? 'bg-[#0F1012]/30' :
                             isTradeDisputed ? 'bg-[#0F1012]/30' : 'bg-[#0F1012]/30'
                           } rounded-full flex items-center justify-center flex-shrink-0`}>
                             <svg className={`w-5 h-5 ${
-                              isTradeCompleted ? 'text-[#1ECB84]' : 
+                              isTradeCompleted ? 'text-[#1ECB84]' :
                               isTradeDisputed ? 'text-[#FE857D]' : 'text-[#1ECB84]'
                             }`} fill="currentColor" viewBox="0 0 20 20">
                               <path fillRule="evenodd" d="M2.166 4.999A11.954 11.954 0 0010 1.944 11.954 11.954 0 0017.834 5c.11.65.166 1.32.166 2.001 0 5.225-3.34 9.67-8 11.317C5.34 16.67 2 12.225 2 7c0-.682.057-1.35.166-2.001zm11.541 3.708a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd"></path>
@@ -2023,7 +1991,7 @@ const PRC_Buy = () => {
                       </div>
                     </div>
                   )}
-                  
+
                   {/* SEPARATOR: Start of Buyer/Seller Chat */}
                   <div className="relative my-8">
                     <div className="absolute inset-0 flex items-center">
@@ -2035,30 +2003,26 @@ const PRC_Buy = () => {
                       </span>
                     </div>
                   </div>
-                  
+
                   {/* BUYER/SELLER CHAT MESSAGES */}
                   <div className="space-y-4">
                     {chatMessages.length > 0 ? (
                       chatMessages
                         .filter(msg => msg.senderId !== "system" && msg.senderId !== "service")
                         .map((message) => {
-                          // Determine if sender is buyer (should be on right side)
                           const isBuyer = message.senderId === tradeData?.buyer.id;
                           const isCurrentUserMsg = message.senderId === currentUser?.id;
-                          // In PRC_Buy, buyer messages should be on the right
                           const shouldBeOnRight = isBuyer || isCurrentUserMsg;
-                          
+
                           const displayName = message.sender?.name || "User";
                           const senderRole = message.sender?.role || (isBuyer ? "Buyer" : "Seller");
-                          
+
                           return (
                             <div
                               key={message.id}
                               className={`flex ${shouldBeOnRight ? 'justify-end' : 'justify-start'}`}
                             >
                               <div className={`max-w-[85%] ${shouldBeOnRight ? 'ml-4' : 'mr-4'}`}>
-                                
-                                {/* Message header with name and time */}
                                 <div className={`flex items-center gap-2 mb-1 ${shouldBeOnRight ? 'justify-end' : 'justify-start'}`}>
                                   {!shouldBeOnRight && (
                                     <div className="w-6 h-6 rounded-full bg-gradient-to-r from-[#4DF2BE] to-[#33A2FF] flex items-center justify-center">
@@ -2071,9 +2035,9 @@ const PRC_Buy = () => {
                                     {shouldBeOnRight ? 'You (Buyer)' : `@${displayName} (${senderRole})`}
                                   </span>
                                   <span className="text-xs text-[#8F8F8F]">
-                                    {new Date(message.createdAt).toLocaleTimeString([], { 
-                                      hour: '2-digit', 
-                                      minute: '2-digit' 
+                                    {new Date(message.createdAt).toLocaleTimeString([], {
+                                      hour: '2-digit',
+                                      minute: '2-digit'
                                     })}
                                   </span>
                                   {shouldBeOnRight && (
@@ -2082,8 +2046,7 @@ const PRC_Buy = () => {
                                     </div>
                                   )}
                                 </div>
-                                
-                                {/* Message bubble */}
+
                                 <div
                                   className={`rounded-2xl p-4 shadow-lg ${
                                     shouldBeOnRight
@@ -2094,8 +2057,7 @@ const PRC_Buy = () => {
                                   <p className="text-sm leading-relaxed whitespace-pre-wrap break-words">
                                     {message.content}
                                   </p>
-                                  
-                                  {/* File attachment preview */}
+
                                   {message.attachment && (
                                     <div className="mt-3">
                                       <a
@@ -2120,13 +2082,13 @@ const PRC_Buy = () => {
                                             Attachment
                                           </p>
                                           <p className="text-xs opacity-75">
-                                            {message.type === "IMAGE" ? "Image" : 
+                                            {message.type === "IMAGE" ? "Image" :
                                              message.type === "PDF" ? "PDF Document" : "File"}
                                           </p>
                                         </div>
-                                        <svg className={`w-5 h-5 ${shouldBeOnRight ? 'text-[#0F1012]' : 'text-white'}`} 
+                                        <svg className={`w-5 h-5 ${shouldBeOnRight ? 'text-[#0F1012]' : 'text-white'}`}
                                              fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" 
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"
                                                 d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path>
                                         </svg>
                                       </a>
@@ -2157,10 +2119,10 @@ const PRC_Buy = () => {
 
                 {/* Message input with file upload */}
                 <div className="p-4 border-t border-[#3A3A3A]">
-                  {isTradeCompleted ? (
+                  {isTradeCompleted || isExpired ? (
                     <div className="text-center p-4 bg-[#1B362B] rounded-lg border border-[#1ECB84]">
                       <p className="text-sm text-[#1ECB84] font-medium">
-                        Trade completed. Chat is now read-only.
+                        {isTradeCompleted ? "Trade completed." : "Trade expired."} Chat is now read-only.
                       </p>
                     </div>
                   ) : (
@@ -2171,36 +2133,35 @@ const PRC_Buy = () => {
                         className="hidden"
                         accept="image/*,.pdf,.doc,.docx"
                         onChange={handleFileUpload}
-                        disabled={sendingMessage || uploadingFile || isTradeDisputed || isTradeCompleted}
+                        disabled={sendingMessage || uploadingFile || isTradeDisputed}
                       />
-                      
+
                       <div className="flex-1 relative">
                         <input
                           value={messageInput}
                           onChange={(e) => setMessageInput(e.target.value)}
-                          disabled={sendingMessage || uploadingFile || isTradeDisputed || isTradeCompleted}
+                          disabled={sendingMessage || uploadingFile || isTradeDisputed}
                           className="w-full h-12 bg-[#222222] border-none px-4 pr-12 text-sm font-normal text-[#C7C7C7] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4DF2BE] disabled:opacity-50"
-                          placeholder={isTradeCompleted ? "Chat closed - Trade completed" : 
-                                    isTradeDisputed ? "Chat disabled during dispute" : 
+                          placeholder={isTradeDisputed ? "Chat disabled during dispute" :
                                     uploadingFile ? "Uploading file..." : "Type a message"}
                         />
-                        {!isTradeCompleted && !isTradeDisputed && (
+                        {!isTradeDisputed && (
                           <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
                             <label htmlFor="file-upload" className={`cursor-pointer ${uploadingFile ? 'opacity-50' : ''}`}>
-                              <Image 
-                                src={Mink} 
-                                alt="upload" 
-                                className="w-5 h-5 hover:opacity-80 transition-opacity" 
+                              <Image
+                                src={Mink}
+                                alt="upload"
+                                className="w-5 h-5 hover:opacity-80 transition-opacity"
                                 title={uploadingFile ? "Uploading..." : "Upload file"}
                               />
                             </label>
                           </div>
                         )}
                       </div>
-                      
-                      <button 
+
+                      <button
                         type="submit"
-                        disabled={sendingMessage || uploadingFile || (!messageInput.trim() && !selectedFile) || isTradeDisputed || isTradeCompleted}
+                        disabled={sendingMessage || uploadingFile || (!messageInput.trim() && !selectedFile) || isTradeDisputed}
                         className="w-12 h-12 bg-[#4DF2BE] flex items-center justify-center rounded-lg hover:bg-[#3DD2A5] transition-colors disabled:opacity-50 disabled:cursor-not-allowed min-w-12"
                       >
                         {sendingMessage || uploadingFile ? (
@@ -2211,7 +2172,7 @@ const PRC_Buy = () => {
                       </button>
                     </form>
                   )}
-                  
+
                   {/* Show selected file preview */}
                   {selectedFile && !uploadingFile && (
                     <div className="mt-3 p-3 bg-[#2D2D2D] rounded-lg flex items-center justify-between">
@@ -2247,7 +2208,7 @@ const PRC_Buy = () => {
 
         {/* Footer */}
         <div className="w-[100%] h-[1px] bg-[#fff] mt-[50%] opacity-20 my-8"></div>
-        
+
         <div className="mb-[80px] whitespace-nowrap mt-[20%]">
           <Footer />
         </div>
@@ -2261,7 +2222,7 @@ const PRC_Buy = () => {
                 <p className="text-sm text-[#C7C7C7] mb-4">
                   Have you made the payment of the exact amount using the provided payment method?
                 </p>
-                
+
                 <div className="mb-6 p-4 bg-[#352E21] rounded-lg">
                   <p className="text-sm font-medium text-[#FFC051]">
                     Third-party payments are not accepted for this trade. The selected bank accounts must belong to the buyer and seller respectively.
@@ -2320,7 +2281,7 @@ const PRC_Buy = () => {
                 <p className="text-sm text-[#C7C7C7] mb-4">
                   This will cancel your trade with @{sellerUsername}. The crypto will be released from escrow and you won't be able to continue this transaction.
                 </p>
-                
+
                 <div className="mb-6 p-4 bg-[#342827] rounded-lg border-l-2 border-l-[#FE857D]">
                   <div className="flex items-start gap-2">
                     <Image src={Yellow_i} alt="warning" className="w-5 h-5 mt-0.5" />
@@ -2366,7 +2327,7 @@ const PRC_Buy = () => {
                 {/* Modal Header */}
                 <div className="flex justify-between items-center mb-4">
                   <h3 className="text-lg sm:text-xl font-bold text-white">Open a Dispute</h3>
-                  <button 
+                  <button
                     onClick={() => !submittingDispute && setShowDisputeModal(false)}
                     className="text-[#8F8F8F] hover:text-white text-lg sm:text-xl"
                     disabled={submittingDispute}
@@ -2402,7 +2363,7 @@ const PRC_Buy = () => {
                     <option value="transaction limit">Transaction limit</option>
                     <option value="other">Other</option>
                   </select>
-                  
+
                   {disputeReason === "other" && (
                     <input
                       type="text"
@@ -2435,7 +2396,7 @@ const PRC_Buy = () => {
                   <label className="block text-sm font-medium text-white mb-2">
                     Upload evidence (optional)
                   </label>
-                  <div 
+                  <div
                     className={`border-2 border-dashed border-[#444] rounded p-4 text-center transition-colors ${
                       submittingDispute ? 'cursor-not-allowed opacity-50' : 'cursor-pointer hover:border-[#4DF2BE]'
                     }`}
@@ -2455,7 +2416,7 @@ const PRC_Buy = () => {
                     <p className="text-sm text-white">Click to upload</p>
                     <p className="text-xs text-[#8F8F8F] mt-1">Images, PDF, DOC up to 10MB</p>
                   </div>
-                  
+
                   {disputeFile && (
                     <div className="mt-2 p-3 bg-[#222] rounded-lg flex justify-between items-center border border-[#3A3A3A]">
                       <div className="flex items-center gap-3">
@@ -2475,7 +2436,7 @@ const PRC_Buy = () => {
                           </p>
                         </div>
                       </div>
-                      <button 
+                      <button
                         onClick={() => !submittingDispute && setDisputeFile(null)}
                         className="text-red-400 hover:text-red-300 text-lg"
                         disabled={submittingDispute}

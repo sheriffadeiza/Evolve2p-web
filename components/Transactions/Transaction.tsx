@@ -214,7 +214,7 @@ const Transaction = () => {
         </div>
 
          <div className="w-[106%] ml-[-40px] h-[1px] bg-[#fff] mt-[30%] opacity-20 my-8"></div>
-      <div className="mb-[80px] whitespace-nowrap mt-[30%]">
+      <div className="mb-[80px] whitespace-nowrap mt-[15%]">
         <Footer />
       </div>
       </div>

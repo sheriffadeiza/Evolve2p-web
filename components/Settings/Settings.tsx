@@ -18,6 +18,8 @@ import Gpin from "../../public/Assets/Evolve2p_Gpin/Profile/pin-code.svg";
 import Ghead from "../../public/Assets/Evolve2p_Ghead/Profile/elements.svg";
 import Logout from "../../public/Assets/Evolve2p_logouticon/elements.svg";
 import Switch from "../../public/Assets/Evolve2p_switch/Profile/elements.svg";
+// Import payment method icon - you'll need to add this icon to your assets
+import PaymentIcon from "../../public/Assets/Evolve2p_paymeth/Profile/payment-success-02.svg"; // Add this icon
 
 const Settings = () => {
   const [showLogoutModal, setShowLogoutModal] = useState(false);
@@ -92,6 +94,18 @@ const Settings = () => {
           icon: Gclock,
           label: "Transaction Limits",
           path: "/translim"
+        }
+      ]
+    },
+    {
+      title: "PAYMENT", // New payment section
+      items: [
+        {
+          href: "/paymeth", // This will take us to the payment methods page
+          icon: PaymentIcon,
+          label: "Payment Methods",
+          path: "/paymeth",
+          description: "Manage your payment options" // Optional description
         }
       ]
     },
@@ -234,15 +248,23 @@ const Settings = () => {
                             alt={item.label} 
                             className="w-5 h-5 lg:w-6 lg:h-6" 
                           />
-                          <p
-                            className={`text-sm lg:text-base font-medium ${
-                              pathname.startsWith(item.path)
-                                ? "text-[#4DF2BE]"
-                                : "text-[#DBDBDB]"
-                            }`}
-                          >
-                            {item.label}
-                          </p>
+                          <div>
+                            <p
+                              className={`text-sm lg:text-base font-medium ${
+                                pathname.startsWith(item.path)
+                                  ? "text-[#4DF2BE]"
+                                  : "text-[#DBDBDB]"
+                              }`}
+                            >
+                              {item.label}
+                            </p>
+                            {/* Optional description for payment methods */}
+                            {item.description && (
+                              <p className="text-xs text-[#8F8F8F] mt-0.5">
+                                {item.description}
+                              </p>
+                            )}
+                          </div>
                         </div>
                         <Image 
                           src={Arrow_great} 

@@ -5,19 +5,10 @@ import Nav from "../../components/NAV/Nav";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import Arrow_d from "../../public/Assets/Evolve2p_arrowd/arrow-down-01.png";
-import Globe from "../../public/Assets/Evolve2p_globe/Makretplace/elements.svg";
-import Funnel from "../../public/Assets/Evolve2p_funnel/elements.svg";
-import Vector from "../../public/Assets/Evolve2p_vector/vector.svg";
-import Repeat from "../../public/Assets/Evolve2p_Repeat/repeat.svg";
 import Mark_green from "../../public/Assets/Evolve2p_mark/elements.svg";
 import Divider from "../../public/Assets/Evolve2p_divider/Divider.svg";
 import Thumbs from "../../public/Assets/Evolve2p_thumbs/elements.svg";
 import Timer from "../../public/Assets/Evolve2p_timer/elements.svg";
-import Dminus from "../../public/Assets/Evolve2p_Dminus/Divider.svg";
-import Dyellow from "../../public/Assets/Evolve2p_Dyellow/Divider.svg";
-import Dpurple from "../../public/Assets/Evolve2p_Dpurple/Divider.svg";
-import Dpink from "../../public/Assets/Evolve2p_Dpink/Divider.svg";
-import Dgreen from "../../public/Assets/Evolve2p_Dgreen/Divider.svg";
 import Currency from "../../public/Assets/Evolve2p_Currency/Profile/money-04.svg";
 import BTC from "../../public/Assets/Evolve2p_BTC/Bitcoin (BTC).svg";
 import ETH from "../../public/Assets/Evolve2p_ETH/Ethereum (ETH).svg";
@@ -33,10 +24,13 @@ const Post: React.FC = () => {
     const [isMarketDropdownOpen, setIsMarketDropdownOpen] = useState(false);
     const [selectedCoin, setSelectedCoin] = useState({ name: "BTC", icon: BTC });
     const [isPaymentOpen, setIsPaymentOpen] = useState(false);
-    const [selectedMethod, setSelectedMethod] = useState<string>("Payment Method");
-    const [loadingMethods, setLoadingMethods] = useState(false);
-    const [errorMethods, setErrorMethods] = useState("");
-    const [paymentMethod, setPaymentMethod] = useState<string | number>("Bank Transfer");
+    const [selectedMethod, setSelectedMethod] = useState<string>("Select payment method");
+    const [selectedMethodId, setSelectedMethodId] = useState<string | null>(null);
+    const [loadingUserMethods, setLoadingUserMethods] = useState(false);
+    const [errorUserMethods, setErrorUserMethods] = useState("");
+    const [userPaymentMethods, setUserPaymentMethods] = useState<any[]>([]);
+    const [tempSelectedMethod, setTempSelectedMethod] = useState<any | null>(null);
+    const [showPaymentDetails, setShowPaymentDetails] = useState(false);
     const [openCurrency, setOpenCurrency] = useState(false);
     const [currencySearch, setCurrencySearch] = useState("");
 
@@ -66,14 +60,14 @@ const Post: React.FC = () => {
     const [terms, setTerms] = useState<string>("");
     const [autoReply, setAutoReply] = useState<string>("");
 
-    // REMOVED: marketRate and feePercent - will be calculated by backend
-    // const [marketRate, setMarketRate] = useState<number>(50000);
-    // const [feePercent, setFeePercent] = useState<number>(0.5);
-
     // Currency state using the service
     const [currencyOptions, setCurrencyOptions] = useState<CurrencyOption[]>([]);
     const [selectedCurrency, setSelectedCurrency] = useState<CurrencyOption | null>(null);
     const [loadingCurrencies, setLoadingCurrencies] = useState(true);
+
+    // User data and verification
+    const [clientUser, setClientUser] = useState<any>(null);
+    const isVerified = clientUser?.kycVerified ?? false;
 
     const coins = [
         { name: "BTC", icon: BTC },
@@ -81,14 +75,6 @@ const Post: React.FC = () => {
         { name: "USDT", icon: USDT },
         { name: "USDC", icon: USDC },
     ];
-
-    const [methods, setMethods] = useState<{ id: string | number; name: string }[]>([
-        { id: "bank", name: "Bank Transfer" },
-        { id: "paypal", name: "PayPal" },
-        { id: "card", name: "Credit Card" },
-        { id: "crypto", name: "Cryptocurrency Wallet" },
-        { id: "mobile", name: "Mobile Payment App" },
-    ]);
 
     const Toggle = ({
         enabled,
@@ -111,7 +97,20 @@ const Post: React.FC = () => {
         );
     };
 
-    // Load currencies from country currency service
+    // Load user from localStorage
+    useEffect(() => {
+        if (typeof window === "undefined") return;
+        const raw = localStorage.getItem("UserData");
+        if (!raw) return;
+        try {
+            const parsed = JSON.parse(raw);
+            setClientUser(parsed.userData ?? parsed);
+        } catch (e) {
+            // ignore
+        }
+    }, []);
+
+    // Load currencies
     useEffect(() => {
         const loadCurrencies = async () => {
             setLoadingCurrencies(true);
@@ -119,19 +118,18 @@ const Post: React.FC = () => {
                 await countryCurrencyService.initialize();
                 const currencies = countryCurrencyService.getAllCurrencies();
                 setCurrencyOptions(currencies);
-                
-                // Set default currency from localStorage or default to USD
+
                 const savedCurrency = localStorage.getItem('selectedCurrency');
                 const currencyCode = savedCurrency || 'USD';
-                
-                const defaultCurrency = countryCurrencyService.getCurrencyByCode(currencyCode) || 
-                                   currencies.find(c => c.code === 'USD') || 
+
+                const defaultCurrency = countryCurrencyService.getCurrencyByCode(currencyCode) ||
+                                   currencies.find(c => c.code === 'USD') ||
                                    currencies[0];
-                
+
                 setSelectedCurrency(defaultCurrency);
-                
+
             } catch (error) {
-                console.error('Error loading currencies:', error);
+                // ignore
             } finally {
                 setLoadingCurrencies(false);
             }
@@ -140,81 +138,99 @@ const Post: React.FC = () => {
         loadCurrencies();
     }, []);
 
-    // Handle currency selection
     const handleCurrencySelect = (currencyOption: CurrencyOption) => {
         setSelectedCurrency(currencyOption);
         setOpenCurrency(false);
         setCurrencySearch("");
-        
-        // Save to localStorage
         localStorage.setItem('selectedCurrency', currencyOption.code);
         localStorage.setItem('selectedCurrencyData', JSON.stringify(currencyOption));
     };
 
-    // Filter currencies based on search
     const filteredCurrencies = currencySearch
         ? countryCurrencyService.searchCurrencies(currencySearch)
         : currencyOptions;
 
-    useEffect(() => {
-        const normalizeMethods = (arr: any[]) =>
-            arr.map((m, i) =>
-                typeof m === "string" ? { id: i, name: m } : { id: m.id ?? i, name: m.name ?? String(m) }
-            );
+    // Fetch user's saved payment methods
+    const fetchUserPaymentMethods = async () => {
+        setLoadingUserMethods(true);
+        setErrorUserMethods("");
+        try {
+            const stored = localStorage.getItem("UserData");
+            const token = stored ? JSON.parse(stored)?.accessToken : null;
+            if (!token) throw new Error("Not authenticated");
 
-        const fetchPaymentMethods = async () => {
-            setLoadingMethods(true);
-            setErrorMethods("");
-
-            try {
-                const res = await fetch("https://evolve2p-backend.onrender.com/api/get-payment-methods", {
-                    method: "GET",
-                    headers: { "Content-Type": "application/json" },
-                });
-
-                if (!res.ok) throw new Error("Failed to load payment methods");
-                const data = await res.json();
-
-                if (Array.isArray(data)) {
-                    setMethods(normalizeMethods(data));
-                } else if (Array.isArray(data.methods)) {
-                    setMethods(normalizeMethods(data.methods));
-                } else if (Array.isArray(data.data)) {
-                    setMethods(normalizeMethods(data.data));
-                } else if (typeof data === "object" && data !== null) {
-                    const values = Object.values(data).filter((v) => typeof v === "string");
-                    if (values.length > 0) setMethods(values.map((v, i) => ({ id: i, name: v })));
-                    else {
-                        const entries = Object.entries(data).map(([k, v]) => ({ id: k, name: typeof v === "string" ? v : String(v) }));
-                        if (entries.length > 0) setMethods(entries);
-                        else setErrorMethods("Unexpected response format");
-                    }
-                } else {
-                    setErrorMethods("Unexpected response format");
+            const res = await fetch(
+                "https://evolve2p-backend.onrender.com/api/get-user-payment-methods",
+                {
+                    headers: { Authorization: `Bearer ${token}` },
                 }
-            } catch (error: any) {
-                console.error("❌ Error fetching payment methods:", error);
-                setErrorMethods(error.message || "Error fetching methods");
-            } finally {
-                setLoadingMethods(false);
-            }
-        };
+            );
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.message || "Failed to load your payment methods");
+            setUserPaymentMethods(data.data || []);
+        } catch (err: any) {
+            setErrorUserMethods(err.message);
+        } finally {
+            setLoadingUserMethods(false);
+        }
+    };
 
-        fetchPaymentMethods();
+    useEffect(() => {
+        fetchUserPaymentMethods();
     }, []);
+
+    // Helper to display method details
+    const getMethodDisplay = (method: any) => {
+        const typeName = method.type?.name || "Payment Method";
+        const details = method.details || {};
+        const firstField = Object.values(details)[0];
+        return firstField ? `${typeName} - ${firstField}` : typeName;
+    };
+
+    // When user selects a method from dropdown, show preview
+    const handleMethodSelect = (method: any) => {
+        if (!isVerified) return; // should not be reachable if UI is disabled, but guard anyway
+        setTempSelectedMethod(method);
+        setShowPaymentDetails(true);
+        setIsPaymentOpen(false);
+    };
+
+    // Confirm the selected method
+    const confirmPaymentMethod = () => {
+        if (tempSelectedMethod) {
+            const methodId = tempSelectedMethod.id || tempSelectedMethod._id;
+            setSelectedMethod(getMethodDisplay(tempSelectedMethod));
+            setSelectedMethodId(methodId);
+            setTempSelectedMethod(null);
+            setShowPaymentDetails(false);
+        }
+    };
+
+    // Cancel method selection
+    const cancelMethodSelection = () => {
+        setTempSelectedMethod(null);
+        setShowPaymentDetails(false);
+    };
 
     const handleReset = () => {
         setModalMaxUSD("");
         setModalMinUSD("");
-        setPaymentMethod("Bank Transfer");
+        setSelectedMethodId(null);
+        setSelectedMethod("Select payment method");
         setSelectedCoin({ name: "BTC", icon: BTC });
         setTerms("");
         setAutoReply("");
+        setTempSelectedMethod(null);
+        setShowPaymentDetails(false);
     };
 
     const handleCreateOffer = async (limits?: { minLimit: number; maxLimit: number; margin: number }) => {
         if (!limits?.minLimit || !limits?.maxLimit) {
             setErrorOffers("Please fill in both min and max limits.");
+            return;
+        }
+        if (!selectedMethodId) {
+            setErrorOffers("Please select a payment method.");
             return;
         }
 
@@ -236,13 +252,11 @@ const Post: React.FC = () => {
                 minLimit: limits.minLimit,
                 maxLimit: limits.maxLimit,
                 margin: limits.margin,
-                paymentMethod,
+                paymentMethod: selectedMethodId,
                 paymentTerms: terms || "Send only from your verified bank account.",
                 autoReply: autoReply || `Hello! I'm ready to ${activeTab.toLowerCase()} ${selectedCoin.name}. Please read my terms carefully before proceeding.`,
                 paymentTime: selectedTimeLimit,
             };
-
-            console.log("📤 Creating offer with payload:", payload);
 
             const response = await fetch("https://evolve2p-backend.onrender.com/api/create-offer", {
                 method: "POST",
@@ -254,46 +268,121 @@ const Post: React.FC = () => {
             });
 
             const data = await response.json();
-            console.log("📥 Offer creation response:", data);
-            
+
             if (!response.ok) throw new Error(data?.message || "Failed to create offer");
 
-            setOffers((prev) => [...prev, data.offer || data]);
+            const newOffer = data.offer || data;
+
+            // Try to enrich with full method details
+            const selectedMethodDetails = userPaymentMethods.find(
+                m => m.id === selectedMethodId || m._id === selectedMethodId
+            );
+            if (selectedMethodDetails) {
+                newOffer.paymentMethod = selectedMethodDetails;
+            }
+
+            setOffers((prev) => [...prev, newOffer]);
             setIsAdModalOpen(false);
             handleReset();
         } catch (err: any) {
-            console.error("❌ Error creating offer:", err);
             setErrorOffers(err.message || "Error creating offer");
         } finally {
             setLoadingOffers(false);
         }
     };
 
-    const [clientUser, setClientUser] = useState<any>(null);
-
-    useEffect(() => {
-        if (typeof window === "undefined") return;
-        const raw = localStorage.getItem("UserData");
-        if (!raw) return;
-        try {
-            const parsed = JSON.parse(raw);
-            setClientUser(parsed.userData ?? parsed);
-        } catch (e) {
-            console.error("Failed parsing UserData from localStorage", e);
-        }
-    }, []);
-
-    // Set default auto-reply when modal opens
     useEffect(() => {
         if (isAdModalOpen) {
             setAutoReply(`Hello! I'm ready to ${activeTab.toLowerCase()} ${selectedCoin.name}. Please read my terms carefully before proceeding.`);
         }
     }, [isAdModalOpen, activeTab, selectedCoin]);
 
+    // Helper to render payment method details in the offer card
+    const renderPaymentMethod = (paymentMethod: any) => {
+        if (!paymentMethod) return "N/A";
+
+        if (paymentMethod.type?.name && paymentMethod.details) {
+            return (
+                <div className="text-xs">
+                    <span className="text-[#4DF2BE]">{paymentMethod.type.name}</span>
+                    {Object.entries(paymentMethod.details).map(([key, val]) => (
+                        <div key={key} className="text-[#8F8F8F] mt-0.5">
+                            {key}: <span className="text-white">{String(val)}</span>
+                        </div>
+                    ))}
+                </div>
+            );
+        }
+
+        if (typeof paymentMethod === 'object' && (paymentMethod.id || paymentMethod._id)) {
+            const id = paymentMethod.id || paymentMethod._id;
+            const found = userPaymentMethods.find(m => m.id === id || m._id === id);
+            if (found) {
+                const typeName = found.type?.name || "Payment Method";
+                const details = found.details || {};
+                return (
+                    <div className="text-xs">
+                        <span className="text-[#4DF2BE]">{typeName}</span>
+                        {Object.entries(details).map(([key, val]) => (
+                            <div key={key} className="text-[#8F8F8F] mt-0.5">
+                                {key}: <span className="text-white">{String(val)}</span>
+                            </div>
+                        ))}
+                    </div>
+                );
+            }
+            return <span className="text-[#4DF2BE] text-xs">{id}</span>;
+        }
+
+        if (typeof paymentMethod === 'string') {
+            const found = userPaymentMethods.find(m => m.id === paymentMethod || m._id === paymentMethod);
+            if (found) {
+                const typeName = found.type?.name || "Payment Method";
+                const details = found.details || {};
+                return (
+                    <div className="text-xs">
+                        <span className="text-[#4DF2BE]">{typeName}</span>
+                        {Object.entries(details).map(([key, val]) => (
+                            <div key={key} className="text-[#8F8F8F] mt-0.5">
+                                {key}: <span className="text-white">{String(val)}</span>
+                            </div>
+                        ))}
+                    </div>
+                );
+            }
+            return <span className="text-[#4DF2BE] text-xs">{paymentMethod}</span>;
+        }
+
+        return "N/A";
+    };
+
     return (
         <main className="min-h-screen bg-[#0F1012] text-white">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 md:py-8">
                 <Nav />
+
+                {/* KYC Banner for unverified users */}
+                {clientUser && !isVerified && (
+                    <div className="mb-6 p-4 bg-[#342827] rounded-lg border-l-4 border-[#FE857D]">
+                        <div className="flex items-start gap-3">
+                            <svg className="w-5 h-5 text-[#FE857D] mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                                <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                            </svg>
+                            <div>
+                                <p className="text-sm font-medium text-white mb-1">Complete KYC to create offers</p>
+                                <p className="text-xs text-[#DBDBDB] mb-2">
+                                    You need to verify your identity before you can create offers and select payment methods.
+                                </p>
+                                <button
+                                    onClick={() => router.push("/Signups/KYC")}
+                                    className="px-4 py-2 bg-[#FE857D] text-white text-xs font-medium rounded-full hover:bg-[#E8746D] transition-colors"
+                                >
+                                    Verify Now
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
 
                 <div className="flex flex-col lg:flex-row gap-6 mt-6">
                     {/* Left Sidebar */}
@@ -383,7 +472,6 @@ const Post: React.FC = () => {
                                     </div>
                                 </div>
 
-                                {/* Currency Dropdown */}
                                 {openCurrency && (
                                     <div className="absolute top-12 left-0 right-0 sm:left-auto sm:right-0 sm:w-96 w-full max-h-80 bg-[#1A1A1A] rounded-lg shadow-lg overflow-y-auto z-50 border border-[#2D2D2D]">
                                         <div className="p-4 relative">
@@ -450,43 +538,77 @@ const Post: React.FC = () => {
 
                             <label className="text-[#8F8F8F] text-sm font-medium">Payment Method</label>
                             <div
-                                className="flex items-center justify-between w-full h-10 bg-[#2D2D2D] p-2 rounded-lg cursor-pointer"
-                                onClick={() => setIsPaymentOpen(!isPaymentOpen)}
+                                className={`flex items-center justify-between w-full h-10 bg-[#2D2D2D] p-2 rounded-lg ${
+                                    isVerified ? "cursor-pointer" : "cursor-not-allowed opacity-60"
+                                }`}
+                                onClick={() => {
+                                    if (isVerified) setIsPaymentOpen(!isPaymentOpen);
+                                }}
                             >
                                 <div className="flex items-center">
                                     <p className="text-sm font-normal text-[#FCFCFC] whitespace-nowrap">
-                                        {loadingMethods ? "Loading..." : selectedMethod}
+                                        {loadingUserMethods ? "Loading..." : 
+                                         !isVerified ? "Verify to select payment method" : selectedMethod}
                                     </p>
                                 </div>
                                 <Image
                                     src={Arrow_d}
                                     alt="arrow"
-                                    className={`w-5 h-5 text-[#8F8F8F] transition-transform duration-200 ${isPaymentOpen ? "rotate-180" : ""
-                                        }`}
+                                    className={`w-5 h-5 text-[#8F8F8F] transition-transform duration-200 ${
+                                        isPaymentOpen && isVerified ? "rotate-180" : ""
+                                    }`}
                                 />
                             </div>
 
-                            {isPaymentOpen && (
-                                <div className="absolute mt-2 w-full lg:w-56 bg-[#222222] rounded-xl shadow-lg p-2 z-50 border border-[#2D2D2D] max-h-60 overflow-y-auto">
-                                    {errorMethods ? (
-                                        <p className="text-red-400 text-center text-sm">{errorMethods}</p>
-                                    ) : methods.length > 0 ? (
-                                        methods.map((method) => (
-                                            <p
-                                                key={method.id}
-                                                className="text-white text-sm font-medium py-2 px-3 cursor-pointer hover:text-emerald-400 rounded-lg hover:bg-[#2D2D2D]"
-                                                onClick={() => {
-                                                    setSelectedMethod(method.name);
-                                                    setPaymentMethod(method.id);
-                                                    setIsPaymentOpen(false);
-                                                }}
-                                            >
-                                                {method.name}
-                                            </p>
-                                        ))
+                            {isPaymentOpen && isVerified && (
+                                <div className="absolute mt-2 w-full lg:w-64 bg-[#222222] rounded-xl shadow-lg p-2 z-50 border border-[#2D2D2D] max-h-60 overflow-y-auto">
+                                    {errorUserMethods ? (
+                                        <p className="text-red-400 text-center text-sm">{errorUserMethods}</p>
+                                    ) : loadingUserMethods ? (
+                                        <p className="text-[#aaa] text-center text-sm">Loading your methods...</p>
+                                    ) : userPaymentMethods.length > 0 ? (
+                                        userPaymentMethods.map((method) => {
+                                            const methodId = method.id || method._id;
+                                            return (
+                                                <p
+                                                    key={methodId}
+                                                    className="text-white text-sm font-medium py-2 px-3 cursor-pointer hover:text-emerald-400 rounded-lg hover:bg-[#2D2D2D]"
+                                                    onClick={() => handleMethodSelect(method)}
+                                                >
+                                                    {getMethodDisplay(method)}
+                                                </p>
+                                            );
+                                        })
                                     ) : (
-                                        <p className="text-[#aaa] text-center text-sm">No methods found</p>
+                                        <p className="text-[#aaa] text-center text-sm">No saved methods found. Add one in Settings.</p>
                                     )}
+                                </div>
+                            )}
+
+                            {/* Payment Method Preview & Confirmation */}
+                            {showPaymentDetails && tempSelectedMethod && (
+                                <div className="mt-4 p-4 bg-[#2D2D2D] rounded-lg border border-[#3A3A3A]">
+                                    <h4 className="text-sm font-bold text-[#FCFCFC] mb-2">Payment Method Details</h4>
+                                    <div className="space-y-2 text-sm">
+                                        <p className="text-[#8F8F8F]">Type: <span className="text-white">{tempSelectedMethod.type?.name || "N/A"}</span></p>
+                                        {tempSelectedMethod.details && Object.entries(tempSelectedMethod.details).map(([key, value]) => (
+                                            <p key={key} className="text-[#8F8F8F]">{key}: <span className="text-white">{String(value)}</span></p>
+                                        ))}
+                                    </div>
+                                    <div className="flex gap-3 mt-4">
+                                        <button
+                                            onClick={confirmPaymentMethod}
+                                            className="flex-1 bg-[#4DF2BE] text-[#0F1012] font-bold px-4 py-2 rounded-full text-sm hover:bg-[#3DD2A5] transition-colors"
+                                        >
+                                            Use this payment method
+                                        </button>
+                                        <button
+                                            onClick={cancelMethodSelection}
+                                            className="flex-1 bg-[#3A3A3A] text-white font-bold px-4 py-2 rounded-full text-sm hover:bg-[#4A4A4A] transition-colors"
+                                        >
+                                            Cancel
+                                        </button>
+                                    </div>
                                 </div>
                             )}
                         </div>
@@ -523,10 +645,15 @@ const Post: React.FC = () => {
 
                         <div className="flex mt-8 w-full">
                             <button
-                                className="bg-[#4DF2BE] text-[#0F1012] text-sm font-bold px-6 py-3 rounded-full w-full h-12 border border-[#4DF2BE] hover:bg-[#3DD2A5] transition-colors"
-                                onClick={() => setIsAdModalOpen(true)}
+                                className={`bg-[#4DF2BE] text-[#0F1012] text-sm font-bold px-6 py-3 rounded-full w-full h-12 border border-[#4DF2BE] hover:bg-[#3DD2A5] transition-colors ${
+                                    !isVerified ? "opacity-50 cursor-not-allowed" : ""
+                                }`}
+                                onClick={() => {
+                                    if (isVerified) setIsAdModalOpen(true);
+                                }}
+                                disabled={!isVerified}
                             >
-                                Create Ad
+                                {isVerified ? "Create Ad" : "Verify to Create Ad"}
                             </button>
                         </div>
 
@@ -543,7 +670,6 @@ const Post: React.FC = () => {
                                     <h2 className="text-xl font-bold text-white mb-6">Set Order Details</h2>
 
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-                                        {/* Min Limit */}
                                         <div>
                                             <label className="block text-sm font-medium text-[#DBDBDB] mb-2">
                                                 Min Limit ({selectedCurrency?.code || "USD"})
@@ -556,10 +682,7 @@ const Post: React.FC = () => {
                                                 className="w-full p-3 bg-[#3A3A3A] border border-[#4A4A4A] rounded-lg text-white outline-none focus:border-[#4DF2BE] transition-colors"
                                                 placeholder="Enter minimum amount"
                                             />
-                                            {/* REMOVED: Crypto conversion display since backend will handle pricing */}
                                         </div>
-
-                                        {/* Max Limit */}
                                         <div>
                                             <label className="block text-sm font-medium text-[#DBDBDB] mb-2">
                                                 Max Limit ({selectedCurrency?.code || "USD"})
@@ -572,11 +695,9 @@ const Post: React.FC = () => {
                                                 className="w-full p-3 bg-[#3A3A3A] border border-[#4A4A4A] rounded-lg text-white outline-none focus:border-[#4DF2BE] transition-colors"
                                                 placeholder="Enter maximum amount"
                                             />
-                                            {/* REMOVED: Crypto conversion display since backend will handle pricing */}
                                         </div>
                                     </div>
 
-                                    {/* Margin - This is sent to backend for price calculation */}
                                     <div className="mb-6">
                                         <label className="block text-sm font-medium text-[#DBDBDB] mb-2">
                                             Margin (%)
@@ -595,7 +716,6 @@ const Post: React.FC = () => {
                                         </p>
                                     </div>
 
-                                    {/* Terms Section */}
                                     <div className="mb-6">
                                         <label className="block text-sm font-bold text-[#DBDBDB] mb-2">
                                             Terms (Optional)
@@ -616,7 +736,6 @@ const Post: React.FC = () => {
                                         </div>
                                     </div>
 
-                                    {/* Auto-Reply Section */}
                                     <div className="mb-6">
                                         <label className="block text-sm font-bold text-[#DBDBDB] mb-2">
                                             Auto-Reply Message
@@ -637,7 +756,6 @@ const Post: React.FC = () => {
                                         </div>
                                     </div>
 
-                                    {/* Summary - Updated to remove hardcoded market rate */}
                                     <div className="bg-[#2D2D2D] rounded-lg p-4 mb-6">
                                         <h3 className="text-sm font-bold text-[#DBDBDB] mb-3">Order Summary</h3>
                                         <div className="space-y-2 text-sm">
@@ -685,7 +803,7 @@ const Post: React.FC = () => {
                                                 margin: Number(modalMargin),
                                             });
                                         }}
-                                        disabled={loadingOffers || !modalMinUSD || !modalMaxUSD}
+                                        disabled={loadingOffers || !modalMinUSD || !modalMaxUSD || !selectedMethodId}
                                     >
                                         {loadingOffers ? "Creating..." : "Post Your Ad"}
                                     </button>
@@ -702,7 +820,6 @@ const Post: React.FC = () => {
                             <p className="w-52">Limits & Payment</p>
                         </div>
 
-                        {/* Offers Display */}
                         <div className="flex flex-col items-center space-y-4">
                             {loadingOffers && (
                                 <div className="flex justify-center items-center py-8">
@@ -719,7 +836,6 @@ const Post: React.FC = () => {
                             {!loadingOffers && !errorOffers && offers.length > 0 && offers.map((offer, i) => (
                                 <div key={i} className="bg-[#222222] p-6 w-full rounded-xl border border-[#2D2D2D]">
                                     <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
-                                        {/* User Info */}
                                         <div className="flex items-center">
                                             <div className="flex items-center w-fit px-3 py-2 rounded-full bg-[#2D2D2D]">
                                                 {(() => {
@@ -742,7 +858,6 @@ const Post: React.FC = () => {
                                             </div>
                                         </div>
 
-                                        {/* Offer Details */}
                                         <div className="flex flex-wrap items-center gap-4 text-sm font-normal text-[#8F8F8F]">
                                             <p className="whitespace-nowrap">Type: <span className="text-white">{offer.type}</span></p>
                                             <Image src={Divider} alt="divider" className="w-px h-4" />
@@ -756,7 +871,6 @@ const Post: React.FC = () => {
                                             </div>
                                         </div>
 
-                                        {/* Price and Limits */}
                                         <div className="flex flex-col space-y-2">
                                             <p className="text-xs font-medium text-[#C7C7C7]">Currency: {offer.currency}</p>
                                             <div className="flex items-center">
@@ -769,22 +883,23 @@ const Post: React.FC = () => {
                                         {/* Payment Info */}
                                         <div className="flex flex-col">
                                             <div className="text-sm text-[#8F8F8F]">
-                                                Payment: <span className="text-[#4DF2BE] whitespace-nowrap">{offer.paymentMethod || selectedMethod}</span>
+                                                Payment:
+                                            </div>
+                                            <div className="text-[#4DF2BE] text-xs font-medium mt-1">
+                                                {renderPaymentMethod(offer.paymentMethod)}
                                             </div>
                                         </div>
 
-                                        {/* Action Button */}
                                         <div className="w-24 whitespace-nowrap">
                                             <button
                                                 className="bg-[#4DF2BE] text-xs text-[#0F1012] font-bold rounded-full py-3 px-4 border border-[#4DF2BE] w-full hover:bg-[#3DD2A5] transition-colors"
-                                                onClick={() => String(offer.type || "").toLowerCase() === "buy" ? router.push("/market_place") : router.push("/market_place/")}
+                                                onClick={() => String(offer.type || "").toLowerCase() === "buy" ? router.push("/myoffers") : router.push("/market_place/")}
                                             >
                                                 {String(offer.type || "").toLowerCase() === "buy" ? "Buy" : "Sell"} {offer.crypto}
                                             </button>
                                         </div>
                                     </div>
 
-                                    {/* Terms Preview */}
                                     {offer.paymentTerms && offer.paymentTerms !== "Send only from your verified bank account." && (
                                         <div className="mt-4 p-3 bg-[#2D2D2D] rounded-lg border-l-4 border-l-[#4DF2BE]">
                                             <p className="text-xs text-[#8F8F8F] mb-1">Terms:</p>
@@ -798,12 +913,21 @@ const Post: React.FC = () => {
                                 <div className="text-center text-[#8F8F8F] py-12">
                                     <div className="text-lg mb-4">No offers created yet</div>
                                     <p className="text-sm mb-6">Create your first ad to see it displayed here</p>
-                                    <button
-                                        onClick={() => setIsAdModalOpen(true)}
-                                        className="bg-[#4DF2BE] text-[#0F1012] font-bold px-6 py-3 rounded-full hover:bg-[#3DD2A5] transition-colors"
-                                    >
-                                        Create Your First Offer
-                                    </button>
+                                    {isVerified ? (
+                                        <button
+                                            onClick={() => setIsAdModalOpen(true)}
+                                            className="bg-[#4DF2BE] text-[#0F1012] font-bold px-6 py-3 rounded-full hover:bg-[#3DD2A5] transition-colors"
+                                        >
+                                            Create Your First Offer
+                                        </button>
+                                    ) : (
+                                        <button
+                                            onClick={() => router.push("/Signups/KYC")}
+                                            className="bg-[#FE857D] text-white font-bold px-6 py-3 rounded-full hover:bg-[#E8746D] transition-colors"
+                                        >
+                                            Verify to Create Offer
+                                        </button>
+                                    )}
                                 </div>
                             )}
                         </div>
@@ -811,7 +935,6 @@ const Post: React.FC = () => {
                 </div>
 
                 <div className="w-[100%] h-[1px] bg-[#fff] mt-[50%] opacity-20 my-8"></div>
-
                 <div className="mb-[80px] whitespace-nowrap mt-[10%]">
                     <Footer />
                 </div>

@@ -1,5 +1,6 @@
 "use client";
-import React, { useState, useEffect } from "react";
+
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { FaBars, FaTimes } from "react-icons/fa";
 import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
@@ -16,94 +17,50 @@ import HistoryIcon from "../../public/Assets/Evolve2p_trahisicon/elements.svg";
 import Switch from "../../public/Assets/Evolve2p_switch/Profile/elements.svg";
 import Logout from "../../public/Assets/Evolve2p_logouticon/elements.svg";
 
+// Safe localStorage access (returns null on error or server)
+const getStoredUser = () => {
+  if (typeof window === "undefined") return null;
+  try {
+    const stored = localStorage.getItem("UserData");
+    if (!stored) return null;
+    const parsed = JSON.parse(stored);
+    return parsed?.userData || parsed;
+  } catch {
+    return null;
+  }
+};
+
 const Nav: React.FC = () => {
   const pathname = usePathname();
   const router = useRouter();
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [isMounted, setIsMounted] = useState(false);
-  const [clientUser, setClientUser] = useState<{ kycVerified?: boolean } | null>(null);
   const [notificationCount, setNotificationCount] = useState(0);
+  const [isVerified, setIsVerified] = useState(false);
 
+  const profileRef = useRef<HTMLDivElement>(null);
+  const mobileMenuRef = useRef<HTMLDivElement>(null);
 
- useEffect(() => {
-  setIsMounted(true);
-
-  if (typeof window !== "undefined") {
-    const stored = localStorage.getItem("UserData");
-    if (stored) {
-      try {
-        const parsed = JSON.parse(stored);
-        const userData = parsed?.userData || parsed;
-
-        setClientUser(userData);
-
-        // Load notifications count
-      if (Array.isArray(parsed?.userData?.notifications)) {
-  setNotificationCount(parsed.userData.notifications.length);
-} else {
-  setNotificationCount(0);
-}
-      } catch (error) {
-        console.error("Error parsing user data:", error);
-      }
+  // Load user data once on mount
+  useEffect(() => {
+    const user = getStoredUser();
+    setIsVerified(!!user?.kycVerified);
+    if (user?.notifications) {
+      setNotificationCount(user.notifications.length);
     }
-  }
-}, []);
-
-  const toggleProfiledown = () => {
-    setIsProfileOpen((prev) => !prev);
-  };
-
-  const toggleMobileMenu = () => {
-    setIsMobileMenuOpen((prev) => !prev);
-  };
-
-  const handleLogout = () => {
-    localStorage.removeItem("accessToken");
-    localStorage.removeItem("userData");
-    localStorage.removeItem("UserData");
-    router.push("/Logins/login");
-  };
-
-  const navLinks = [
-    { name: "Dashboard", path: "/dashboard" },
-    { name: "Wallet", path: "/wallet" },
-    { name: "Marketplace", path: "/market_place" },
-    { name: "Trade history", path: "/tradehistory" },
-    { name: "Support", path: "/support" },
-  ];
-
-  const profileOptions = [
-    { name: "My Profile", icon: ProfileIcon, action: () => router.push("/profile") },
-    { name: "Notifications", icon: SettingsIcon, action: () => router.push("/bell_notify") },
-    { name: "My Transactions", icon: TransactionsIcon, action: () => router.push("/transactions") },
-    { name: "Transaction Limit", icon: LimitIcon, action: () => router.push("/translim") },
-    { name: "Trade History", icon: HistoryIcon, action: () => router.push("/tradehistory") },
-  ];
-
-  // Add Verify Me option conditionally
-  if (!clientUser?.kycVerified) {
-    profileOptions.unshift({
-      name: "Verify me",
-      icon: VerifyIcon,
-      action: () => router.push("/Signups/KYC") // Add your verification route here if needed
-    });
-  }
+  }, []);
 
   // Close dropdowns when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      const target = event.target as HTMLElement;
-      if (!target.closest('.profile-dropdown') && !target.closest('.profile-trigger')) {
+      if (profileRef.current && !profileRef.current.contains(event.target as Node)) {
         setIsProfileOpen(false);
       }
-      if (!target.closest('.mobile-menu') && !target.closest('.mobile-menu-trigger')) {
+      if (mobileMenuRef.current && !mobileMenuRef.current.contains(event.target as Node)) {
         setIsMobileMenuOpen(false);
       }
     };
-
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
@@ -115,33 +72,64 @@ const Nav: React.FC = () => {
     } else {
       document.body.style.overflow = 'unset';
     }
-    
     return () => {
       document.body.style.overflow = 'unset';
     };
   }, [isMobileMenuOpen]);
 
-  if (!isMounted) {
-    return (
-      <nav className="w-full bg-[#0F1012] border-b border-[#2D2D2D] py-4 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-7xl mx-auto flex items-center justify-between">
-          <div className="w-32 h-8 bg-[#2D2D2D] rounded animate-pulse"></div>
-        </div>
-      </nav>
-    );
-  }
+  const toggleProfile = useCallback(() => {
+    setIsProfileOpen(prev => !prev);
+  }, []);
 
-  return ( 
+  const toggleMobileMenu = useCallback(() => {
+    setIsMobileMenuOpen(prev => !prev);
+  }, []);
+
+  const handleLogout = useCallback(() => {
+    localStorage.removeItem("accessToken");
+    localStorage.removeItem("userData");
+    localStorage.removeItem("UserData");
+    router.push("/Logins/login");
+  }, [router]);
+
+  // Navigation links – static
+  const navLinks = [
+    { name: "Dashboard", path: "/dashboard" },
+    { name: "Wallet", path: "/wallet" },
+    { name: "Marketplace", path: "/market_place" },
+    { name: "Trade history", path: "/tradehistory" },
+    { name: "Support", path: "/support" },
+  ];
+
+  // All profile options (including Verify me) – always rendered
+  const profileOptions = [
+    {
+      name: "Verify me",
+      icon: VerifyIcon,
+      path: "/Signups/KYC",
+      special: true,
+    },
+    { name: "My Profile", icon: ProfileIcon, path: "/profile" },
+    { name: "Notifications", icon: SettingsIcon, path: "/bell_notify" },
+    { name: "My Transactions", icon: TransactionsIcon, path: "/transactions" },
+    { name: "Transaction Limit", icon: LimitIcon, path: "/translim" },
+    { name: "Trade History", icon: HistoryIcon, path: "/tradehistory" },
+  ];
+
+  return (
     <>
       <nav className="w-full bg-[#0F1012] border-b border-[#2D2D2D] py-4 px-4 sm:px-6 lg:px-8 relative z-50">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
           {/* Logo */}
           <div className="flex items-center">
-            <Image 
-              src={Logo} 
-              alt="logo" 
-              className="w-32 h-8 cursor-pointer"
+            <Image
+              src={Logo}
+              alt="logo"
+              width={109}
+              height={32}
+              className="w-32 h-auto cursor-pointer"
               onClick={() => router.push("/dashboard")}
+              priority
             />
           </div>
 
@@ -167,116 +155,109 @@ const Nav: React.FC = () => {
             })}
           </ul>
 
-          {/* Right Section - Icons & Profile */}
+          {/* Right Section – Icons & Profile */}
           <div className="flex items-center space-x-4">
             {/* Notification Bell */}
             <div className="relative">
-  <div
-    onClick={() => router.push("/bell_notify")}
-    className="relative w-10 h-10 flex items-center justify-center bg-transparent border border-[#2D2D2D] rounded-full cursor-pointer hover:bg-[#2D2D2D] transition-colors"
-  >
-    <Image src={Bell} alt="bell" width={20} height={20} />
-
-    {notificationCount > 0 && (
-      <span className="absolute -top-1 -right-1 min-w-[16px] h-4 px-1 
-  bg-red-500 text-white-600 rounded-full 
-  flex items-center justify-center text-[10px] font-bold shadow-md">
-  {notificationCount}
-</span>
-    )}
-  </div>
-</div>
-
+              <div
+                onClick={() => router.push("/bell_notify")}
+                className="relative w-10 h-10 flex items-center justify-center bg-transparent border border-[#2D2D2D] rounded-full cursor-pointer hover:bg-[#2D2D2D] transition-colors"
+              >
+                <Image src={Bell} alt="bell" width={20} height={20} className="w-5 h-5" />
+                {notificationCount > 0 && (
+                  <span className="absolute -top-1 -right-1 min-w-[16px] h-4 px-1 bg-red-500 text-white rounded-full flex items-center justify-center text-[10px] font-bold shadow-md">
+                    {notificationCount}
+                  </span>
+                )}
+              </div>
+            </div>
 
             {/* Profile Dropdown */}
-            <div className="relative profile-trigger">
+            <div className="relative profile-trigger" ref={profileRef}>
               <div
                 className="flex items-center space-x-2 bg-transparent border border-[#2D2D2D] rounded-full px-3 py-2 cursor-pointer hover:bg-[#2D2D2D] transition-colors"
-                onClick={toggleProfiledown}
+                onClick={toggleProfile}
               >
-                <Image src={Profile} alt="profile" width={20} height={20} />
+                <Image src={Profile} alt="profile" width={20} height={20} className="w-5 h-5" />
                 <Image
                   src={Parrow}
                   alt="dropdown arrow"
                   width={16}
                   height={16}
-                  className={`transition-transform ${isProfileOpen ? 'rotate-180' : ''}`}
+                  className={`transition-transform w-4 h-4 ${isProfileOpen ? 'rotate-180' : ''}`}
                 />
               </div>
 
               {isProfileOpen && (
                 <div className="profile-dropdown absolute top-full right-0 mt-2 w-64 bg-[#222222] rounded-xl shadow-lg border border-[#333] p-4 z-50 space-y-3">
-                  {profileOptions.map((item, index) => (
-                    <div
-                      key={index}
-                      onClick={item.action}
-                      className="flex justify-between items-center cursor-pointer hover:text-[#4DF2BE] transition-colors p-2 rounded-lg hover:bg-[#2D2D2D]"
-                    >
-                      <div className="flex items-center space-x-3">
-                        <Image
-                          src={item.icon}
-                          alt={item.name}
-                          width={20}
-                          height={20}
-                        />
-                        <span
-                          className={`text-sm font-medium ${
-                            item.name === "Verify me"
-                              ? "text-[#FE857D]"
-                              : "text-[#FCFCFC]"
-                          }`}
-                        >
-                          {item.name}
-                        </span>
+                  {profileOptions.map((item, index) => {
+                    // Hide "Verify me" if already verified
+                    if (item.special && isVerified) return null;
+                    return (
+                      <div
+                        key={index}
+                        onClick={() => {
+                          router.push(item.path);
+                          setIsProfileOpen(false);
+                        }}
+                        className="flex justify-between items-center cursor-pointer hover:text-[#4DF2BE] transition-colors p-2 rounded-lg hover:bg-[#2D2D2D]"
+                      >
+                        <div className="flex items-center space-x-3">
+                          <Image src={item.icon} alt={item.name} width={20} height={20} className="w-5 h-5" />
+                          <span
+                            className={`text-sm font-medium ${
+                              item.special ? "text-[#FE857D]" : "text-[#FCFCFC]"
+                            }`}
+                          >
+                            {item.name}
+                          </span>
+                        </div>
                       </div>
-                    </div>
-                  ))}
-                  
+                    );
+                  })}
+
                   <hr className="border-[#333]" />
-                  
-                  <div 
+
+                  <div
                     className="flex items-center space-x-3 cursor-pointer p-2 rounded-lg hover:bg-[#2D2D2D] transition-colors"
                     onClick={() => setShowLogoutModal(true)}
                   >
-                    <Image src={Logout} alt="logout" width={20} height={20} />
-                    <span className="text-sm font-medium text-[#FE857D]">
-                      Logout
-                    </span>
+                    <Image src={Logout} alt="logout" width={20} height={20} className="w-5 h-5" />
+                    <span className="text-sm font-medium text-[#FE857D]">Logout</span>
                   </div>
                 </div>
               )}
             </div>
 
             {/* Mobile Menu Button */}
-            <button 
+            <button
               className="lg:hidden mobile-menu-trigger text-2xl text-white p-2 hover:bg-[#2D2D2D] rounded-full transition-colors"
               onClick={toggleMobileMenu}
+              aria-label="Toggle menu"
             >
               {isMobileMenuOpen ? <FaTimes /> : <FaBars />}
             </button>
           </div>
         </div>
 
-        {/* Mobile Menu - Only shows the 5 navigation items */}
-        <div className={`lg:hidden mobile-menu fixed top-0 right-0 h-full w-80 bg-[#1A1A1A] border-l border-[#2D2D2D] z-50 transform transition-transform duration-300 ease-in-out ${
-          isMobileMenuOpen ? 'translate-x-0' : 'translate-x-full'
-        }`}>
-          {/* Header with close button */}
+        {/* Mobile Menu */}
+        <div
+          ref={mobileMenuRef}
+          className={`lg:hidden mobile-menu fixed top-0 right-0 h-full w-80 bg-[#1A1A1A] border-l border-[#2D2D2D] z-50 transform transition-transform duration-300 ease-in-out ${
+            isMobileMenuOpen ? 'translate-x-0' : 'translate-x-full'
+          }`}
+        >
           <div className="flex items-center justify-between p-6 border-b border-[#2D2D2D]">
-            <Image 
-              src={Logo} 
-              alt="logo" 
-              className="w-32 h-8"
-            />
-            <button 
+            <Image src={Logo} alt="logo" width={109} height={32} className="w-32 h-auto" priority />
+            <button
               onClick={toggleMobileMenu}
               className="text-2xl text-white p-2 hover:bg-[#2D2D2D] rounded-full transition-colors"
+              aria-label="Close menu"
             >
               <FaTimes />
             </button>
           </div>
 
-          {/* Navigation Links - Only the 5 specified items */}
           <div className="p-6 space-y-4">
             {navLinks.map((link) => {
               const isActive = pathname === link.path;
@@ -298,13 +279,11 @@ const Nav: React.FC = () => {
               );
             })}
           </div>
-
-          {/* REMOVED the profile section at the bottom */}
         </div>
 
         {/* Overlay when mobile menu is open */}
         {isMobileMenuOpen && (
-          <div 
+          <div
             className="lg:hidden fixed inset-0 bg-black bg-opacity-50 z-40"
             onClick={toggleMobileMenu}
           />
@@ -316,14 +295,8 @@ const Nav: React.FC = () => {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60] p-4">
           <div className="bg-[#0F1012] rounded-2xl max-w-md w-full text-center text-white shadow-lg border border-[#333]">
             <div className="flex items-center justify-center p-8">
-              <Image
-                src={Switch}
-                alt="switch"
-                width={56}
-                height={56}
-              />
+              <Image src={Switch} alt="switch" width={56} height={56} className="w-14 h-14" />
             </div>
-
             <div className="px-6 pb-6">
               <h2 className="text-xl font-bold text-white mb-3">
                 Are you sure you want to log out?
@@ -333,7 +306,6 @@ const Nav: React.FC = () => {
                 important information before proceeding.
               </p>
             </div>
-
             <div className="p-6 space-y-3">
               <button
                 onClick={handleLogout}
