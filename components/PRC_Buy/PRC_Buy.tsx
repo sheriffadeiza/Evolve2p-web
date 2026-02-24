@@ -59,10 +59,7 @@ interface TradeData {
       name: string;
       type: string;
       details?: {
-        bank_name?: string;
-        account_name?: string;
-        account_number?: string;
-        [key: string]: any;
+        [key: string]: any; // flexible, because keys may have spaces
       };
     };
     paymentTerms: string;
@@ -153,11 +150,12 @@ interface CancelTradeResponse {
   };
 }
 
-// Inner component that uses useSearchParams and useParams – must be wrapped in Suspense
+// ==================== Inner component that uses useSearchParams – wrapped in Suspense ====================
 function TradeDetails() {
   const router = useRouter();
   const params = useParams();
   const searchParams = useSearchParams();
+
   const [isHelpOpen, setIsHelpOpen] = useState(false);
   const [isTermsOpen, setIsTermsOpen] = useState(false);
   const [tradeData, setTradeData] = useState<TradeData | null>(null);
@@ -206,7 +204,7 @@ function TradeDetails() {
         try {
           return JSON.parse(userData);
         } catch (e) {
-          // ignore parsing error
+          console.error("Error parsing user data:", e);
         }
       }
     }
@@ -239,8 +237,10 @@ function TradeDetails() {
 
   // Copy to clipboard function
   const copyToClipboard = useCallback((text: string) => {
-    navigator.clipboard.writeText(text).catch(() => {
-      // fallback – do nothing
+    navigator.clipboard.writeText(text).then(() => {
+      console.log("Copied:", text);
+    }).catch(err => {
+      console.error("Failed to copy:", err);
     });
   }, []);
 
@@ -271,6 +271,10 @@ function TradeDetails() {
     if (!pricePerUnit && tradeData?.amountFiat && tradeData?.amountCrypto) {
       pricePerUnit = tradeData.amountFiat / tradeData.amountCrypto;
     }
+
+    // Get payment details from tradeData or offerDetails (fallback)
+    const rawDetails = tradeData?.offer?.paymentMethod?.details || offerDetails?.paymentMethod?.details;
+
     return {
       fiatAmount: tradeData?.amountFiat || 0,
       quantity: tradeData?.amountCrypto || 0,
@@ -279,7 +283,7 @@ function TradeDetails() {
       buyerUsername: tradeData?.buyer?.username || "",
       currentUserUsername: currentUser?.username || (tradeData?.buyer?.id === currentUser?.id ? tradeData?.buyer?.username : tradeData?.seller?.username) || "",
       paymentMethod: tradeData?.offer?.paymentMethod?.name || "",
-      paymentDetails: tradeData?.offer?.paymentMethod?.details || offerDetails?.paymentMethod?.details,
+      paymentDetails: rawDetails,
       fiatCurrency: tradeData?.fiatCurrency || tradeData?.offer?.currency || "USD",
       cryptoType: tradeData?.cryptoType || tradeData?.offer?.crypto || "BTC"
     };
@@ -310,7 +314,10 @@ function TradeDetails() {
     if (!tradeData?.chat?.id || socket) return;
 
     const authToken = getAuthToken();
-    if (!authToken) return;
+    if (!authToken) {
+      console.log("No auth token for socket connection");
+      return;
+    }
 
     const socketUrl = process.env.NEXT_PUBLIC_SOCKET_URL || "https://evolve2p-backend.onrender.com";
     const newSocket = io(socketUrl, {
@@ -322,15 +329,23 @@ function TradeDetails() {
     });
 
     const handleConnect = () => {
+      console.log("✅ Socket.IO connected");
       setIsSocketConnected(true);
       newSocket.emit('join-chat', tradeData.chat.id);
     };
 
     const handleDisconnect = () => {
+      console.log("🔌 Socket.IO disconnected");
       setIsSocketConnected(false);
     };
 
+    const handleError = (error: any) => {
+      console.error("❌ Socket.IO error:", error);
+    };
+
     const handleNewMessage = (message: ChatMessage) => {
+      console.log("📨 New message received via Socket.IO:", message);
+
       const messageExists = chatMessages.some(msg => msg.id === message.id);
       if (messageExists) return;
 
@@ -361,6 +376,8 @@ function TradeDetails() {
     };
 
     const handleTradeUpdated = (updatedTrade: TradeData) => {
+      console.log("🔄 Trade updated via Socket.IO:", updatedTrade);
+
       if ((updatedTrade.status === "COMPLETED" || updatedTrade.status === "RELEASED" ||
            updatedTrade.escrow?.status === "RELEASED") && !isCryptoReleased) {
         setIsCryptoReleased(true);
@@ -379,6 +396,7 @@ function TradeDetails() {
 
     const handleCryptoReleased = (data: { tradeId: string; releasedAt: string }) => {
       if (data.tradeId === tradeData.id) {
+        console.log("🎉 Crypto released notification received:", data);
         setIsCryptoReleased(true);
         setReleaseTime(new Date(data.releasedAt));
         setTradeData(prev => prev ? {
@@ -397,6 +415,7 @@ function TradeDetails() {
 
     newSocket.on('connect', handleConnect);
     newSocket.on('disconnect', handleDisconnect);
+    newSocket.on('error', handleError);
     newSocket.on('new-message', handleNewMessage);
     newSocket.on('trade-updated', handleTradeUpdated);
     newSocket.on('crypto-released', handleCryptoReleased);
@@ -407,11 +426,13 @@ function TradeDetails() {
       if (newSocket) {
         newSocket.off('connect', handleConnect);
         newSocket.off('disconnect', handleDisconnect);
+        newSocket.off('error', handleError);
         newSocket.off('new-message', handleNewMessage);
         newSocket.off('trade-updated', handleTradeUpdated);
         newSocket.off('crypto-released', handleCryptoReleased);
         newSocket.emit('leave-chat', tradeData.chat.id);
         newSocket.disconnect();
+        console.log("🧹 Socket.IO disconnected on cleanup");
       }
     };
   }, [tradeData?.chat?.id, tradeData?.buyer?.id, getAuthToken, currentUser?.id]);
@@ -508,7 +529,7 @@ function TradeDetails() {
           }
         }
       } catch (error) {
-        // silently ignore polling errors
+        console.error("Error checking crypto release:", error);
       } finally {
         setCheckingRelease(false);
       }
@@ -567,7 +588,7 @@ function TradeDetails() {
         }
       }
     } catch (error) {
-      // ignore
+      console.error("Error sending crypto released message:", error);
     }
   }, [tradeData?.chat?.id, cryptoType, quantity, getAuthToken, socket, releaseMessageSent]);
 
@@ -787,7 +808,7 @@ function TradeDetails() {
         }
       }
     } catch (err) {
-      // ignore
+      console.error("❌ Error fetching chat messages:", err);
     }
   }, [tradeData?.chat?.id, tradeData?.buyer?.id, currentUser?.id, buyerUsername, sellerUsername, getAuthToken]);
 
@@ -835,7 +856,7 @@ function TradeDetails() {
 
         if (!response.ok) {
           const errorText = await response.text();
-          throw new Error(`Failed to fetch trade: ${response.status}`);
+          throw new Error(`Failed to fetch trade: ${response.status} - ${errorText}`);
         }
 
         const apiResponse: ApiResponse = await response.json();
@@ -866,6 +887,7 @@ function TradeDetails() {
         }
 
       } catch (err) {
+        console.error("❌ Error fetching trade data:", err);
         const errorMessage = err instanceof Error ? err.message : "Failed to fetch trade data";
         setError(errorMessage);
       } finally {
@@ -898,9 +920,11 @@ function TradeDetails() {
       if (response.ok) {
         const data = await response.json();
         setOfferDetails(data.data || data.offer || data);
+      } else {
+        console.error('Offer fetch failed with status:', response.status);
       }
     } catch (err) {
-      // ignore
+      console.error("❌ Error fetching offer details:", err);
     }
   };
 
@@ -971,7 +995,7 @@ function TradeDetails() {
       if (!response.ok) {
         const errorText = await response.text();
         setChatMessages(prev => prev.filter(msg => msg.id !== tempId));
-        throw new Error(`Failed to send`);
+        throw new Error(`Failed to send: ${response.status}`);
       }
 
       const result = await response.json();
@@ -1008,7 +1032,10 @@ function TradeDetails() {
       }
 
     } catch (error) {
-      alert("Failed to send message. Please try again.");
+      console.error('❌ Error sending message:', error);
+      if (error instanceof Error && !error.message.includes('Failed to fetch')) {
+        alert(error.message);
+      }
     } finally {
       setSendingMessage(false);
       setUploadingFile(false);
@@ -1038,7 +1065,7 @@ function TradeDetails() {
 
       if (!response.ok) {
         const errorText = await response.text();
-        throw new Error(`Failed to mark as paid`);
+        throw new Error(`Failed to mark as paid: ${response.status} - ${errorText}`);
       }
 
       const result = await response.json();
@@ -1063,7 +1090,8 @@ function TradeDetails() {
       }
 
     } catch (error) {
-      alert('Error marking as paid. Please try again.');
+      console.error('❌ Error marking as paid:', error);
+      alert(error instanceof Error ? error.message : 'Error marking as paid. Please try again.');
     } finally {
       setIsMarkingAsPaid(false);
     }
@@ -1098,7 +1126,7 @@ function TradeDetails() {
 
       if (!response.ok) {
         const errorText = await response.text();
-        throw new Error(`Failed to cancel trade`);
+        throw new Error(`Failed to cancel trade: ${response.status} - ${errorText}`);
       }
 
       const result: CancelTradeResponse = await response.json();
@@ -1136,7 +1164,8 @@ function TradeDetails() {
       }, 3000);
 
     } catch (error) {
-      alert('Error cancelling trade. Please try again.');
+      console.error('❌ Error cancelling trade:', error);
+      alert(error instanceof Error ? error.message : 'Error cancelling trade. Please try again.');
     } finally {
       setIsCancelling(false);
     }
@@ -1192,7 +1221,7 @@ function TradeDetails() {
       const result: DisputeData = await response.json();
 
       if (!response.ok) {
-        throw new Error(result.message || `Failed to submit dispute`);
+        throw new Error(result.message || `Failed to submit dispute: ${response.status}`);
       }
 
       if (result.success) {
@@ -1221,7 +1250,8 @@ function TradeDetails() {
       }
 
     } catch (error) {
-      alert('Error submitting dispute. Please try again.');
+      console.error('❌ Error submitting dispute:', error);
+      alert(error instanceof Error ? error.message : 'Error submitting dispute');
     } finally {
       setSubmittingDispute(false);
     }
@@ -1253,6 +1283,7 @@ function TradeDetails() {
         .filter(term => term.length > 0)
         .map(term => term.startsWith('•') ? term : `• ${term}`);
     } else {
+      // Default terms when none provided
       return [
         "• Only first-party payments",
         "• Bank-to-bank transfers only",
@@ -1323,8 +1354,12 @@ function TradeDetails() {
 
   return (
     <>
-      {/* Back navigation is already rendered in the parent, so we don't include it here */}
-      {/* Main content */}
+      {/* Back button */}
+      <div className="flex items-center gap-3 text-base font-medium text-white mb-6 lg:mb-8 cursor-pointer" onClick={() => router.back()}>
+        <Image src={Less_than} alt="lessthan" className="w-4 h-4" />
+        <p>Buy {cryptoType}</p>
+      </div>
+
       <div className={`flex gap-6 lg:gap-8 ${showChat ? 'flex-col xl:flex-row' : 'flex-col'}`}>
         {/* Left section - Trade Details */}
         <div className={`${showChat ? 'xl:flex-1' : 'w-full'} max-w-4xl`}>
@@ -1453,11 +1488,7 @@ function TradeDetails() {
                 <div className="flex items-center justify-between p-3 sm:p-4">
                   <p className="text-sm font-medium text-[#DBDBDB]">Buying</p>
                   <div className="flex items-center gap-2 px-2 py-1 rounded-2xl bg-[#3A3A3A]">
-                    <Image
-                      src={cryptoIcons[cryptoType] || BTC}
-                      alt={cryptoType}
-                      className="w-4 h-4"
-                    />
+                    <Image src={cryptoIcons[cryptoType] || BTC} alt={cryptoType} className="w-4 h-4" />
                     <p className="text-xs font-medium text-[#DBDBDB]">
                       {cryptoType}
                     </p>
@@ -1499,38 +1530,38 @@ function TradeDetails() {
                   </p>
                 </div>
 
-                {/* Payment Details (Bank Details) - using correct field names */}
+                {/* Payment Details (Bank Details) - using bracket notation for keys with spaces */}
                 {paymentDetails && !isTradeCompleted && (
                   <div className="border-t border-[#3A3A3A] p-3 sm:p-4 space-y-2">
                     <p className="text-xs font-semibold text-[#8F8F8F] uppercase">Seller's Payment Details</p>
-                    {paymentDetails.bank_name && (
+                    {paymentDetails["Bank Name"] && (
                       <div className="flex items-center justify-between">
                         <span className="text-sm text-[#DBDBDB]">Bank Name</span>
                         <div className="flex items-center gap-2">
-                          <span className="text-sm text-white">{paymentDetails.bank_name}</span>
-                          <button onClick={() => copyToClipboard(paymentDetails.bank_name ?? "")} className="text-[#4DF2BE] hover:text-white">
+                          <span className="text-sm text-white">{paymentDetails["Bank Name"]}</span>
+                          <button onClick={() => copyToClipboard(paymentDetails["Bank Name"] ?? "")} className="text-[#4DF2BE] hover:text-white">
                             <Image src={CopyIcon} alt="copy" width={16} height={16} />
                           </button>
                         </div>
                       </div>
                     )}
-                    {paymentDetails.account_name && (
+                    {paymentDetails["Account Name"] && (
                       <div className="flex items-center justify-between">
                         <span className="text-sm text-[#DBDBDB]">Account Name</span>
                         <div className="flex items-center gap-2">
-                          <span className="text-sm text-white">{paymentDetails.account_name}</span>
-                          <button onClick={() => copyToClipboard(paymentDetails.account_name ?? "")} className="text-[#4DF2BE] hover:text-white">
+                          <span className="text-sm text-white">{paymentDetails["Account Name"]}</span>
+                          <button onClick={() => copyToClipboard(paymentDetails["Account Name"] ?? "")} className="text-[#4DF2BE] hover:text-white">
                             <Image src={CopyIcon} alt="copy" width={16} height={16} />
                           </button>
                         </div>
                       </div>
                     )}
-                    {paymentDetails.account_number && (
+                    {paymentDetails["Account Number"] && (
                       <div className="flex items-center justify-between">
                         <span className="text-sm text-[#DBDBDB]">Account Number</span>
                         <div className="flex items-center gap-2">
-                          <span className="text-sm text-white">{paymentDetails.account_number}</span>
-                          <button onClick={() => copyToClipboard(paymentDetails.account_number ?? "")} className="text-[#4DF2BE] hover:text-white">
+                          <span className="text-sm text-white">{paymentDetails["Account Number"]}</span>
+                          <button onClick={() => copyToClipboard(paymentDetails["Account Number"] ?? "")} className="text-[#4DF2BE] hover:text-white">
                             <Image src={CopyIcon} alt="copy" width={16} height={16} />
                           </button>
                         </div>
@@ -1803,7 +1834,7 @@ function TradeDetails() {
                     />
                   </div>
                   <div>
-                    <p className="text-sm font-medium text-[#FCFCFC]}">{sellerUsername}</p>
+                    <p className="text-sm font-medium text-[#FCFCFC]">{sellerUsername}</p>
                     <p className="text-xs text-[#8F8F8F]">
                       Seller • Online
                     </p>
@@ -2542,20 +2573,12 @@ function TradeDetails() {
   );
 }
 
-// Main page component with Suspense
+// ==================== MAIN PAGE COMPONENT with Suspense boundary ====================
 export default function PRC_Buy() {
-  const router = useRouter();
-
   return (
     <main className="min-h-screen bg-[#0F1012] text-white">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-6">
         <Nav />
-
-        {/* Back navigation - static, can be outside Suspense */}
-        <div className="flex items-center gap-3 text-base font-medium text-white mb-6 lg:mb-8 cursor-pointer" onClick={() => router.back()}>
-          <Image src={Less_than} alt="lessthan" className="w-4 h-4" />
-          <p>Buy</p>
-        </div>
 
         {/* Suspense boundary for the part that uses useSearchParams */}
         <Suspense fallback={
@@ -2570,7 +2593,7 @@ export default function PRC_Buy() {
         </Suspense>
 
         {/* Footer - static */}
-        <div className="w-[100%] h-[1px] bg-[#fff] mt-[50%] opacity-20 my-8"></div>
+        <div className="w-full h-[1px] bg-[#fff] mt-[50%] opacity-20 my-8"></div>
         <div className="mb-[80px] whitespace-nowrap mt-[20%]">
           <Footer />
         </div>

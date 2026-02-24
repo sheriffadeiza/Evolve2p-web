@@ -471,7 +471,7 @@ const PRC_Sell = () => {
     }
   }, [showChat, tradeData?.chat?.id, fetchChatMessages, chatMessages.length]);
 
-  // Fetch trade data
+  // Fetch trade data and log offer details
   useEffect(() => {
     const fetchTradeData = async () => {
       if (!tradeId) {
@@ -518,6 +518,11 @@ const PRC_Sell = () => {
 
           setTradeData(trade);
 
+          // Log the trade data and offer details for debugging
+          console.log('📦 Trade data received:', trade);
+          console.log('🔄 Offer object:', trade.offer);
+          console.log('💳 Payment method details:', trade.offer?.paymentMethod?.details);
+
           if (trade.offer?.id) {
             await fetchOfferDetails(trade.offer.id, authToken);
           }
@@ -536,7 +541,7 @@ const PRC_Sell = () => {
     fetchTradeData();
   }, [tradeId, getAuthToken]);
 
-  // Fetch offer details
+  // Fetch offer details and log them
   const fetchOfferDetails = async (offerId: string, authToken: string | null) => {
     try {
       const headers: HeadersInit = {
@@ -557,10 +562,11 @@ const PRC_Sell = () => {
 
       if (response.ok) {
         const data = await response.json();
+        console.log('📦 Raw offer details response:', data);
         setOfferDetails(data.data || data.offer || data);
       }
     } catch (err) {
-      // ignore
+      console.error('❌ Failed to fetch offer details:', err);
     }
   };
 
@@ -1243,7 +1249,7 @@ const PRC_Sell = () => {
                   {/* Payment Details - now after Payment Method */}
                   {paymentDetails && !isTradeCompleted && (
                     <div className="border-t border-[#3A3A3A] p-3 sm:p-4 space-y-2">
-                      <p className="text-xs font-semibold text-[#8F8F8F] uppercase">Your Payment Details</p>
+                      <p className="text-xs font-semibold text-[#8F8F8F] uppercase">Buyer's Payment Details</p>
                       {paymentDetails.bank_name && (
                         <div className="flex items-center justify-between">
                           <span className="text-sm text-[#DBDBDB]">Bank Name</span>
