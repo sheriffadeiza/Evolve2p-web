@@ -1,16 +1,12 @@
-'use client';
-
-import { ReactNode } from 'react';
 import './globals.css';
-import { SignupProvider } from '@/context/SignupContext';
+import type { ReactNode } from 'react';
+
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="en"> 
+    <html lang="en">
       <body className="bg-[#0F1012]">
-        <SignupProvider>
-          {children}
-        </SignupProvider>
+        {children}
       </body>
     </html>
   );

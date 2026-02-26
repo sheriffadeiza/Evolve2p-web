@@ -1,0 +1,26 @@
+{
+  "version": 2,
+  "builds": [
+    {
+      "src": "package.json",
+      "use": "@vercel/next"
+    }
+  ],
+  "env": {
+    "NEXT_PUBLIC_API_URL": "https://evolve2p-backend.vercel.app"
+  },
+  "routes": [
+    {
+      "src": "/login",
+      "dest": "/Logins/login"
+    },
+    {
+      "src": "/signup",
+      "dest": "/Signups/Email"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/$1"
+    }
+  ]
+}

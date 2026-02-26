@@ -1,34 +1,19 @@
+'use client';
 
+import { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 
-import React from 'react';
-import Header from '../../components/Signup/SignupEmail/Header';
+export default function LoginRedirect() {
+  const router = useRouter();
 
-import ImageContent from '@/components/Signup/SignupEmail/ImageContent';
-import Loginnav from '@/Lcomponents1/Loginnav';
-import Loginbd from '@/Lcomponents1/Loginbd';
+  useEffect(() => {
+    // Redirect to the correct login page
+    router.replace('/Logins/login');
+  }, [router]);
 
-
-const page = () => {
   return (
-    <div className="min-h-screen flex flex-col bg-[#0F1012]">
-      {/* Header Section */}
-      <Header />
-      
-      {/* Main Content */}
-      <div className="flex flex-1">
-        {/* Left Section */}
-        <div className="w-1/2 min-h-[calc(150vh-64px)]">
-          <Loginnav/>
-          <Loginbd/>
-        </div>
-        
-        {/* Right Section */}
-        <div className="w-1/2 mt-[20px]  min-h-[calc(150vh-64px)] bg-[#2D2D2D]">
-          <ImageContent />
-        </div>
-      </div>
+    <div className="min-h-screen flex flex-col items-center justify-center bg-[#0F1012] text-white">
+      <p>Redirecting to login page...</p>
     </div>
   );
-};
-
-export default page;
+}

@@ -1,103 +1,230 @@
-'use client';
+"use client";
 
-import React, { useState } from 'react';
-import { useRouter } from 'next/navigation';
-const VerifyEmailBody: React.FC = () => {
+import React, { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { API_BASE_URL } from "@/config";
+
+const SEND_OTP_ENDPOINT = `${API_BASE_URL}/api/send-otp`;
+const VERIFY_EMAIL_ENDPOINT = `${API_BASE_URL}/api/verify-email`;
+
+const VerifyEmailbd: React.FC = () => {
   const router = useRouter();
-  const [pin, setPin] = useState<string[]>(['', '', '', '', '', '']);
+  const [pin, setPin] = useState<string[]>(["", "", "", "", "", ""]);
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState(false);
+  const [email, setEmail] = useState("");
+  const [resendTimer, setResendTimer] = useState(30);
+  const [canResend, setCanResend] = useState(false);
 
+  // ✅ On mount: only get email from localStorage – NO automatic OTP send
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const stored = localStorage.getItem("UserReg");
+      if (stored) {
+        try {
+          const parsed = JSON.parse(stored);
+          if (parsed?.email) {
+            setEmail(parsed.email);
+          } else {
+            router.push("/Signups/Email");
+          }
+        } catch {
+          router.push("/Signups/Email");
+        }
+      } else {
+        router.push("/Signups/Email");
+      }
+    }
+  }, [router]);
+
+  // Timer for resend button
+  useEffect(() => {
+    if (!canResend && resendTimer > 0) {
+      const timer = setInterval(() => {
+        setResendTimer((prev) => {
+          if (prev <= 1) {
+            clearInterval(timer);
+            setCanResend(true);
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+      return () => clearInterval(timer);
+    }
+  }, [canResend, resendTimer]);
+
+  // Send OTP – called only when user clicks "Resend code"
+  const sendOTP = async (email: string) => {
+    setIsLoading(true);
+    setError("");
+    try {
+      const response = await fetch(SEND_OTP_ENDPOINT, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+        body: JSON.stringify({ email }),
+      });
+
+      await response.json();
+
+      if (!response.ok) {
+        throw new Error("Failed to send code");
+      }
+    } catch (err: any) {
+      setError(err?.message || "Failed to send code");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Handle PIN input
   const handleChange = (val: string, idx: number) => {
-    if (!/^\d?$/.test(val)) return; // Only allow numbers
+    if (!/^\d?$/.test(val)) return;
 
     const newPin = [...pin];
     newPin[idx] = val;
     setPin(newPin);
+    setError("");
 
-    // Move focus to next input
     if (val && idx < 5) {
       const nextInput = document.getElementById(`pin-${idx + 1}`);
       if (nextInput) (nextInput as HTMLInputElement).focus();
     }
+  };
 
-    // If all fields are filled, show loader then redirect
-    if (newPin.every(d => d !== '')) {
-      setIsLoading(true);
+  // Verify code
+  const verifyCode = async (code: string) => {
+    setIsLoading(true);
+    setError("");
+    setSuccess(false);
+
+    try {
+      const response = await fetch(VERIFY_EMAIL_ENDPOINT, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+        body: JSON.stringify({ email, otp: code }),
+      });
+
+      const data = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        const msg =
+          data?.message || data?.detail || "Verification failed. Try again.";
+        setError(msg);
+        setPin(["", "", "", "", "", ""]);
+        document.getElementById("pin-0")?.focus();
+        setIsLoading(false);
+        return;
+      }
+
+      // ✅ Success → mark verified in localStorage
+      const currentLocalData = localStorage.getItem("UserReg")
+        ? JSON.parse(localStorage.getItem("UserReg") as string)
+        : {};
+      localStorage.setItem(
+        "UserReg",
+        JSON.stringify({ ...currentLocalData, isEmailVerified: true })
+      );
+
+      setError("");
+      setSuccess(true);
+      setIsLoading(false);
       setTimeout(() => {
-        router.push('/Profile'); // Replace with your desired route
-      }, 1500); // Simulate loading
+        router.push("/Signups/Password");
+      }, 1000);
+    } catch (err: any) {
+      setError(err?.message || "Invalid verification code.");
+      setPin(["", "", "", "", "", ""]);
+      document.getElementById("pin-0")?.focus();
+      setIsLoading(false);
     }
   };
 
+  // Resend OTP
+  const handleResendCode = async () => {
+    if (!canResend) return;
+    setIsLoading(true);
+    setError("");
+    setCanResend(false);
+    setResendTimer(30);
+
+    await sendOTP(email);
+  };
+
+  const isPinComplete = pin.every((d) => d !== "");
+
   return (
-    <div className="max-w-md mx-auto ml-[80px] mt-10 px-4 text-white">
-      <h1 className="text-[24px] text-[#FCFCFC] font-[700] mb-2">Verify Email</h1>
-      <p className="text-[16px] font-[400] text-[#8F8F8F] mb-6">
-        Please enter the 6-digit code sent to <br />
-        <span className="text-[#DBDBDB]">davidokeyemi@sample.com</span>
-      </p>
+    <div className="w-full lg:mx-0  flex justify-center">
+      <div className="lg:max-w-lg max-w-sm  p-4 mx-auto lg:ml-[120px] mt-10 lg:px-4 text-white ">
+        <h1 className="text-[24px] text-[#FCFCFC] font-[700] mb-2">
+          Verify Email
+        </h1>
+        <p className="text-[16px] font-[400] text-[#8F8F8F] mb-6">
+          Please enter the 6-digit code sent to <br />
+          <span className="text-[#DBDBDB]">{email || "your email"}</span>
+        </p>
 
-      
+        {error && (
+          <div className="text-[#F5918A] text-[14px] font-[500] mb-4">
+            {error}
+          </div>
+        )}
 
-<div className="flex gap-[10px] ml-[-15%] border-none justify-center mb-6">
-  {pin.map((digit, idx) => (
-    <input
-      key={idx}
-      id={`pin-${idx}`}
-      maxLength={1}
-      value={digit}
-      onChange={(e) => handleChange(e.target.value, idx)}
-      className="w-[62px] h-[56px] rounded-[10px] border-none bg-[#222222] text-center text-[14px] font-[500] text-[#FCFCFC] focus:outline-none focus:ring-1 focus:ring-[#4DF2BE]"
-      type="password"
-      inputMode="numeric"
-      pattern="[0-9]*"
-    />
-  ))}
-</div>
+        {success && (
+          <div className="text-[#1ECB84] text-[14px] font-[500] mb-4">
+            Email verified successfully! Redirecting...
+          </div>
+        )}
 
-
-
-      <div className="text-center text-[14px] font-[400] text-[#DBDBDB] ml-[-15%] mt-[20px]">
-        Didn’t receive code?{' '}
-        <button className="text-[#FFFFFF] w-[149px] h-[40px] text-[14px] ml-[10px] rounded-[100px] bg-[#222222] border-none font-[700] hover:underline">
-          Resend code 30s
-        </button>
-      </div>
-      {isLoading && (
-        <div className="fixed inset-0 flex ml-[15%] mt-[30px] items-center justify-center bg-black bg-opacity-50 z-50">
-            <div className="loader"></div>
-          
-          <style jsx global>{`
-            .loader {
-              width: 30px;
-              height: 30px;
-              position: relative;
-            }
-            .loader::after {
-              content: "";
-              position: absolute;
-              top: 0;
-              left: 0;
-              width: 70%;
-              height: 70%;
-              border: 5px solid #333333;
-              border-top-color: #4DF2BE;
-              border-radius: 50%;
-              animation: spin 1s linear infinite;
-            }
-            @keyframes spin {
-              0% {
-                transform: rotate(0deg);
-              }
-              100% {
-                transform: rotate(360deg);
-              }
-            }
-          `}</style>
+        <div className="flex gap-[5px]  justify-center mb-6   lg:w-full">
+          {pin.map((digit, idx) => (
+            <input
+              key={idx}
+              id={`pin-${idx}`}
+              maxLength={1}
+              value={pin[idx]}
+              onChange={(e) => handleChange(e.target.value, idx)}
+              className=" w-full lg:w-[55px] h-[56px] rounded-[10px] border-none bg-[#222222] text-center text-[14px] font-[500] text-[#FCFCFC] focus:outline-none focus:ring-1 focus:ring-[#4DF2BE"
+              type="password"
+              inputMode="numeric"
+              pattern="[0-9]*"
+              disabled={isLoading}
+            />
+          ))}
         </div>
-      )}
+
+        {isPinComplete && (
+          <button
+            className=" w-full lg:w-[100%] h-[48px] mt-[10px] lg:ml-[-10px] bg-[#4DF2BE] border-none text-[#0F1012] rounded-[100px] font-[700] disabled:opacity-50 "
+            onClick={() => verifyCode(pin.join(""))}
+            disabled={isLoading}
+          >
+            {isLoading ? "Verifying..." : "Verify Email"}
+          </button>
+        )}
+
+        <div className="text-center text-[14px] font-[400] text-[#DBDBDB] lg:ml-[-5%] mt-[20px] ">
+          Didn't receive code?{" "}
+          <button
+            onClick={handleResendCode}
+            disabled={!canResend || isLoading}
+            className={`text-[#FFFFFF] w-[149px] h-[40px] text-[14px] ml-[30px] rounded-[100px] bg-[#222222] border-none font-[700] hover:underline ${
+              !canResend || isLoading ? "opacity-50 cursor-not-allowed" : ""
+            }`}
+          >
+            {canResend ? "Resend code" : `Resend code ${resendTimer}s`}
+          </button>
+        </div>
       </div>
+    </div>
   );
 };
 
-export default VerifyEmailBody;
+export default VerifyEmailbd;
