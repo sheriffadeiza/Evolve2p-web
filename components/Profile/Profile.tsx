@@ -13,6 +13,7 @@ import Barrow from "../../public/Assets/Evolve2p_Barrow/arrow-down-01.svg";
 import Mode from "../../public/Assets/Evolve2p_mode/Profile/elements.svg";
 import Lang from "../../public/Assets/Evolve2p_Lang/Profile/globe.svg";
 import Times from "../../public/Assets/Evolve2p_times/Icon container.png";
+import { API_BASE_URL } from "@/config";
 import Footer from "../Footer/Footer";
 import { countryCurrencyService, CurrencyOption } from "../../utils/countryCurrencyService";
 import PhoneInput from 'react-phone-number-input';
@@ -87,35 +88,33 @@ const Toggle = ({
   );
 };
 
-// Helper function to format phone number to E.164
+// ✅ UPDATED: Helper function to format phone number to strict E.164 (no spaces, no special chars)
 const formatToE164 = (phone: string, countryDialCode: string = "+234"): string => {
   if (!phone) return "";
   
-  // If already in E.164 format, return as is
-  if (phone.startsWith('+')) {
-    return phone;
+  // Remove all non-digit characters except leading '+'
+  const cleaned = phone.replace(/[^\d+]/g, '');
+  
+  // If it already starts with '+', ensure only digits after it
+  if (cleaned.startsWith('+')) {
+    return '+' + cleaned.slice(1).replace(/\D/g, '');
   }
   
-  // Remove all non-digits
-  const cleaned = phone.replace(/\D/g, '');
+  // Otherwise, construct E.164 from dial code and digits
+  const digitsOnly = cleaned.replace(/\D/g, '');
+  if (!digitsOnly) return "";
   
-  if (!cleaned) return "";
-  
-  // Remove country code digits from dial code
   const countryCodeDigits = countryDialCode.replace('+', '');
+  let digits = digitsOnly;
   
-  // Remove leading zero if present
-  let digits = cleaned;
   if (digits.startsWith('0')) {
     digits = digits.substring(1);
   }
   
-  // Check if the number already starts with country code
   if (digits.startsWith(countryCodeDigits)) {
     return `+${digits}`;
   }
   
-  // Return in E.164 format
   return `+${countryCodeDigits}${digits}`;
 };
 
@@ -410,12 +409,19 @@ const Profile = () => {
           
           setUserData(userDataObj);
           
-          // Format phone to E.164
+          // ✅ Format phone to strict E.164 (no spaces)
           const selectedCountry = userDataObj.country || { name: "Nigeria", code: "NG", dial_code: "+234" };
           const formattedPhone = formatToE164(userDataObj.phone, selectedCountry.dial_code);
           
           setPhoneNumber(formattedPhone as E164Number || undefined);
           setSelectedCountry(selectedCountry);
+          
+          // Optionally clean stored phone number to avoid warning next time
+          if (stored && parsed.phone !== formattedPhone) {
+            parsed.phone = formattedPhone;
+            if (parsed.userData) parsed.userData.phone = formattedPhone;
+            localStorage.setItem("UserData", JSON.stringify(parsed));
+          }
           
           if (userDataObj.dayOfBirth) {
             try {
@@ -593,7 +599,7 @@ const Profile = () => {
         country: selectedCountry.code
       };
 
-      const res = await fetch("https://evolve2p-backend.onrender.com/api/update-user", {
+      const res = await fetch(`${API_BASE_URL}/api/update-user`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",

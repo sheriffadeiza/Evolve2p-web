@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
+import { API_BASE_URL } from "@/config";
 
 const Confirmbd: React.FC = () => {
   const [pin, setPin] = useState<string[]>(["", "", "", ""]);
@@ -61,7 +62,7 @@ const Confirmbd: React.FC = () => {
 
     try {
       const res = await fetch(
-        "https://evolve2p-backend.onrender.com/api/update-user",
+        `${API_BASE_URL}/api/update-user`,
         {
           method: "PUT",
           headers: {

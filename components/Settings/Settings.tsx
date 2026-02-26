@@ -76,8 +76,24 @@ const Settings = () => {
     }
   };
 
+  // Menu item type definition
+  type MenuItem = {
+    href: string;
+    icon: any;
+    label: string;
+    path: string;
+    description?: string;
+    showVerificationStatus?: boolean;
+    isVerified?: boolean;
+  };
+  
+  type MenuSection = {
+    title: string;
+    items: MenuItem[];
+  };
+  
   // Menu items data for better organization
-  const menuSections = [
+  const menuSections: MenuSection[] = [
     {
       title: "ACCOUNT",
       items: [
@@ -87,13 +103,15 @@ const Settings = () => {
           label: "Account Verification",
           path: "/account_ver",
           showVerificationStatus: true,
-          isVerified: isUserVerified()
+          isVerified: isUserVerified(),
+          description: undefined
         },
         {
           href: "/translim",
           icon: Gclock,
           label: "Transaction Limits",
-          path: "/translim"
+          path: "/translim",
+          description: undefined
         }
       ]
     },
@@ -116,19 +134,22 @@ const Settings = () => {
           href: "/changep",
           icon: Changep,
           label: "Change Password",
-          path: "/changep"
+          path: "/changep",
+          description: undefined
         },
         {
           href: "/tfa",
           icon: Glocked,
           label: "Two Factor Authentication",
-          path: "/tfa"
+          path: "/tfa",
+          description: undefined
         },
         {
           href: "/change-pin",
           icon: Gpin,
           label: "Change your Security PIN",
-          path: "/change-pin"
+          path: "/change-pin",
+          description: undefined
         }
       ]
     },
@@ -139,7 +160,8 @@ const Settings = () => {
           href: "/support",
           icon: Ghead,
           label: "Talk to support",
-          path: "/support"
+          path: "/support",
+          description: undefined
         }
       ]
     }
@@ -277,9 +299,9 @@ const Settings = () => {
                       {item.showVerificationStatus && (
                         <div className="mt-2 ml-8 lg:ml-10">
                           <span className={`text-xs ${
-                            item.isVerified ? "text-[#4DF2BE]" : "text-[#FE857D]"
+                            item.isVerified === true ? "text-[#4DF2BE]" : "text-[#FE857D]"
                           }`}>
-                            {item.isVerified ? "✓ Verified" : "Not Verified"}
+                            {item.isVerified === true ? "✓ Verified" : "Not Verified"}
                           </span>
                         </div>
                       )}

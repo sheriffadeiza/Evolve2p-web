@@ -10,6 +10,7 @@ import { QRCodeCanvas } from "qrcode.react";
 import Copy from "../../public/Assets/Evolve2p_code/elements.svg";
 import ModalC from "../../public/Assets/Evolve2p_modalC/elements.png";
 import Footer from "../../components/Footer/Footer";
+import { API_BASE_URL } from "@/config";
 
 const SetupTwoFA: React.FC = () => {
   const [showModal, setShowModal] = useState(false);
@@ -40,7 +41,7 @@ const SetupTwoFA: React.FC = () => {
 
     try {
       const res = await fetch(
-        "https://evolve2p-backend.onrender.com/api/generate-secrete",
+        `${API_BASE_URL}/api/generate-secrete`,
         {
           method: "POST",
           headers: {
@@ -87,7 +88,7 @@ const SetupTwoFA: React.FC = () => {
 
     try {
       const res = await fetch(
-        "https://evolve2p-backend.onrender.com/api/verify-secrete",
+        `${API_BASE_URL}/api/verify-secrete`,
         {
           method: "POST",
           headers: {

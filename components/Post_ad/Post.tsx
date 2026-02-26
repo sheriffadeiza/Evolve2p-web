@@ -16,6 +16,7 @@ import USDT from "../../public/Assets/Evolve2p_USDT/Tether (USDT).svg";
 import USDC from "../../public/Assets/Evolve2p_USDC/USD Coin (USDC).svg";
 import Times from "../../public/Assets/Evolve2p_times/Icon container.png";
 import Barrow from "../../public/Assets/Evolve2p_Barrow/arrow-down-01.svg";
+import { API_BASE_URL } from "@/config";
 import Footer from "../../components/Footer/Footer";
 import { countryCurrencyService, CurrencyOption } from "../../utils/countryCurrencyService";
 
@@ -160,7 +161,7 @@ const Post: React.FC = () => {
             if (!token) throw new Error("Not authenticated");
 
             const res = await fetch(
-                "https://evolve2p-backend.onrender.com/api/get-user-payment-methods",
+                `${API_BASE_URL}/api/get-user-payment-methods`,
                 {
                     headers: { Authorization: `Bearer ${token}` },
                 }
@@ -258,7 +259,7 @@ const Post: React.FC = () => {
                 paymentTime: selectedTimeLimit,
             };
 
-            const response = await fetch("https://evolve2p-backend.onrender.com/api/create-offer", {
+            const response = await fetch(`${API_BASE_URL}/api/create-offer`, {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",

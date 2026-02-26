@@ -21,6 +21,7 @@ import Yellow_i from "../../public/Assets/Evolve2p_yellowi/elements.svg";
 import Copy from "../../public/Assets/Evolve2p_code/elements.svg";
 import Share from "../../public/Assets/Evolve2p_share/elements.svg";
 import Footer from "../Footer/Footer";
+import { API_BASE_URL } from "@/config";
 import { useRouter } from "next/navigation";
 import WalletTransactions from "@/app/walletTransaction/walletTrans";
 
@@ -438,7 +439,7 @@ const Wallet: React.FC<QRCodeBoxProps> = () => {
         timestamp: new Date().toISOString()
       };
 
-      const response = await fetch('https://evolve2p-backend.onrender.com/api/send', {
+      const response = await fetch(`${API_BASE_URL}/api/send`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

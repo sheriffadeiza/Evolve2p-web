@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { API_BASE_URL } from "@/config";
 
 const Resetpbd = () => {
   const [email, setEmail] = useState("");
@@ -24,7 +25,7 @@ const Resetpbd = () => {
     try {
       // 1. Check if email exists (success means user exists)
       const checkRes = await fetch(
-        "https://evolve2p-backend.onrender.com/api/check-email-exist",
+        `${API_BASE_URL}/api/check-email-exist`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -41,7 +42,7 @@ const Resetpbd = () => {
 
       // 2. Send OTP to email
       const otpRes = await fetch(
-        "https://evolve2p-backend.onrender.com/api/send-otp",
+        `${API_BASE_URL}/api/send-otp`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },

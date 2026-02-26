@@ -24,6 +24,7 @@ import Mink from "../../public/Assets/Evolve2p_mink/P2P Marketplace/Group.svg";
 import Footer from "../../components/Footer/Footer";
 import Check from "../../public/Assets/Evolve2p_checklist/Checklist card.png";
 import CopyIcon from "../../public/Assets/Evolve2p_paycopy/P2P Marketplace/copy-01.svg";
+import { API_BASE_URL } from "@/config";
 import io, { Socket } from "socket.io-client";
 
 // Mapping of crypto symbols to their icon images
@@ -291,7 +292,7 @@ function PRC_SellContent() {
     const authToken = getAuthToken();
     if (!authToken) return;
 
-    const socketUrl = process.env.NEXT_PUBLIC_SOCKET_URL || "https://evolve2p-backend.onrender.com";
+    const socketUrl = process.env.NEXT_PUBLIC_SOCKET_URL || `${API_BASE_URL}`;
     const newSocket = io(socketUrl, {
       query: {
         token: authToken,
@@ -418,7 +419,7 @@ function PRC_SellContent() {
       }
 
       const response = await fetch(
-        `https://evolve2p-backend.onrender.com/api/get-chats/${tradeData.chat.id}`,
+        `${API_BASE_URL}/api/get-chats/${tradeData.chat.id}`,
         {
           method: 'GET',
           headers: headers,
@@ -497,7 +498,7 @@ function PRC_SellContent() {
         }
 
         const response = await fetch(
-          `https://evolve2p-backend.onrender.com/api/get-trade/${tradeId}`,
+          `${API_BASE_URL}/api/get-trade/${tradeId}`,
           {
             method: 'GET',
             headers: headers,
@@ -555,7 +556,7 @@ function PRC_SellContent() {
       }
 
       const response = await fetch(
-        `https://evolve2p-backend.onrender.com/api/get-offer/${offerId}`,
+        `${API_BASE_URL}/api/get-offer/${offerId}`,
         {
           method: 'GET',
           headers: headers,
@@ -626,7 +627,7 @@ function PRC_SellContent() {
       }
 
       const response = await fetch(
-        'https://evolve2p-backend.onrender.com/api/send-chat',
+        `${API_BASE_URL}/api/send-chat`,
         {
           method: 'POST',
           headers: {
@@ -694,7 +695,7 @@ function PRC_SellContent() {
       }
 
       const response = await fetch(
-        `https://evolve2p-backend.onrender.com/api/release-trade/${tradeId}`,
+        `${API_BASE_URL}/api/release-trade/${tradeId}`,
         {
           method: 'POST',
           headers: {
@@ -772,7 +773,7 @@ function PRC_SellContent() {
         formData.append('evidence', disputeFile);
       }
 
-      const response = await fetch('https://evolve2p-backend.onrender.com/api/open-dispute', {
+      const response = await fetch(`${API_BASE_URL}/api/open-dispute`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${authToken}`

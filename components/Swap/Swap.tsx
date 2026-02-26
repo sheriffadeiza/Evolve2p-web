@@ -15,6 +15,7 @@ import USDC from "../../public/Assets/Evolve2p_USDC/USD Coin (USDC).svg";
 import USDT from "../../public/Assets/Evolve2p_USDT/Tether (USDT).svg";
 import Footer from "../../components/Footer/Footer";
 import { useRouter } from "next/navigation";
+import { API_BASE_URL } from "@/config";
 
 type CoinSymbol = "BTC" | "ETH" | "USDT" | "USDC";
 
@@ -229,7 +230,7 @@ const Swap: React.FC = () => {
       const stored = localStorage.getItem("UserData");
       const accessToken = JSON.parse(stored || "")?.accessToken;
 
-      const res = await fetch("https://evolve2p-backend.onrender.com/api/swap", {
+      const res = await fetch(`${API_BASE_URL}/api/swap`, {
         headers: {
           "Content-Type": "application/json",
           Authorization: "Bearer " + accessToken,

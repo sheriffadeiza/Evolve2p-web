@@ -10,6 +10,7 @@ import EditIcon from "../../public/Assets/Evolve2p_editoffer/P2P Marketplace/pen
 import DeleteIcon from "../../public/Assets/Evolve2p_deleteoffer/P2P Marketplace/delete-03.svg";
 import Times from "../../public/Assets/Evolve2p_times/Icon container.png";
 import Barrow from "../../public/Assets/Evolve2p_Barrow/arrow-down-01.svg";
+import { API_BASE_URL } from "@/config";
 
 interface Offer {
   id?: string;
@@ -222,7 +223,7 @@ const MyOffers: React.FC<MyOffersProps> = ({ initialTab = "ALL" }) => {
     setErrorUserMethods("");
     try {
       const res = await fetch(
-        "https://evolve2p-backend.onrender.com/api/get-user-payment-methods",
+        `${API_BASE_URL}/api/get-user-payment-methods`,
         {
           headers: { Authorization: `Bearer ${token}` },
         }
@@ -281,7 +282,7 @@ const MyOffers: React.FC<MyOffersProps> = ({ initialTab = "ALL" }) => {
 
     try {
       const response = await fetch(
-        "https://evolve2p-backend.onrender.com/api/get-offers",
+        `${API_BASE_URL}/api/get-offers`,
         {
           method: "GET",
           headers: {
@@ -365,7 +366,7 @@ const MyOffers: React.FC<MyOffersProps> = ({ initialTab = "ALL" }) => {
     try {
       console.log(`🗑️ Deleting offer: ${offerId}`);
       const response = await fetch(
-        "https://evolve2p-backend.onrender.com/api/delete-offer",
+        `${API_BASE_URL}/api/delete-offer`,
         {
           method: "PUT",
           headers: {
@@ -485,7 +486,7 @@ const MyOffers: React.FC<MyOffersProps> = ({ initialTab = "ALL" }) => {
       };
 
       const response = await fetch(
-        "https://evolve2p-backend.onrender.com/api/update-offer",
+        `${API_BASE_URL}/api/update-offer`,
         {
           method: "PUT",
           headers: {

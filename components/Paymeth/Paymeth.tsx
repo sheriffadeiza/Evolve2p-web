@@ -2,8 +2,8 @@
 
 import React, { useState, useEffect } from "react";
 import Image from "next/image";
-import Settings from "../../components/Settings/Settings";
 import Times from "../../public/Assets/Evolve2p_times/Icon container.png";
+import { API_BASE_URL } from "@/config";
 import G19 from "../../public/Assets/Evolve2p_group19/Group 19.svg";
 
 // ---------- Add Payment Method Modal (dynamic from API) ----------
@@ -38,7 +38,7 @@ const AddPaymentMethodModal = ({
         if (!token) throw new Error("Not authenticated");
 
         const res = await fetch(
-          "https://evolve2p-backend.onrender.com/api/get-payment-methods",
+          `${API_BASE_URL}/get-payment-methods`,
           {
             headers: { Authorization: `Bearer ${token}` },
           }
@@ -96,7 +96,7 @@ const AddPaymentMethodModal = ({
       };
 
       const res = await fetch(
-        "https://evolve2p-backend.onrender.com/api/create-payment-method",
+        `${API_BASE_URL}/api/create-payment-method`,
         {
           method: "POST",
           headers: {
@@ -280,7 +280,7 @@ const Paymeth = () => {
       if (!token) throw new Error("Not authenticated");
 
       const res = await fetch(
-        "https://evolve2p-backend.onrender.com/api/get-user-payment-methods",
+        `${API_BASE_URL}/api/get-user-payment-methods`,
         {
           headers: { Authorization: `Bearer ${token}` },
         }

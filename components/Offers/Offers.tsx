@@ -4,7 +4,6 @@ import { useState, useEffect } from "react";
 import Nav from "../NAV/Nav";
 import { useRouter, useParams, useSearchParams } from "next/navigation";
 import Image from "next/image";
-import Vector from "../../public/Assets/Evolve2p_vector/vector.svg";
 import Mark_green from "../../public/Assets/Evolve2p_mark/elements.svg";
 import Less_than from "../../public/Assets/Evolve2p_lessthan/Makretplace/arrow-left-01.svg";
 import Divider from "../../public/Assets/Evolve2p_divider/Divider.svg";
@@ -20,6 +19,7 @@ import USDT from "../../public/Assets/Evolve2p_USDT/Tether (USDT).svg";
 import USDC from "../../public/Assets/Evolve2p_USDC/USD Coin (USDC).svg";
 import Arrow_great from "../../public/Assets/Evolve2p_Larrow/arrow-right-01.svg";
 import Times from "../../public/Assets/Evolve2p_times/Icon container.png";
+import { API_BASE_URL } from "@/config";
 import Footer from "../Footer/Footer";
 import { countryCurrencyService, CurrencyOption } from "../../utils/countryCurrencyService";
 
@@ -176,7 +176,7 @@ const Offers = () => {
         paymentTimeLimit: offer.paymentTime || "30 minutes"
       };
 
-      const response = await fetch("https://evolve2p-backend.onrender.com/api/create-trade", {
+      const response = await fetch(`${API_BASE_URL}/api/create-trade`, {
         method: "POST",
         headers,
         body: JSON.stringify(tradeData),
@@ -335,9 +335,9 @@ const Offers = () => {
         const headers: any = { "Content-Type": "application/json" };
         if (token) headers.Authorization = `Bearer ${token}`;
 
-        const res = await fetch(`https://evolve2p-backend.onrender.com/api/get-offer/${offerId}`, { headers });
+        const res = await fetch(`${API_BASE_URL}/api/get-offer/${offerId}`, { headers });
         if (!res.ok) throw new Error(`API request failed`);
-
+``
         const data = await res.json();
         let offerData = data.data || data.offer || data;
         if (!offerData.id) throw new Error("No offer data");

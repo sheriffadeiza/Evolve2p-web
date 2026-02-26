@@ -6,6 +6,7 @@ import Evolve_ee from "../../../public/Assets/Evolve_ee/Clip path group.png";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import Times from "../../../public/Assets/Evolve2p_times/Icon container.png";
+import { API_BASE_URL } from "@/config";
 
 const KYCVbd = () => {
   const [loading, setLoading] = useState(false);
@@ -35,7 +36,7 @@ const KYCVbd = () => {
       }
 
       const res = await fetch(
-        "https://evolve2p-backend.onrender.com/api/kyc-get-link",
+        `${API_BASE_URL}/api/kyc-get-link`,
         {
           method: "POST",
           headers: {

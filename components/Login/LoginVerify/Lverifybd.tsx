@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
+import { API_BASE_URL } from "@/config";
 
 const Lverifybd: React.FC = () => {
   const router = useRouter();
@@ -36,7 +37,7 @@ const Lverifybd: React.FC = () => {
     try {
       const code = pin.join("");
       const res = await fetch(
-        "https://evolve2p-backend.onrender.com/api/verify-email",
+        `${API_BASE_URL}/api/verify-email`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -75,7 +76,7 @@ const Lverifybd: React.FC = () => {
     setResendLoading(true);
     try {
       const otpRes = await fetch(
-        "https://evolve2p-backend.onrender.com/api/send-otp",
+        `${API_BASE_URL}/api/send-otp`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },

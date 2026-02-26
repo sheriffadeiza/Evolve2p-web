@@ -2,10 +2,10 @@
 
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { API_BASE_URL } from "@/config";
 
-const SEND_OTP_ENDPOINT = "https://evolve2p-backend.onrender.com/api/send-otp";
-const VERIFY_EMAIL_ENDPOINT =
-  "https://evolve2p-backend.onrender.com/api/verify-email";
+const SEND_OTP_ENDPOINT = `${API_BASE_URL}/api/send-otp`;
+const VERIFY_EMAIL_ENDPOINT = `${API_BASE_URL}/api/verify-email`;
 
 const VerifyEmailbd: React.FC = () => {
   const router = useRouter();

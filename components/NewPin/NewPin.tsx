@@ -7,9 +7,10 @@ import Lessthan from "../../public/Assets/Evolve2p_lessthan/Makretplace/arrow-le
 import Image from "next/image";
 import Footer from "../../components/Footer/Footer";
 import { useRouter } from "next/navigation";
+import { API_BASE_URL } from "@/config";
 
 const UPDATE_PIN_ENDPOINT =
-  "https://evolve2p-backend.onrender.com/api/update-user";
+  `${API_BASE_URL}/api/update-user`;
 
 const NewPin: React.FC = () => {
   const router = useRouter();

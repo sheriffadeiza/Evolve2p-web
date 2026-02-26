@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
+import { API_BASE_URL } from "@/config";
 
 const EmailForm = () => {
   const router = useRouter();
@@ -10,7 +11,7 @@ const EmailForm = () => {
   const [isLoading, setIsLoading] = useState(false);
 
   const SEND_OTP_ENDPOINT =
-    "https://evolve2p-backend.onrender.com/api/send-otp";
+    `${API_BASE_URL}/api/send-otp`;
 
   const sendOTP = async (email: string) => {
     setIsLoading(true);
@@ -62,7 +63,7 @@ const EmailForm = () => {
 
     try {
       const response = await fetch(
-        "https://evolve2p-backend.onrender.com/api/check-email-exist",
+        `${API_BASE_URL}/api/check-email-exist`,
         {
           body: JSON.stringify({ email }),
           method: "POST",

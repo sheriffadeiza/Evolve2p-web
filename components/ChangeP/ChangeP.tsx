@@ -8,6 +8,7 @@ import schecklistActive from '../../public/Assets/Evolve2p_checklist2/checklist-
 import ModalC from '../../public/Assets/Evolve2p_modalC/elements.png';
 import { useRouter } from 'next/navigation';
 import React, { useEffect, useState } from 'react';
+import { API_BASE_URL } from "../../config";
 import Footer from "../../components/Footer/Footer";
 
 const ChangeP = () => {
@@ -90,7 +91,7 @@ const ChangeP = () => {
         newPassword: password,
       };
 
-      const res = await fetch("https://evolve2p-backend.onrender.com/api/change-password", {
+      const res = await fetch(`${API_BASE_URL}/api/change-password`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",

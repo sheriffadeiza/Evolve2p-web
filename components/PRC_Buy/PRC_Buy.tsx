@@ -15,14 +15,13 @@ import USDC from "../../public/Assets/Evolve2p_USDC/USD Coin (USDC).svg";
 import Yellow_i from "../../public/Assets/Evolve2p_yellowi/elements.svg";
 import UPa from "../../public/Assets/Evolve2p_upA/Makretplace/elements.svg";
 import Book from "../../public/Assets/Evolve2p_book/P2P Marketplace/book-open-02.svg";
-import Vector from "../../public/Assets/Evolve2p_vector/vector.svg";
 import Mark_green from "../../public/Assets/Evolve2p_mark/elements.svg";
-import Arrow_great from "../../public/Assets/Evolve2p_Larrow/arrow-right-01.svg";
 import Gtime from "../../public/Assets/Evolve2p_Gtime/P2P Marketplace/elements.svg";
 import Message from "../../public/Assets/Evolve2p_message/P2P Marketplace/elements.svg";
 import Mink from "../../public/Assets/Evolve2p_mink/P2P Marketplace/Group.svg";
 import Footer from "../../components/Footer/Footer";
 import Check from "../../public/Assets/Evolve2p_checklist/Checklist card.png";
+import { API_BASE_URL } from "@/config";
 import CopyIcon from "../../public/Assets/Evolve2p_paycopy/P2P Marketplace/copy-01.svg";
 import io, { Socket } from "socket.io-client";
 
@@ -319,7 +318,7 @@ function TradeDetails() {
       return;
     }
 
-    const socketUrl = process.env.NEXT_PUBLIC_SOCKET_URL || "https://evolve2p-backend.onrender.com";
+    const socketUrl = process.env.NEXT_PUBLIC_SOCKET_URL || `${API_BASE_URL}`;
     const newSocket = io(socketUrl, {
       query: {
         token: authToken,
@@ -491,7 +490,7 @@ function TradeDetails() {
         if (!authToken) return;
 
         const response = await fetch(
-          `https://evolve2p-backend.onrender.com/api/get-trade/${tradeId}`,
+          `${API_BASE_URL}/api/get-trade/${tradeId}`,
           {
             method: 'GET',
             headers: {
@@ -550,7 +549,7 @@ function TradeDetails() {
 
       const messageContent = `✅ ${cryptoType} RELEASED!\n\nYour ${quantity.toFixed(5)} ${cryptoType} has been released from escrow and is now in your wallet! Trade completed successfully.`;
 
-      const response = await fetch('https://evolve2p-backend.onrender.com/api/send-chat', {
+      const response = await fetch(`${API_BASE_URL}/api/send-chat`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${authToken}`
@@ -764,7 +763,7 @@ function TradeDetails() {
       }
 
       const response = await fetch(
-        `https://evolve2p-backend.onrender.com/api/get-chats/${tradeData.chat.id}`,
+        `${API_BASE_URL}/api/get-chats/${tradeData.chat.id}`,
         {
           method: 'GET',
           headers: headers,
@@ -843,7 +842,7 @@ function TradeDetails() {
         }
 
         const response = await fetch(
-          `https://evolve2p-backend.onrender.com/api/get-trade/${tradeId}`,
+          `${API_BASE_URL}/api/get-trade/${tradeId}`,
           {
             method: 'GET',
             headers: headers,
@@ -910,7 +909,7 @@ function TradeDetails() {
       }
 
       const response = await fetch(
-        `https://evolve2p-backend.onrender.com/api/get-offer/${offerId}`,
+        `${API_BASE_URL}/api/get-offer/${offerId}`,
         {
           method: 'GET',
           headers: headers,
@@ -982,7 +981,7 @@ function TradeDetails() {
       }
 
       const response = await fetch(
-        'https://evolve2p-backend.onrender.com/api/send-chat',
+        `${API_BASE_URL}/api/send-chat`,
         {
           method: 'POST',
           headers: {
@@ -1053,7 +1052,7 @@ function TradeDetails() {
       }
 
       const response = await fetch(
-        `https://evolve2p-backend.onrender.com/api/mark-trade-as-paid/${tradeId}`,
+        `${API_BASE_URL}/api/mark-trade-as-paid/${tradeId}`,
         {
           method: 'POST',
           headers: {
@@ -1114,7 +1113,7 @@ function TradeDetails() {
       }
 
       const response = await fetch(
-        `https://evolve2p-backend.onrender.com/api/cancle-trade/${tradeId}`,
+        `${API_BASE_URL}/api/cancle-trade/${tradeId}`,
         {
           method: 'POST',
           headers: {
@@ -1210,7 +1209,7 @@ function TradeDetails() {
         formData.append('evidence', disputeFile);
       }
 
-      const response = await fetch('https://evolve2p-backend.onrender.com/api/open-dispute', {
+      const response = await fetch(`${API_BASE_URL}/api/open-dispute`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${authToken}`

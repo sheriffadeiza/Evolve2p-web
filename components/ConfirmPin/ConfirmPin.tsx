@@ -8,9 +8,10 @@ import Image from "next/image";
 import Footer from "../../components/Footer/Footer";
 import { useRouter } from "next/navigation";
 import Modalc from "../../public/Assets/Evolve2p_modalC/elements.png";
+import { API_BASE_URL } from "@/config";
 
 const CHECK_PIN_ENDPOINT =
-  "https://evolve2p-backend.onrender.com/api/check-pin";
+  `${API_BASE_URL}/api/check-pin`;
 
 const ConfirmPin: React.FC = () => {
   const router = useRouter();

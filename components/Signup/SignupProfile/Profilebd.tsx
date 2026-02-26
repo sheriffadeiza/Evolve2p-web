@@ -6,8 +6,9 @@ import PhoneInput from 'react-phone-number-input';
 import { isValidPhoneNumber } from 'react-phone-number-input';
 import 'react-phone-number-input/style.css';
 import { E164Number } from 'libphonenumber-js';
+import { API_BASE_URL } from "@/config";
 
-const BASE_URL = "https://evolve2p-backend.onrender.com/api/";
+const BASE_URL = `${API_BASE_URL}/api/`;
 
 const Profilebd = () => {
   const router = useRouter();

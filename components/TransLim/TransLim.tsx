@@ -3,6 +3,7 @@ import Nav from "../NAV/Nav";
 import Settings from "../../components/Settings/Settings";
 import React, {useState, useEffect} from 'react'
 import Footer from "../../components/Footer/Footer";
+import { API_BASE_URL } from "@/config";
 
 const TransLim: React.FC = () => {
   const [activeTab, setActiveTab] = useState<"withdrawal" | "deposit">("withdrawal");
@@ -32,7 +33,7 @@ const TransLim: React.FC = () => {
           }
         }
 
-        const response = await fetch("https://evolve2p-backend.onrender.com/api/admin/settings", {
+        const response = await fetch(`${API_BASE_URL}/api/admin/settings`, {
           method: "GET",
           headers: {
             "Content-Type": "application/json",
