@@ -17,7 +17,7 @@ const Passwordbd = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [currentUserData, setCurrentUserData] = useState<any>(null);
 
-  // ✅ Safely read localStorage on the client only
+  // Safely read localStorage on the client only
   useEffect(() => {
     if (typeof window !== "undefined") {
       const stored = window.localStorage.getItem("UserReg");
@@ -75,22 +75,22 @@ const Passwordbd = () => {
   };
 
   return (
-    <div className="w-full lg:mx-0  flex justify-center">
-      <div className="max-w-sm lg:max-w-md lg:ml-[80px] mx-auto mt-10 p-4  text-white ">
-        <h1 className="text-[24px] text-[#FCFCFC] font-[700] mb-2">
+    <div className="w-full flex justify-center">
+      <div className="w-full max-w-md mx-auto mt-10 p-4 text-white">
+        <h1 className="text-2xl text-[#FCFCFC] font-bold mb-2">
           Create password
         </h1>
-        <p className="text-[16px] font-[400] text-[#8F8F8F] lg:whitespace-nowrap whitespace-wrap">
+        <p className="text-base font-normal text-[#8F8F8F]">
           Create a strong password to protect your trades and funds.
         </p>
 
         {error && (
-          <div className="text-[#F5918A] text-[14px] font-[500] mt-4 mb-2">
+          <div className="text-[#F5918A] text-sm font-medium mt-4 mb-2">
             {error}
           </div>
         )}
 
-        <label className="block text-[14px] mt-[30px] font-[500] text-[#8F8F8F] mb-1">
+        <label className="block text-sm font-medium text-[#8F8F8F] mt-6 mb-1">
           Password
         </label>
         <div className="relative">
@@ -101,34 +101,29 @@ const Passwordbd = () => {
               setPassword(e.target.value);
               if (error) setError("");
             }}
-            className={`w-full lg:w-[380px] h-[56px] mt-[10px] bg-[#222222] text-[#DBDBDB] text-[14px] font-[500] mb-4 pl-[15px] pr-10 focus:outline-none rounded-[10px] border-2 ${
+            className={`w-full h-14 bg-[#222222] text-[#DBDBDB] text-sm font-medium pl-4 pr-12 rounded-lg border-2 focus:outline-none ${
               error &&
               (!isMinLength || !hasNumber || !hasSpecialChar || !hasUpperLower)
                 ? "border-[#F5918A]"
-                : "border-[#222222]"
+                : "border-[#222222] focus:border-[#4DF2BE]"
             }`}
             placeholder="Enter your password"
           />
           <button
             type="button"
             onClick={() => setShowPassword(!showPassword)}
-            className="absolute border-0 lg:right-[42px] right-2 ml-[-40px] top-[48%] bg-[#222222] -translate-y-1/2 text-[#DBDBDB]"
+            className="absolute right-4 top-1/2 -translate-y-1/2 text-[#DBDBDB]"
             aria-label="Toggle password visibility"
           >
-            <Image
-              src={eyeIcon}
-              alt="Toggle password visibility"
-              width={20}
-              height={20}
-            />
+            <Image src={eyeIcon} alt="" width={20} height={20} />
           </button>
         </div>
 
-        <ul className="w-full text-[14px] font-[400] font-satoshi lg:ml-[-40px] text-[#8F8F8F] mb-6 space-y-[10px]">
-          <li className="flex items-center gap-[5px]">
+        <ul className="w-full text-sm font-normal text-[#8F8F8F] mt-4 mb-6 space-y-2 pl-0">
+          <li className="flex items-center gap-2">
             <Image
               src={isMinLength ? checklistActive : checklistInactive}
-              alt="check list"
+              alt=""
               width={16}
               height={16}
             />
@@ -136,10 +131,10 @@ const Passwordbd = () => {
               Minimum 6 characters
             </span>
           </li>
-          <li className="flex items-center gap-[5px]">
+          <li className="flex items-center gap-2">
             <Image
               src={hasNumber ? checklistActive : checklistInactive}
-              alt="check list"
+              alt=""
               width={16}
               height={16}
             />
@@ -147,10 +142,10 @@ const Passwordbd = () => {
               At least 1 number
             </span>
           </li>
-          <li className="flex items-center gap-[5px]">
+          <li className="flex items-center gap-2">
             <Image
               src={hasSpecialChar ? checklistActive : checklistInactive}
-              alt="check list"
+              alt=""
               width={16}
               height={16}
             />
@@ -160,10 +155,10 @@ const Passwordbd = () => {
               At least 1 special character
             </span>
           </li>
-          <li className="flex items-center gap-[5px]">
+          <li className="flex items-center gap-2">
             <Image
               src={hasUpperLower ? checklistActive : checklistInactive}
-              alt="check list"
+              alt=""
               width={16}
               height={16}
             />
@@ -175,10 +170,10 @@ const Passwordbd = () => {
           </li>
         </ul>
 
-        <label className="block text-[14px] mt-[20px] font-[500] text-[#8F8F8F] mb-1">
+        <label className="block text-sm font-medium text-[#8F8F8F] mb-1">
           Confirm password
         </label>
-        <div className="relative inline-block  w-full">
+        <div className="relative">
           <input
             type={showConfirm ? "text" : "password"}
             value={confirmPassword}
@@ -186,28 +181,25 @@ const Passwordbd = () => {
               setConfirmPassword(e.target.value);
               if (error) setError("");
             }}
-            className={`w-full lg:w-[380px] h-[56px] bg-[#222222] mt-[10px] text-[#DBDBDB] text-[14px] mb-4 pl-[15px] font-[500] pr-10 rounded-[10px] focus:outline-none border-2 ${
-              error && !passwordsMatch ? "border-[#F5918A]" : "border-[#222222]"
+            className={`w-full h-14 bg-[#222222] text-[#DBDBDB] text-sm font-medium pl-4 pr-12 rounded-lg border-2 focus:outline-none ${
+              error && !passwordsMatch
+                ? "border-[#F5918A]"
+                : "border-[#222222] focus:border-[#4DF2BE]"
             }`}
             placeholder="Re-enter your password"
           />
           <button
             type="button"
             onClick={() => setShowConfirm(!showConfirm)}
-            className="absolute top-[48%] border-0 right-2 lg:right-[42px] ml-[-40px] bg-[#222222] -translate-y-1/2 text-[#DBDBDB]"
+            className="absolute right-4 top-1/2 -translate-y-1/2 text-[#DBDBDB]"
             aria-label="Toggle confirm password visibility"
           >
-            <Image
-              src={eyeIcon}
-              alt="Toggle password visibility"
-              width={20}
-              height={20}
-            />
+            <Image src={eyeIcon} alt="" width={20} height={20} />
           </button>
         </div>
 
         <button
-          className="w-full lg:w-[370px] h-[56px] border-none cursor-pointer mt-[40px] bg-[#4DF2BE] text-[#0F1012] py-3 rounded-[100px] hover:bg-[#1a5d50]"
+          className="w-full h-14 mt-8 bg-[#4DF2BE] text-[#0F1012] font-bold rounded-full hover:bg-[#3dd0a3] disabled:opacity-50 transition-colors"
           onClick={handleContinue}
           disabled={isLoading}
         >

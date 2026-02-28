@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, ClipboardEvent, KeyboardEvent } from "react";
 import { useRouter } from "next/navigation";
 import { API_BASE_URL } from "@/config";
 
@@ -22,6 +22,38 @@ const Confirmbd: React.FC = () => {
     if (val && idx < 3) {
       const nextInput = document.getElementById(`pin-${idx + 1}`);
       if (nextInput) (nextInput as HTMLInputElement).focus();
+    }
+  };
+
+  // Handle backspace key for seamless deletion across fields
+  const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>, idx: number) => {
+    if (e.key === "Backspace") {
+      // If current field is empty and it's not the first field, move to previous and clear it
+      if (pin[idx] === "" && idx > 0) {
+        e.preventDefault(); // Prevent default backspace behaviour
+        const newPin = [...pin];
+        newPin[idx - 1] = ""; // Clear previous field
+        setPin(newPin);
+        // Focus previous input
+        const prevInput = document.getElementById(`pin-${idx - 1}`);
+        if (prevInput) (prevInput as HTMLInputElement).focus();
+      }
+    }
+  };
+
+  // Handle paste event: fill all four inputs if pasted content is 4 digits
+  const handlePaste = (e: ClipboardEvent<HTMLInputElement>) => {
+    e.preventDefault();
+    const pastedData = e.clipboardData.getData("text/plain").trim();
+    if (/^\d{4}$/.test(pastedData)) {
+      const digits = pastedData.split("");
+      setPin(digits);
+      setError("");
+      // Focus the last input after paste
+      const lastInput = document.getElementById("pin-3");
+      if (lastInput) (lastInput as HTMLInputElement).focus();
+    } else {
+      setError("Please paste a valid 4-digit PIN");
     }
   };
 
@@ -61,17 +93,14 @@ const Confirmbd: React.FC = () => {
     setIsLoading(true);
 
     try {
-      const res = await fetch(
-        `${API_BASE_URL}/api/update-user`,
-        {
-          method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${user?.accessToken}`,
-          },
-          body: JSON.stringify({ pin: pinValue }),
-        }
-      );
+      const res = await fetch(`${API_BASE_URL}/api/update-user`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${user?.accessToken}`,
+        },
+        body: JSON.stringify({ pin: pinValue }),
+      });
 
       const data = await res.json();
 
@@ -99,12 +128,12 @@ const Confirmbd: React.FC = () => {
   };
 
   return (
-    <div className="w-full lg:mx-auto">
-      <div className="text-whitemt-[30px]  lg:max-w-md mx-auto p-8 max-w-sm">
+    <div className="w-full flex justify-center">
+      <div className="w-full max-w-md mx-auto mt-10 p-4 text-white">
         {/* Success Modal */}
         {showSuccess && (
-          <div className="fixed inset-0  bg-black bg-opacity-70 flex items-center justify-center z-50">
-            <div className=" text-white w-[300px] h-[250px] bg-[#222222] p-6 rounded-[10px] text-center  z-[100]">
+          <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50">
+            <div className="text-white w-[300px] h-[250px] bg-[#222222] p-6 rounded-[10px] text-center z-[100]">
               <h3 className="text-[#4DF2BE] text-[18px] font-bold mb-2">
                 Success!
               </h3>
@@ -113,81 +142,81 @@ const Confirmbd: React.FC = () => {
               </p>
               <button
                 onClick={handleContinue}
-                className="flex items-center justify-center bg-[#4DF2BE] mt-[50px] border-none w-[250px] h-[30px]  text-[16px]  mt-[30px] transition-colors duration-200 text-black font-semibold py-2 px-4 rounded-full"
+                className="flex items-center justify-center bg-[#4DF2BE] mt-[50px] border-none w-[250px] h-[30px] text-[16px] transition-colors duration-200 text-black font-semibold py-2 px-4 rounded-full"
               >
                 Continue to KYC
               </button>
             </div>
           </div>
         )}
-        <div className="w-full">
-          <h2 className="text-[24px] text-[#FCFCFC] font-[700]">
-            Confirm your PIN
-          </h2>
-          <p className="text-[16px] font-[400] mt-[4px] mb-6 text-[#8F8F8F]">
-            Re-enter your PIN to make sure it's correct.
-          </p>
 
-          {error && (
-            <div className="text-[#F5918A] text-[14px] mb-4 w-[350px]">
-              {error}
-            </div>
-          )}
+        <h2 className="text-2xl text-[#FCFCFC] font-bold">
+          Confirm your PIN
+        </h2>
+        <p className="text-base font-normal mt-1 mb-6 text-[#8F8F8F]">
+          Re-enter your PIN to make sure it's correct.
+        </p>
 
-          <div className="flex gap-1">
-            {pin.map((digit, idx) => (
-              <input
-                key={idx}
-                id={`pin-${idx}`}
-                maxLength={1}
-                value={digit}
-                onChange={(e) => handleChange(e.target.value, idx)}
-                className="w-full lg:w-[70px] h-[56px] lg:ml-[15px] rounded-[10px] border-none bg-[#222222] font-[500] text-center text-[14px] text-[#FCFCFC] focus:outline-none focus:ring-1 focus:ring-[#1ECB84]"
-                type="password"
-                inputMode="numeric"
-                disabled={showSuccess}
-              />
-            ))}
-          </div>
+        {error && (
+          <div className="text-[#F5918A] text-sm mb-4">{error}</div>
+        )}
 
-          {pin.join("").length === 4 && (
-            <button
-              className="w-full lg:w-[300px] h-[48px] mt-[30px] lg:ml-[50px] text-[16px] border-none bg-[#4DF2BE] text-[#0F1012] rounded-[100px] font-[700] disabled:opacity-50"
-              onClick={handleSubmit}
-              disabled={isLoading}
-            >
-              {isLoading ? "Setting PIN..." : "Continue"}
-            </button>
-          )}
-
-          <style jsx global>{`
-            .loader {
-              width: 30px;
-              height: 30px;
-              position: relative;
-            }
-            .loader::after {
-              content: "";
-              position: absolute;
-              top: 0;
-              left: 0;
-              width: 70%;
-              height: 70%;
-              border: 5px solid #333333;
-              border-top-color: #4df2be;
-              border-radius: 50%;
-              animation: spin 1s linear infinite;
-            }
-            @keyframes spin {
-              0% {
-                transform: rotate(0deg);
-              }
-              100% {
-                transform: rotate(360deg);
-              }
-            }
-          `}</style>
+        <div className="flex gap-2 justify-between">
+          {pin.map((digit, idx) => (
+            <input
+              key={idx}
+              id={`pin-${idx}`}
+              maxLength={1}
+              value={digit}
+              onChange={(e) => handleChange(e.target.value, idx)}
+              onKeyDown={(e) => handleKeyDown(e, idx)}
+              onPaste={idx === 0 ? handlePaste : undefined}
+              className="w-16 h-14 rounded-lg border-none bg-[#222222] font-medium text-center text-sm text-[#FCFCFC] focus:outline-none focus:ring-1 focus:ring-[#1ECB84]"
+              type="password"
+              inputMode="numeric"
+              disabled={showSuccess}
+              autoFocus={idx === 0}
+            />
+          ))}
         </div>
+
+        {pin.every((d) => d !== "") && (
+          <button
+            className="w-full h-12 mt-8 bg-[#4DF2BE] text-base text-[#0F1012] rounded-full font-bold disabled:opacity-50 hover:bg-[#3dd0a3] transition-colors"
+            onClick={handleSubmit}
+            disabled={isLoading}
+          >
+            {isLoading ? "Setting PIN..." : "Continue"}
+          </button>
+        )}
+
+        <style jsx global>{`
+          .loader {
+            width: 30px;
+            height: 30px;
+            position: relative;
+          }
+          .loader::after {
+            content: "";
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 70%;
+            height: 70%;
+            border: 5px solid #333333;
+            border-top-color: #4df2be;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+          }
+          @keyframes spin {
+            0% {
+              transform: rotate(0deg);
+            }
+            100% {
+              transform: rotate(360deg);
+            }
+          }
+        `}</style>
       </div>
     </div>
   );

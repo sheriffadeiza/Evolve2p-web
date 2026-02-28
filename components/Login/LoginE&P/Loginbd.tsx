@@ -4,8 +4,9 @@ import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import image from "../../../public/Assets/Evolve2p_viewslash/view-off-slash.png";
+import { API_BASE_URL } from "@/config";
 
-const BASE_URL = "https://evolve2p-backend.onrender.com/api/";
+const BASE_URL = `${API_BASE_URL}`;
 
 const Loginbd: React.FC = () => {
   const router = useRouter();
@@ -27,7 +28,7 @@ const Loginbd: React.FC = () => {
     setLoading(true);
 
     try {
-      const loginResponse = await fetch(BASE_URL + "auth/login", {
+      const loginResponse = await fetch(BASE_URL + "/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password }),
@@ -46,7 +47,7 @@ const Loginbd: React.FC = () => {
       localStorage.setItem("accessToken", token);
 
       // Verify token validity
-      const checkTokenResponse = await fetch(BASE_URL + "check-token", {
+      const checkTokenResponse = await fetch(BASE_URL + "/api/check-token", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -57,7 +58,7 @@ const Loginbd: React.FC = () => {
       const checkTokenData = await checkTokenResponse.json();
 
       if (checkTokenData?.success) {
-        const userResponse = await fetch(BASE_URL + "get-user", {
+        const userResponse = await fetch(BASE_URL + "/api/get-user", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",

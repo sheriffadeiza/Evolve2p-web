@@ -7,6 +7,7 @@ import schecklistInactive from "../../../public/Assets/Evolve2p_checklist2/check
 import schecklistActive from "../../../public/Assets/Evolve2p_checklist2/checklist-active.svg";
 import ModalC from "../../../public/Assets/Evolve2p_modalC/elements.png";
 import { useRouter } from "next/navigation";
+import { API_BASE_URL } from "@/config";
 
 const Lpassbd = () => {
   const router = useRouter();
@@ -70,7 +71,7 @@ const Lpassbd = () => {
       };
 
       const res = await fetch(
-        "https://evolve2p-backend.onrender.com/api/forgot-password",
+        `${API_BASE_URL}/api/forgot-password`,
         {
           method: "PUT",
           headers: {

@@ -1,13 +1,13 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, ClipboardEvent, KeyboardEvent } from "react";
 import { useRouter } from "next/navigation";
 
 const SecPinbd: React.FC = () => {
   const [pin, setPin] = useState<string[]>(["", "", "", ""]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
-  const [deleteLoading, setDeleteLoading] = useState(false);
+  const [deleteLoading, setDeleteLoading] = useState(false); // kept for potential future use
   const router = useRouter();
 
   const handleChange = (val: string, idx: number) => {
@@ -16,9 +16,44 @@ const SecPinbd: React.FC = () => {
     const newPin = [...pin];
     newPin[idx] = val;
     setPin(newPin);
+    setError("");
 
-    const nextInput = document.getElementById(`pin-${idx + 1}`);
-    if (val && nextInput) (nextInput as HTMLInputElement).focus();
+    if (val && idx < 3) {
+      const nextInput = document.getElementById(`pin-${idx + 1}`);
+      if (nextInput) (nextInput as HTMLInputElement).focus();
+    }
+  };
+
+  // Handle backspace key for seamless deletion across fields
+  const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>, idx: number) => {
+    if (e.key === "Backspace") {
+      // If current field is empty and it's not the first field, move to previous and clear it
+      if (pin[idx] === "" && idx > 0) {
+        e.preventDefault(); // Prevent default backspace behaviour
+        const newPin = [...pin];
+        newPin[idx - 1] = ""; // Clear previous field
+        setPin(newPin);
+        // Focus previous input
+        const prevInput = document.getElementById(`pin-${idx - 1}`);
+        if (prevInput) (prevInput as HTMLInputElement).focus();
+      }
+    }
+  };
+
+  // Handle paste event: fill all four inputs if pasted content is 4 digits
+  const handlePaste = (e: ClipboardEvent<HTMLInputElement>) => {
+    e.preventDefault();
+    const pastedData = e.clipboardData.getData("text/plain").trim();
+    if (/^\d{4}$/.test(pastedData)) {
+      const digits = pastedData.split("");
+      setPin(digits);
+      setError("");
+      // Focus the last input after paste
+      const lastInput = document.getElementById("pin-3");
+      if (lastInput) (lastInput as HTMLInputElement).focus();
+    } else {
+      setError("Please paste a valid 4-digit PIN");
+    }
   };
 
   const handleSubmit = async () => {
@@ -28,17 +63,16 @@ const SecPinbd: React.FC = () => {
   };
 
   return (
-    <div className="w-full lg:mx-0 ">
-      <div className="text-white lg:ml-[68px] mt-[26px] mx-auto p-8 max-w-sm  xl:max-w-md lg:max-w-md">
-        <h2 className="text-[24px] text-[#FCFCFC] font-[700]">
+    <div className="w-full flex justify-center">
+      <div className="w-full max-w-md mx-auto mt-10 p-4 text-white">
+        <h2 className="text-2xl text-[#FCFCFC] font-bold">
           Setup security PIN
         </h2>
-        <p className="text-[16px] font-[400] mt-1 mb-6 text-[#8F8F8F] whitespace-wrap xl:whitespace-nowrap lg:whitespace-nowrap">
-          Your PIN helps you log in faster and approve transactions <br />{" "}
-          securely.
+        <p className="text-base font-normal mt-1 mb-6 text-[#8F8F8F]">
+          Your PIN helps you log in faster and approve transactions securely.
         </p>
 
-        <div className="flex gap-1 lg:ml-[6px]  w-full ">
+        <div className="flex gap-2 justify-between">
           {pin.map((digit, idx) => (
             <input
               key={idx}
@@ -46,7 +80,9 @@ const SecPinbd: React.FC = () => {
               maxLength={1}
               value={digit}
               onChange={(e) => handleChange(e.target.value, idx)}
-              className="w-full lg:w-[70px] h-[56px] ml-[10px] rounded-[10px] border-none bg-[#222222] font-[500] text-center text-[14px] text-[#FCFCFC] focus:outline-none focus:ring-1 focus:ring-[#1ECB84]"
+              onKeyDown={(e) => handleKeyDown(e, idx)}
+              onPaste={idx === 0 ? handlePaste : undefined} // only first input handles paste
+              className="w-16 h-14 rounded-lg border-none bg-[#222222] font-medium text-center text-sm text-[#FCFCFC] focus:outline-none focus:ring-1 focus:ring-[#1ECB84]"
               type="password"
               inputMode="numeric"
               disabled={isLoading}
@@ -56,14 +92,14 @@ const SecPinbd: React.FC = () => {
         </div>
 
         {error && (
-          <div className="text-[#F5918A] text-[14px] font-[500] mt-4">
+          <div className="text-[#F5918A] text-sm font-medium mt-4">
             {error}
           </div>
         )}
 
-        {pin.join("").length === 4 && (
+        {pin.every((d) => d !== "") && (
           <button
-            className="w-full lg:w-[300px] h-[48px] ml-[8px] lg:ml-[24px] border-none mt-[30px] bg-[#4DF2BE] text-[16px] text-[#0F1012] rounded-[100px] font-[700] disabled:opacity-50"
+            className="w-full h-12 mt-8 bg-[#4DF2BE] text-base text-[#0F1012] rounded-full font-bold disabled:opacity-50 hover:bg-[#3dd0a3] transition-colors"
             onClick={handleSubmit}
             disabled={isLoading}
           >
@@ -72,7 +108,7 @@ const SecPinbd: React.FC = () => {
         )}
 
         {isLoading && (
-          <div className="flex justify-center mt-[30px] ml-[-40px]">
+          <div className="flex justify-center mt-6">
             <div className="loader"></div>
           </div>
         )}

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, ClipboardEvent, KeyboardEvent } from "react";
 import { useRouter } from "next/navigation";
 import { API_BASE_URL } from "@/config";
 
@@ -17,7 +17,7 @@ const VerifyEmailbd: React.FC = () => {
   const [resendTimer, setResendTimer] = useState(30);
   const [canResend, setCanResend] = useState(false);
 
-  // ✅ On mount: only get email from localStorage – NO automatic OTP send
+  // On mount: get email from localStorage (no automatic OTP send)
   useEffect(() => {
     if (typeof window !== "undefined") {
       const stored = localStorage.getItem("UserReg");
@@ -81,7 +81,7 @@ const VerifyEmailbd: React.FC = () => {
     }
   };
 
-  // Handle PIN input
+  // Handle change for each input (allow only digits)
   const handleChange = (val: string, idx: number) => {
     if (!/^\d?$/.test(val)) return;
 
@@ -90,9 +90,45 @@ const VerifyEmailbd: React.FC = () => {
     setPin(newPin);
     setError("");
 
+    // Auto‑focus next input if a digit was entered
     if (val && idx < 5) {
       const nextInput = document.getElementById(`pin-${idx + 1}`);
       if (nextInput) (nextInput as HTMLInputElement).focus();
+    }
+  };
+
+  // Handle backspace key for seamless deletion across fields
+  const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>, idx: number) => {
+    if (e.key === "Backspace") {
+      // If current field is empty and it's not the first field, move to previous and clear it
+      if (pin[idx] === "" && idx > 0) {
+        e.preventDefault(); // Prevent default backspace behaviour (nothing)
+        const newPin = [...pin];
+        newPin[idx - 1] = ""; // Clear previous field
+        setPin(newPin);
+        // Focus previous input
+        const prevInput = document.getElementById(`pin-${idx - 1}`);
+        if (prevInput) (prevInput as HTMLInputElement).focus();
+      }
+      // If current field has a value, normal backspace behaviour will clear it via handleChange
+    }
+  };
+
+  // Handle paste event: fill all six inputs if pasted content is 6 digits
+  const handlePaste = (e: ClipboardEvent<HTMLInputElement>) => {
+    e.preventDefault();
+    const pastedData = e.clipboardData.getData("text/plain").trim();
+    // Check if pasted string is exactly 6 digits
+    if (/^\d{6}$/.test(pastedData)) {
+      const digits = pastedData.split("");
+      setPin(digits);
+      setError("");
+      // Optionally focus the next empty field or the last one – here we focus the last input
+      const lastInput = document.getElementById("pin-5");
+      if (lastInput) (lastInput as HTMLInputElement).focus();
+    } else {
+      // Optional: show a temporary error if paste is invalid
+      setError("Please paste a valid 6-digit code");
     }
   };
 
@@ -124,7 +160,7 @@ const VerifyEmailbd: React.FC = () => {
         return;
       }
 
-      // ✅ Success → mark verified in localStorage
+      // Success → mark verified in localStorage
       const currentLocalData = localStorage.getItem("UserReg")
         ? JSON.parse(localStorage.getItem("UserReg") as string)
         : {};
@@ -161,8 +197,8 @@ const VerifyEmailbd: React.FC = () => {
   const isPinComplete = pin.every((d) => d !== "");
 
   return (
-    <div className="w-full lg:mx-0  flex justify-center">
-      <div className="lg:max-w-lg max-w-sm  p-4 mx-auto lg:ml-[120px] mt-10 lg:px-4 text-white ">
+    <div className="w-full lg:mx-0 flex justify-center">
+      <div className="lg:max-w-lg max-w-sm p-4 mx-auto lg:ml-[120px] mt-10 lg:px-4 text-white">
         <h1 className="text-[24px] text-[#FCFCFC] font-[700] mb-2">
           Verify Email
         </h1>
@@ -183,7 +219,7 @@ const VerifyEmailbd: React.FC = () => {
           </div>
         )}
 
-        <div className="flex gap-[5px]  justify-center mb-6   lg:w-full">
+        <div className="flex gap-[5px] justify-center mb-6 lg:w-full">
           {pin.map((digit, idx) => (
             <input
               key={idx}
@@ -191,7 +227,9 @@ const VerifyEmailbd: React.FC = () => {
               maxLength={1}
               value={pin[idx]}
               onChange={(e) => handleChange(e.target.value, idx)}
-              className=" w-full lg:w-[55px] h-[56px] rounded-[10px] border-none bg-[#222222] text-center text-[14px] font-[500] text-[#FCFCFC] focus:outline-none focus:ring-1 focus:ring-[#4DF2BE"
+              onKeyDown={(e) => handleKeyDown(e, idx)}
+              onPaste={idx === 0 ? handlePaste : undefined} // Attach paste only to first input for simplicity
+              className="w-full lg:w-[55px] h-[56px] rounded-[10px] border-none bg-[#222222] text-center text-[14px] font-[500] text-[#FCFCFC] focus:outline-none focus:ring-1 focus:ring-[#4DF2BE]"
               type="password"
               inputMode="numeric"
               pattern="[0-9]*"
@@ -202,7 +240,7 @@ const VerifyEmailbd: React.FC = () => {
 
         {isPinComplete && (
           <button
-            className=" w-full lg:w-[100%] h-[48px] mt-[10px] lg:ml-[-10px] bg-[#4DF2BE] border-none text-[#0F1012] rounded-[100px] font-[700] disabled:opacity-50 "
+            className="w-full lg:w-[100%] h-[48px] mt-[10px] lg:ml-[-10px] bg-[#4DF2BE] border-none text-[#0F1012] rounded-[100px] font-[700] disabled:opacity-50"
             onClick={() => verifyCode(pin.join(""))}
             disabled={isLoading}
           >
@@ -210,7 +248,7 @@ const VerifyEmailbd: React.FC = () => {
           </button>
         )}
 
-        <div className="text-center text-[14px] font-[400] text-[#DBDBDB] lg:ml-[-5%] mt-[20px] ">
+        <div className="text-center text-[14px] font-[400] text-[#DBDBDB] lg:ml-[-5%] mt-[20px]">
           Didn't receive code?{" "}
           <button
             onClick={handleResendCode}

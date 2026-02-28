@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, ClipboardEvent, KeyboardEvent } from "react";
 import { useRouter } from "next/navigation";
 import { API_BASE_URL } from "@/config";
 
@@ -22,10 +22,43 @@ const Lverifybd: React.FC = () => {
     const newPin = [...pin];
     newPin[idx] = val;
     setPin(newPin);
+    setError("");
 
     if (val && idx < 5) {
       const nextInput = document.getElementById(`pin-${idx + 1}`);
       if (nextInput) (nextInput as HTMLInputElement).focus();
+    }
+  };
+
+  // Handle backspace key for seamless deletion across fields
+  const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>, idx: number) => {
+    if (e.key === "Backspace") {
+      // If current field is empty and it's not the first field, move to previous and clear it
+      if (pin[idx] === "" && idx > 0) {
+        e.preventDefault();
+        const newPin = [...pin];
+        newPin[idx - 1] = ""; // Clear previous field
+        setPin(newPin);
+        // Focus previous input
+        const prevInput = document.getElementById(`pin-${idx - 1}`);
+        if (prevInput) (prevInput as HTMLInputElement).focus();
+      }
+    }
+  };
+
+  // Handle paste event: fill all six inputs if pasted content is 6 digits
+  const handlePaste = (e: ClipboardEvent<HTMLInputElement>) => {
+    e.preventDefault();
+    const pastedData = e.clipboardData.getData("text/plain").trim();
+    if (/^\d{6}$/.test(pastedData)) {
+      const digits = pastedData.split("");
+      setPin(digits);
+      setError("");
+      // Focus the last input after paste
+      const lastInput = document.getElementById("pin-5");
+      if (lastInput) (lastInput as HTMLInputElement).focus();
+    } else {
+      setError("Please paste a valid 6-digit code");
     }
   };
 
@@ -36,17 +69,14 @@ const Lverifybd: React.FC = () => {
 
     try {
       const code = pin.join("");
-      const res = await fetch(
-        `${API_BASE_URL}/api/verify-email`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            email: email,
-            otp: code,
-          }),
-        }
-      );
+      const res = await fetch(`${API_BASE_URL}/api/verify-email`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: email,
+          otp: code,
+        }),
+      });
       const data = await res.json();
 
       if (!res.ok) {
@@ -75,14 +105,11 @@ const Lverifybd: React.FC = () => {
     setError("");
     setResendLoading(true);
     try {
-      const otpRes = await fetch(
-        `${API_BASE_URL}/api/send-otp`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ email }),
-        }
-      );
+      const otpRes = await fetch(`${API_BASE_URL}/api/send-otp`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
+      });
       const otpData = await otpRes.json();
       if (!otpRes.ok) {
         setError(
@@ -101,17 +128,15 @@ const Lverifybd: React.FC = () => {
   const allFilled = pin.every((digit) => digit.length === 1);
 
   return (
-    <div className="max-w-md mx-auto  text-center mt-4 px-4 text-white  mb-6">
-      <h1 className="text-[24px] ml-[-15%] text-[#FCFCFC] font-[700] mb-2">
-        Verify Email
-      </h1>
-      <p className="text-[16px] ml-[-8%]  font-[400] text-[#8F8F8F] mb-6">
+    <div className="max-w-md mx-auto text-center mt-4 px-4 text-white mb-6">
+      <h1 className="text-2xl text-[#FCFCFC] font-bold mb-2">Verify Email</h1>
+      <p className="text-base font-normal text-[#8F8F8F] mb-6">
         Please enter the 6-digit code sent to <br />
-        <span className="text-[#DBDBDB] ml-[20px] ">{email}</span>
+        <span className="text-[#DBDBDB]">{email}</span>
       </p>
 
       <form onSubmit={handleVerify}>
-        <div className="flex gap-[10px]   justify-center mb-6 ">
+        <div className="flex gap-2 justify-between mb-6">
           {pin.map((digit, idx) => (
             <input
               key={idx}
@@ -119,16 +144,19 @@ const Lverifybd: React.FC = () => {
               maxLength={1}
               value={digit}
               onChange={(e) => handleChange(e.target.value, idx)}
-              className="w-[100%] h-[56px] rounded-[10px] border-none bg-[#222222] text-center text-xl text-[#FCFCFC] focus:outline-none focus:ring-1 focus:ring-[#1ECB84]"
+              onKeyDown={(e) => handleKeyDown(e, idx)}
+              onPaste={idx === 0 ? handlePaste : undefined}
+              className="w-14 h-14 rounded-lg border-none bg-[#222222] text-center text-xl text-[#FCFCFC] focus:outline-none focus:ring-1 focus:ring-[#1ECB84]"
               type="password"
               disabled={isLoading}
               autoComplete="one-time-code"
+              inputMode="numeric"
             />
           ))}
         </div>
 
         {error && (
-          <div className="text-[#F5918A] text-[14px] font-[500] mb-2">
+          <div className="text-[#F5918A] text-sm font-medium mb-2">
             {error}
           </div>
         )}
@@ -137,17 +165,17 @@ const Lverifybd: React.FC = () => {
           <button
             type="submit"
             disabled={isLoading}
-            className="w-[100%] h-[56px] py-2 mt-[20px]  border-none justify-center rounded-[100px] text-[14px] font-[700] bg-[#4DF2BE] text-[#0F1012] hover:opacity-90"
+            className="w-full h-14 py-2 mt-4 border-none rounded-full text-sm font-bold bg-[#4DF2BE] text-[#0F1012] hover:opacity-90 disabled:opacity-50"
           >
             {isLoading ? "Verifying email..." : "Verify Email"}
           </button>
         )}
       </form>
 
-      <div className="text-center text-[14px] font-[400] text-[#DBDBDB] ml-[10%] mt-[20px]">
+      <div className="text-center text-sm font-normal text-[#DBDBDB] mt-6">
         Didn't receive code?{" "}
         <button
-          className="text-[#FFFFFF] w-[149px] h-[40px] text-[14px] ml-[10px] rounded-[100px] bg-[#222222] border-none font-[700] hover:underline"
+          className="text-[#FFFFFF] w-36 h-10 text-sm ml-2 rounded-full bg-[#222222] border-none font-bold hover:underline disabled:opacity-50"
           disabled={isLoading || resendLoading}
           type="button"
           onClick={handleResend}
@@ -157,18 +185,18 @@ const Lverifybd: React.FC = () => {
       </div>
 
       {showModal && (
-        <div className="fixed inset-0 flex ml-[14%] md:mt-[-8%] w-[70%] mt-[14%] items-center justify-center  bg-opacity-60 z-50 xl:mt-[40%%]">
+        <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-60 z-50">
           <div className="bg-[#1F1F1F] rounded-lg p-8 shadow-lg text-center flex flex-col items-center justify-center border-2">
-            <h2 className="text-[#1ECB84] text-[20px] font-[700] mb-2">
+            <h2 className="text-[#1ECB84] text-xl font-bold mb-2">
               Email Verified!
             </h2>
-            <p className="text-[#DBDBDB] text-[16px]">Redirecting...</p>
+            <p className="text-[#DBDBDB] text-base">Redirecting...</p>
           </div>
         </div>
       )}
 
       {isLoading && (
-        <div className="fixed inset-0 flex ml-[55%] mt-[30px] items-center justify-center bg-black bg-opacity-50 z-50">
+        <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
           <div className="loader"></div>
           <style jsx global>{`
             .loader {
