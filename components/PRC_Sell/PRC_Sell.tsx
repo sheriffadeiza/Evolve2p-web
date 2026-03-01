@@ -1226,7 +1226,7 @@ function PRC_SellContent() {
                 <div className="flex items-center justify-between p-3 sm:p-4 border-t border-[#3A3A3A]">
                   <p className="text-sm font-medium text-[#DBDBDB]">Price per 1 {cryptoType}</p>
                   <p className="text-sm font-medium text-white">
-                    1 {cryptoType} = {pricePerUnit.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 8 })} {fiatCurrency}
+                   1 {cryptoType} = {pricePerUnit ? Math.round(Number(pricePerUnit)).toLocaleString() : '0'} {fiatCurrency}
                   </p>
                 </div>
 
