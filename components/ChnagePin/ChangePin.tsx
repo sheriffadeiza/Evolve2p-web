@@ -5,6 +5,7 @@ import Nav from "../../components/NAV/Nav";
 import Settings from "../../components/Settings/Settings";
 import Footer from "../../components/Footer/Footer";
 import { useRouter } from "next/navigation";
+import { API_BASE_URL } from "@/config";
 
 const UpdatePin: React.FC = () => {
   const router = useRouter();
@@ -71,7 +72,7 @@ const UpdatePin: React.FC = () => {
     setIsLoading(true);
 
     try {
-      const res = await fetch("https://evolve2p-backend.onrender.com/api/check-pin", {
+      const res = await fetch(`${API_BASE_URL}/api/check-pin`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

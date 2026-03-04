@@ -80,7 +80,7 @@ const FConfirmPin: React.FC = () => {
           </div>
 
           {/* Main Content */}
-          <div className="flex-1 bg-[#1A1A1A] rounded-xl p-4 lg:p-8">
+          <div className="flex-1 ml-[50px] bg-[#1A1A1A] rounded-xl p-4 lg:p-8">
             {/* Back Button */}
             <div
               onClick={() => router.push("/change-pin/fnewpin")}
@@ -132,7 +132,7 @@ const FConfirmPin: React.FC = () => {
 
          <div className="w-[100%]  h-[1px] bg-[#fff] mt-[50%] opacity-20 my-8"></div>
         
-                <div className=" mb-[80px] mt-[10%] ">
+                <div className=" mb-[80px] mt-[10%] whitespace-nowrap">
                   <Footer />
                 </div>
       </div>
@@ -153,10 +153,10 @@ const FConfirmPin: React.FC = () => {
               Your new security PIN has been verified. You can now use it to access and authorize transactions.
             </p>
             <button
-              onClick={() => router.push("/profile")}
+              onClick={() => router.push("/Logins/login")}
               className="w-full max-w-xs h-12 border-none bg-[#2D2D2D] text-white font-semibold rounded-full hover:bg-[#3A3A3A] transition-colors text-sm lg:text-base"
             >
-              Back to Profile
+              Back to Login
             </button>
           </div>
         </div>

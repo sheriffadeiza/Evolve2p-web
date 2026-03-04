@@ -48,13 +48,13 @@ const ForgotPin: React.FC = () => {
         <Nav />
 
         <div className="flex flex-col lg:flex-row gap-6 mt-6">
-          {/* Settings Sidebar */}
-          <div className="lg:w-64">
+          {/* Settings Sidebar - fixed width */}
+          <aside className="lg:w-64 w-full flex-shrink-0">
             <Settings />
-          </div>
+          </aside>
 
-          {/* Main Content */}
-          <div className="flex-1 bg-[#1A1A1A] rounded-xl p-4 lg:p-8">
+          {/* Main Content - takes remaining space, with overflow handling */}
+          <main className="flex-1 min-w-0 ml-[50px] bg-[#1A1A1A] rounded-xl p-4 lg:p-8">
             {/* Back Button */}
             <div
               onClick={() => router.push("/change-pin")}
@@ -140,15 +140,14 @@ const ForgotPin: React.FC = () => {
                 )}
               </button>
             </div>
-          </div>
+          </main>
         </div>
 
         {/* Divider */}
-         <div className="w-[100%]  h-[1px] bg-[#fff] mt-[50%] opacity-20 my-8"></div>
-        
-                <div className=" mb-[80px] mt-[10%] ">
-                  <Footer />
-                </div>
+       <div className="w-[100%] h-[1px] mt-[30%] bg-[#fff] opacity-20 my-8"></div>
+              <div className="mb-[80px] mt-[150px] whitespace-nowrap">
+                <Footer />
+              </div>
       </div>
     </main>
   );

@@ -2,9 +2,9 @@
 
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { API_BASE_URL } from "@/config";
 
-const CHECK_PIN_ENDPOINT =
-  "https://evolve2p-backend.onrender.com/api/check-pin";
+const CHECK_PIN_ENDPOINT = `${API_BASE_URL}/api/check-pin`;
 
 const Lsecpinbd: React.FC = () => {
   const [pin, setPin] = useState<string[]>(["", "", "", ""]);
@@ -13,17 +13,18 @@ const Lsecpinbd: React.FC = () => {
   const [success, setSuccess] = useState<string>("");
   const [userData, setUserData] = useState<{
     accessToken: string;
-    userData: any;
+    userData?: { email?: string };
+    email?: string; // fallback if email is at top level
   } | null>(null);
 
   const router = useRouter();
 
-  // ✅ Load UserData from localStorage on client-side
   useEffect(() => {
     try {
       const stored = localStorage.getItem("UserData");
       if (stored) {
-        setUserData(JSON.parse(stored));
+        const parsed = JSON.parse(stored);
+        setUserData(parsed);
       } else {
         setError("Please login first");
         setTimeout(() => router.push("/Logins/login"), 1500);
@@ -33,6 +34,17 @@ const Lsecpinbd: React.FC = () => {
     }
   }, [router]);
 
+  // Helper to extract email (handle different possible structures)
+  const getUserEmail = (): string | null => {
+    if (!userData) return null;
+    // Try common paths
+    return (
+      userData.userData?.email ||
+      userData.email ||
+      null
+    );
+  };
+
   const handleChange = (val: string, idx: number) => {
     if (!/^\d?$/.test(val)) return;
     const newPin = [...pin];
@@ -40,7 +52,6 @@ const Lsecpinbd: React.FC = () => {
     setPin(newPin);
     setError("");
 
-    // Focus next input
     if (val && idx < 3) {
       document.getElementById(`pin-${idx + 1}`)?.focus();
     }
@@ -61,8 +72,15 @@ const Lsecpinbd: React.FC = () => {
       return;
     }
 
+    const email = getUserEmail();
+    if (!email) {
+      setError("Email not found. Please log in again.");
+      setTimeout(() => router.push("/Logins/login"), 1500);
+      return;
+    }
+
     if (!userData?.accessToken) {
-      setError("Session expired. Please login again.");
+      setError("Session expired. Please log in again.");
       setTimeout(() => router.push("/Logins/login"), 1500);
       return;
     }
@@ -75,16 +93,20 @@ const Lsecpinbd: React.FC = () => {
           "Content-Type": "application/json",
           Authorization: `Bearer ${userData.accessToken}`,
         },
-        body: JSON.stringify({
-          email: userData.userData?.email,
-          pin: tempPin,
-        }),
+        body: JSON.stringify({ email, pin: tempPin }),
       });
 
       const data = await response.json();
 
       if (!data?.success) {
-        setError(data?.message || "Invalid PIN");
+        // Handle specific backend messages
+        const msg = data?.message || "Invalid PIN";
+        if (msg.toLowerCase().includes("user does not exist") || msg.toLowerCase().includes("user not found")) {
+          setError("Account not found. Please register first.");
+          setTimeout(() => router.push("/Signups/Email"), 2000);
+        } else {
+          setError(msg);
+        }
         setPin(["", "", "", ""]);
         return;
       }
@@ -105,9 +127,8 @@ const Lsecpinbd: React.FC = () => {
       <h2 className="text-[20px] sm:text-[22px] md:text-[24px] text-[#FCFCFC] font-[700] text-center md:text-left">
         Enter security PIN
       </h2>
-      <p className="text-[14px]  sm:text-[15px] md:text-[16px] font-[400] mt-[10px] md:mt-[-10px] mb-6 text-[#8F8F8F] text-center md:text-left">
-        Your PIN helps you log in faster and approve transactions <br className="hidden md:block" />{" "}
-        securely.
+      <p className="text-[14px] sm:text-[15px] md:text-[16px] font-[400] mt-[10px] md:mt-[-10px] mb-6 text-[#8F8F8F] text-center md:text-left">
+        Your PIN helps you log in faster and approve transactions <br className="hidden md:block" /> securely.
       </p>
 
       {error && (
@@ -151,7 +172,7 @@ const Lsecpinbd: React.FC = () => {
 
       <div
         className="text-[13px] sm:text-[14px] mt-12 sm:mt-[70px] text-center md:text-center md:ml-[-23%] font-[700] text-[#FCFCFC] hover:underline cursor-pointer"
-        onClick={() => alert("Forgot PIN functionality coming soon")}
+        onClick={() => router.push("/change-pin/forgotpin")}
       >
         Forgot PIN
       </div>

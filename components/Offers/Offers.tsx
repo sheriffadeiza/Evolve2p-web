@@ -38,6 +38,7 @@ const Offers = () => {
   const [isCreatingTrade, setIsCreatingTrade] = useState(false);
   const [paymentDetails, setPaymentDetails] = useState<any>(null);
   const [isFollowing, setIsFollowing] = useState(false);
+  const [followRequired, setFollowRequired] = useState(false); // NEW
 
   const toggleSeller = () => setIsSellerOpen((prev) => !prev);
   const [payAmount, setPayAmount] = useState<string>("");
@@ -57,10 +58,9 @@ const Offers = () => {
     setIsFollowing(false);
   }, [offer?.user?.id]);
 
-  // Follow toggle handler
+  // Follow toggle handler (simplified – no more direct alert)
   const handleFollowToggle = () => {
     setIsFollowing(!isFollowing);
-    alert(isFollowing ? 'Unfollowed' : 'Followed');
   };
 
   // Helper to extract payment details from the offer
@@ -214,9 +214,12 @@ const Offers = () => {
     return `${oppositeType} ${offer.crypto}`;
   };
 
+  // UPDATED: handleTradeAction now checks follow status
   const handleTradeAction = async () => {
+    // If not following, open modal and mark that follow is required
     if (!isFollowing) {
-      alert("You must follow this user to start a trade.");
+      setFollowRequired(true);
+      setIsSellerOpen(true);
       return;
     }
     if (!isPayAmountValid()) {
@@ -252,6 +255,12 @@ const Offers = () => {
     } catch (error) {
       alert(error instanceof Error ? error.message : "Failed to create trade");
     }
+  };
+
+  // NEW: close modal and reset follow requirement
+  const closeModal = () => {
+    setIsSellerOpen(false);
+    setFollowRequired(false);
   };
 
   const getUserRoleText = () => {
@@ -337,7 +346,7 @@ const Offers = () => {
 
         const res = await fetch(`${API_BASE_URL}/api/get-offer/${offerId}`, { headers });
         if (!res.ok) throw new Error(`API request failed`);
-``
+
         const data = await res.json();
         let offerData = data.data || data.offer || data;
         if (!offerData.id) throw new Error("No offer data");
@@ -716,15 +725,28 @@ const Offers = () => {
           </div>
         </div>
 
-        {/* User Details Modal */}
+        {/* User Details Modal - UPDATED with overlay click close and smart follow button */}
         {isSellerOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
-            <div className="bg-[#0F1012] rounded-xl w-full max-w-lg lg:max-w-2xl max-h-[80vh] overflow-y-auto">
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
+            onClick={closeModal} // click outside closes
+          >
+            <div
+              className="bg-[#0F1012] rounded-xl w-full max-w-lg lg:max-w-2xl max-h-[80vh] overflow-y-auto"
+              onClick={(e) => e.stopPropagation()} // prevent closing when clicking inside
+            >
               <div className="flex items-center justify-between p-4 lg:p-6">
                 <p className="text-base lg:text-lg font-bold text-white">
                   {offer.type?.toUpperCase() === 'SELL' ? 'Seller' : 'Buyer'} details
                 </p>
-                <Image src={Times} alt="Close" width={24} height={24} className="cursor-pointer w-6 h-6 lg:w-8 lg:h-8" onClick={toggleSeller} />
+                <Image
+                  src={Times}
+                  alt="Close"
+                  width={24}
+                  height={24}
+                  className="cursor-pointer w-6 h-6 lg:w-8 lg:h-8"
+                  onClick={closeModal}
+                />
               </div>
 
               <div className="bg-[#1A1A1A] p-4 lg:p-6 max-h-[60vh] overflow-y-auto space-y-4 lg:space-y-6">
@@ -744,8 +766,22 @@ const Offers = () => {
                     </div>
                     <Image src={Mark_green} alt="mark" className="ml-2 w-3 h-3" />
                   </div>
+                  {/* SMART FOLLOW BUTTON */}
                   <button
-                    onClick={handleFollowToggle}
+                    onClick={() => {
+                      if (followRequired) {
+                        // In follow‑required mode: follow, then close modal and proceed with trade
+                        setIsFollowing(true);
+                        closeModal(); // closes and resets followRequired
+                        // Wait a tick for state to update, then trigger trade action
+                        setTimeout(() => {
+                          handleTradeAction(); // now isFollowing will be true
+                        }, 100);
+                      } else {
+                        // Normal toggle (just follow/unfollow)
+                        setIsFollowing(!isFollowing);
+                      }
+                    }}
                     className={`w-20 h-10 rounded-full border text-sm font-bold transition-colors ${
                       isFollowing
                         ? 'bg-[#4DF2BE] text-[#0F1012] border-[#4DF2BE] hover:bg-[#3DD2A5]'

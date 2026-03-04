@@ -1,28 +1,17 @@
 "use client";
 
-import React, { useState, useEffect, useMemo, useCallback } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import Nav from "../../components/NAV/Nav";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import Arrow_d from "../../public/Assets/Evolve2p_arrowd/arrow-down-01.png";
-import Globe from "../../public/Assets/Evolve2p_globe/Makretplace/elements.svg";
-import Funnel from "../../public/Assets/Evolve2p_funnel/elements.svg";
-import Vector from "../../public/Assets/Evolve2p_vector/vector.svg";
-import Repeat from "../../public/Assets/Evolve2p_Repeat/repeat.svg";
 import Mark_green from "../../public/Assets/Evolve2p_mark/elements.svg";
-import Divider from "../../public/Assets/Evolve2p_divider/Divider.svg";
-import Thumbs from "../../public/Assets/Evolve2p_thumbs/elements.svg";
 import Timer from "../../public/Assets/Evolve2p_timer/elements.svg";
-import Dminus from "../../public/Assets/Evolve2p_Dminus/Divider.svg";
-import Dyellow from "../../public/Assets/Evolve2p_Dyellow/Divider.svg";
-import Dpurple from "../../public/Assets/Evolve2p_Dpurple/Divider.svg";
-import Dpink from "../../public/Assets/Evolve2p_Dpink/Divider.svg";
-import Dgreen from "../../public/Assets/Evolve2p_Dgreen/Divider.svg";
 import BTC from "../../public/Assets/Evolve2p_BTC/Bitcoin (BTC).svg";
 import ETH from "../../public/Assets/Evolve2p_ETH/Ethereum (ETH).svg";
 import USDT from "../../public/Assets/Evolve2p_USDT/Tether (USDT).svg";
 import USDC from "../../public/Assets/Evolve2p_USDC/USD Coin (USDC).svg";
-import Times from "../../public/Assets/Evolve2p_times/Icon container.png";
+import { API_BASE_URL } from "@/config";
 import AD from "../../public/Assets/Evolve2p_Ad/P2P Marketplace/element.svg";
 import Footer from "../../components/Footer/Footer";
 import { countryCurrencyService, CurrencyOption } from "../../utils/countryCurrencyService";
@@ -62,7 +51,7 @@ interface UserData {
   token?: string;
   username?: string;
   email?: string;
-  kycVerified?: boolean;          // added
+  kycVerified?: boolean;          
   user?: {
     username?: string;
     kycVerified?: boolean;
@@ -85,14 +74,9 @@ const Market_place: React.FC = () => {
   const [selectedMethod, setSelectedMethod] = useState<string>("Payment Method");
   const [loadingMethods, setLoadingMethods] = useState<boolean>(false);
   const [errorMethods, setErrorMethods] = useState<string>("");
-  const [selected2Method, setSelected2Method] = useState<string>("Payment Method");
   const [isFunnelOpen, setIsFunnelOpen] = useState<boolean>(false);
-  const [paymentMethod, setPaymentMethod] = useState<string | number>("Bank Transfer");
-  const [payment2Method, setPayment2Method] = useState<string>("Bank Transfer");
-  const [isPayment2Open, setIsPayment2Open] = useState<boolean>(false);
   const [isCurrencyOpen, setIsCurrencyOpen] = useState<boolean>(false);
   const [selectedFiatCurrencyCode, setSelectedFiatCurrencyCode] = useState<string>("USD");
-  const [isRegionOpen, setIsRegionOpen] = useState<boolean>(false);
   const [region, setRegion] = useState<string>("All Regions");
 
   const router = useRouter();
@@ -248,7 +232,7 @@ const Market_place: React.FC = () => {
       if (!token) throw new Error("No access token found");
 
       const response = await fetch(
-        "https://evolve2p-backend.onrender.com/api/get-payment-methods",
+        `${API_BASE_URL}/api/get-payment-methods`,
         {
           method: "GET",
           headers: {
@@ -388,7 +372,7 @@ const Market_place: React.FC = () => {
       if (!token) throw new Error("No access token found");
 
       const response = await fetch(
-        "https://evolve2p-backend.onrender.com/api/get-offers",
+        `${API_BASE_URL}/api/get-offers`,
         {
           method: "GET",
           headers: {

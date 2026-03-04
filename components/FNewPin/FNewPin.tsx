@@ -7,6 +7,7 @@ import Lessthan from "../../public/Assets/Evolve2p_lessthan/Makretplace/arrow-le
 import Image from "next/image";
 import Footer from "../Footer/Footer";
 import { useRouter } from "next/navigation";
+import { API_BASE_URL } from "@/config";
 
 const FNewPin: React.FC = () => {
   const router = useRouter();
@@ -99,7 +100,7 @@ const FNewPin: React.FC = () => {
 
     try {
       const res = await fetch(
-        "https://evolve2p-backend.onrender.com/api/reset-pin",
+        `${API_BASE_URL}/api/reset-pin`,
         {
           method: "PUT",
           headers: {
@@ -145,7 +146,7 @@ const FNewPin: React.FC = () => {
           </div>
 
           {/* Main Content */}
-          <div className="flex-1 bg-[#1A1A1A] rounded-xl p-4 lg:p-8">
+          <div className="flex-1 ml-[50px] bg-[#1A1A1A] rounded-xl p-4 lg:p-8">
             {/* Back Button */}
             <div
               className="flex items-center gap-2 w-fit px-4 h-9 cursor-pointer rounded-full bg-[#2D2D2D] hover:bg-[#3A3A3A] transition-colors mb-6 lg:mb-8"
@@ -209,7 +210,7 @@ const FNewPin: React.FC = () => {
 
          <div className="w-[100%]  h-[1px] bg-[#fff] mt-[50%] opacity-20 my-8"></div>
         
-                <div className=" mb-[80px] mt-[10%] ">
+                <div className=" mb-[80px] whitespace-nowrap mt-[10%] ">
                   <Footer />
                 </div>
       </div>
