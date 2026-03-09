@@ -1013,7 +1013,7 @@ const Profile = () => {
                   )}
                 </div>
 
-                {/* Country Dropdown - Just shows countries (no codes) */}
+                {/* Country Dropdown - with flags */}
                 <div className="flex-1" ref={countryRef}>
                   <p className="text-sm font-medium text-[#C7C7C7] mb-2">
                     Country
@@ -1025,9 +1025,14 @@ const Profile = () => {
                     >
                       <div className="w-full h-12 lg:h-14 bg-gradient-to-b from-[#1F1F1F] to-[#222222] border border-[#3A3A3A] hover:border-[#4DF2BE]/50 transition-all duration-200 rounded-lg flex items-center justify-between px-4 group hover:shadow-lg hover:shadow-[#4DF2BE]/10">
                         <div className="flex items-center gap-3">
-                          <div className="w-8 h-6 bg-gradient-to-br from-[#2D2D2D] to-[#1A1A1A] rounded-md flex items-center justify-center text-xs font-semibold text-[#DBDBDB] shadow-md">
-                            {selectedCountry.code}
-                          </div>
+                          <img
+                            src={`https://flagcdn.com/w40/${selectedCountry.code.toLowerCase()}.png`}
+                            alt={selectedCountry.name}
+                            className="w-8 h-6 rounded object-cover border border-[#3A3A3A]"
+                            onError={(e) => {
+                              (e.target as HTMLImageElement).src = 'data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'40\' height=\'30\' viewBox=\'0 0 40 30\'%3E%3Crect width=\'40\' height=\'30\' fill=\'%23333\' /%3E%3C/svg%3E';
+                            }}
+                          />
                           <span className="text-sm font-medium text-white">
                             {selectedCountry.name}
                           </span>
@@ -1085,12 +1090,14 @@ const Profile = () => {
                                     }`}
                                 >
                                   <div className="flex items-center gap-3">
-                                    <div className={`w-8 h-6 rounded-md flex items-center justify-center text-xs font-semibold shadow-sm ${selectedCountry.code === country.code
-                                      ? "bg-gradient-to-br from-[#4DF2BE] to-[#3DE0AD] text-[#0F1012]"
-                                      : "bg-gradient-to-br from-[#3A3A3A] to-[#2D2D2D] text-[#DBDBDB]"
-                                      }`}>
-                                      {country.code}
-                                    </div>
+                                    <img
+                                      src={`https://flagcdn.com/w40/${country.code.toLowerCase()}.png`}
+                                      alt={country.name}
+                                      className="w-8 h-6 rounded object-cover border border-[#3A3A3A]"
+                                      onError={(e) => {
+                                        (e.target as HTMLImageElement).src = 'data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'40\' height=\'30\' viewBox=\'0 0 40 30\'%3E%3Crect width=\'40\' height=\'30\' fill=\'%23333\' /%3E%3C/svg%3E';
+                                      }}
+                                    />
                                     <div className={`text-sm font-medium ${selectedCountry.code === country.code ? "text-white" : "text-[#DBDBDB]"}`}>
                                       {country.name}
                                     </div>

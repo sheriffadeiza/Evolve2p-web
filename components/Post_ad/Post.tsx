@@ -111,26 +111,35 @@ const Post: React.FC = () => {
         }
     }, []);
 
-    // Load currencies
+    // Load currencies – use reliable flag CDN with fallback
     useEffect(() => {
         const loadCurrencies = async () => {
             setLoadingCurrencies(true);
             try {
                 await countryCurrencyService.initialize();
-                const currencies = countryCurrencyService.getAllCurrencies();
+                let currencies = countryCurrencyService.getAllCurrencies();
+
+                // Replace each flag with a URL from flagicons.lipis.dev
+                currencies = currencies.map(currency => {
+                    const countryCode = currency.code.slice(0, 2).toLowerCase();
+                    return {
+                        ...currency,
+                        flag: `https://flagicons.lipis.dev/flags/4x3/${countryCode}.svg`
+                    };
+                });
+
                 setCurrencyOptions(currencies);
 
                 const savedCurrency = localStorage.getItem('selectedCurrency');
                 const currencyCode = savedCurrency || 'USD';
-
-                const defaultCurrency = countryCurrencyService.getCurrencyByCode(currencyCode) ||
+                const defaultCurrency = currencies.find(c => c.code === currencyCode) ||
                                    currencies.find(c => c.code === 'USD') ||
                                    currencies[0];
 
                 setSelectedCurrency(defaultCurrency);
 
             } catch (error) {
-                // ignore
+                console.error('Currency load failed', error);
             } finally {
                 setLoadingCurrencies(false);
             }
@@ -147,9 +156,17 @@ const Post: React.FC = () => {
         localStorage.setItem('selectedCurrencyData', JSON.stringify(currencyOption));
     };
 
-    const filteredCurrencies = currencySearch
-        ? countryCurrencyService.searchCurrencies(currencySearch)
-        : currencyOptions;
+    // Filter currencies based on search – using transformed currencyOptions
+    const filteredCurrencies = React.useMemo(() => {
+        if (!currencySearch.trim()) return currencyOptions;
+        const searchLower = currencySearch.toLowerCase();
+        return currencyOptions.filter(
+            (c) =>
+                c.code.toLowerCase().includes(searchLower) ||
+                c.name.toLowerCase().includes(searchLower) ||
+                c.country.toLowerCase().includes(searchLower)
+        );
+    }, [currencySearch, currencyOptions]);
 
     // Fetch user's saved payment methods
     const fetchUserPaymentMethods = async () => {
@@ -190,7 +207,7 @@ const Post: React.FC = () => {
 
     // When user selects a method from dropdown, show preview
     const handleMethodSelect = (method: any) => {
-        if (!isVerified) return; // should not be reachable if UI is disabled, but guard anyway
+        if (!isVerified) return;
         setTempSelectedMethod(method);
         setShowPaymentDetails(true);
         setIsPaymentOpen(false);
@@ -462,6 +479,9 @@ const Post: React.FC = () => {
                                                 width={20}
                                                 height={14}
                                                 className="rounded-sm object-cover"
+                                                onError={(e) => {
+                                                    (e.target as HTMLImageElement).src = 'data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'40\' height=\'30\' viewBox=\'0 0 40 30\'%3E%3Crect width=\'40\' height=\'30\' fill=\'%23333\' /%3E%3C/svg%3E';
+                                                }}
                                             />
                                         )}
 
@@ -514,7 +534,7 @@ const Post: React.FC = () => {
                                                                     height={24}
                                                                     className="rounded-full object-cover"
                                                                     onError={(e) => {
-                                                                        (e.target as HTMLImageElement).src = 'https://flagcdn.com/w320/us.png';
+                                                                        (e.target as HTMLImageElement).src = 'data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'40\' height=\'30\' viewBox=\'0 0 40 30\'%3E%3Crect width=\'40\' height=\'30\' fill=\'%23333\' /%3E%3C/svg%3E';
                                                                     }}
                                                                 />
                                                                 <div>
@@ -894,7 +914,7 @@ const Post: React.FC = () => {
                                         <div className="w-24 whitespace-nowrap">
                                             <button
                                                 className="bg-[#4DF2BE] text-xs text-[#0F1012] font-bold rounded-full py-3 px-4 border border-[#4DF2BE] w-full hover:bg-[#3DD2A5] transition-colors"
-                                                onClick={() => String(offer.type || "").toLowerCase() === "buy" ? router.push("/myoffers") : router.push("/market_place/")}
+                                                onClick={() => String(offer.type || "").toLowerCase() === "buy" ? router.push("/myoffers") : router.push("/myoffers")}
                                             >
                                                 {String(offer.type || "").toLowerCase() === "buy" ? "Buy" : "Sell"} {offer.crypto}
                                             </button>

@@ -58,7 +58,7 @@ interface TradeData {
       name: string;
       type: string;
       details?: {
-        [key: string]: any; // flexible, because keys may have spaces
+        [key: string]: any;
       };
     };
     paymentTerms: string;
@@ -72,6 +72,7 @@ interface TradeData {
   chat: {
     id: string;
   };
+  expiresAt?: string;
   updatedAt?: string;
   createdAt?: string;
   markedPaidAt?: string;
@@ -149,7 +150,7 @@ interface CancelTradeResponse {
   };
 }
 
-// ==================== Inner component that uses useSearchParams – wrapped in Suspense ====================
+// ==================== Inner component ====================
 function TradeDetails() {
   const router = useRouter();
   const params = useParams();
@@ -161,7 +162,7 @@ function TradeDetails() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showChat, setShowChat] = useState(false);
-  const [timeLeft, setTimeLeft] = useState(30 * 60);
+  const [timeLeft, setTimeLeft] = useState(0);
   const [messageInput, setMessageInput] = useState("");
   const [showPaidModal, setShowPaidModal] = useState(false);
   const [showCancelModal, setShowCancelModal] = useState(false);
@@ -210,7 +211,7 @@ function TradeDetails() {
     return null;
   }, []);
 
-  // Get trade ID from URL (query param or dynamic route)
+  // Get trade ID from URL
   const getTradeIdFromUrl = useCallback(() => {
     const queryId = searchParams.get('tradeId');
     if (queryId) return queryId;
@@ -252,7 +253,7 @@ function TradeDetails() {
     return tradeData.buyer.id === currentUser.id;
   }, [tradeData, currentUser]);
 
-  // ========== Payment details extraction with correct price per unit ==========
+  // ========== Payment details extraction ==========
   const {
     fiatAmount,
     quantity,
@@ -265,13 +266,11 @@ function TradeDetails() {
     fiatCurrency,
     cryptoType
   } = useMemo(() => {
-    // Calculate price per unit if not directly provided
     let pricePerUnit = tradeData?.offer?.price;
     if (!pricePerUnit && tradeData?.amountFiat && tradeData?.amountCrypto) {
       pricePerUnit = tradeData.amountFiat / tradeData.amountCrypto;
     }
 
-    // Get payment details from tradeData or offerDetails (fallback)
     const rawDetails = tradeData?.offer?.paymentMethod?.details || offerDetails?.paymentMethod?.details;
 
     return {
@@ -299,24 +298,63 @@ function TradeDetails() {
            tradeData?.escrow?.status === "RELEASED" || isCryptoReleased;
   }, [tradeData?.status, tradeData?.escrow?.status, isCryptoReleased]);
 
+  // Check if trade is cancelled
+  const isTradeCancelled = useMemo(() => {
+    return tradeData?.status === "CANCELLED";
+  }, [tradeData?.status]);
+
   // Check if trade is in review (paid but not released)
   const isTradeInReview = useMemo(() => {
     return (tradeData?.status === "IN_REVIEW" || tradeData?.status === "PAID") &&
-           !isTradeCompleted && !isTradeDisputed;
-  }, [tradeData?.status, isTradeCompleted, isTradeDisputed]);
+           !isTradeCompleted && !isTradeDisputed && !isTradeCancelled;
+  }, [tradeData?.status, isTradeCompleted, isTradeDisputed, isTradeCancelled]);
 
   // Check if timer has expired
   const isExpired = useMemo(() => timeLeft <= 0, [timeLeft]);
 
-  // Initialize Socket.IO connection
+  // Determine if trade is active (pending)
+  const isTradePending = useMemo(() => {
+    return tradeData?.status === "PENDING" && !isExpired && !isTradeCancelled;
+  }, [tradeData?.status, isExpired, isTradeCancelled]);
+
+  // Helper to calculate remaining time based on expiresAt
+  const calculateTimeLeft = useCallback(() => {
+    if (!tradeData?.expiresAt) return 0;
+    const expiry = new Date(tradeData.expiresAt).getTime();
+    const now = new Date().getTime();
+    return Math.max(0, Math.floor((expiry - now) / 1000));
+  }, [tradeData?.expiresAt]);
+
+  // Update timeLeft when tradeData changes
+  useEffect(() => {
+    if (tradeData?.expiresAt) {
+      setTimeLeft(calculateTimeLeft());
+    }
+  }, [tradeData, calculateTimeLeft]);
+
+  // Timer countdown – only runs if trade is pending and not expired
+  useEffect(() => {
+    if (!isTradePending || timeLeft <= 0) return;
+
+    const timerId = setInterval(() => {
+      setTimeLeft(prev => {
+        if (prev <= 1) {
+          clearInterval(timerId);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(timerId);
+  }, [isTradePending, timeLeft]);
+
+  // Initialize Socket.IO connection (unchanged)
   useEffect(() => {
     if (!tradeData?.chat?.id || socket) return;
 
     const authToken = getAuthToken();
-    if (!authToken) {
-      console.log("No auth token for socket connection");
-      return;
-    }
+    if (!authToken) return;
 
     const socketUrl = process.env.NEXT_PUBLIC_SOCKET_URL || `${API_BASE_URL}`;
     const newSocket = io(socketUrl, {
@@ -328,13 +366,11 @@ function TradeDetails() {
     });
 
     const handleConnect = () => {
-      console.log("✅ Socket.IO connected");
       setIsSocketConnected(true);
       newSocket.emit('join-chat', tradeData.chat.id);
     };
 
     const handleDisconnect = () => {
-      console.log("🔌 Socket.IO disconnected");
       setIsSocketConnected(false);
     };
 
@@ -343,8 +379,6 @@ function TradeDetails() {
     };
 
     const handleNewMessage = (message: ChatMessage) => {
-      console.log("📨 New message received via Socket.IO:", message);
-
       const messageExists = chatMessages.some(msg => msg.id === message.id);
       if (messageExists) return;
 
@@ -365,18 +399,13 @@ function TradeDetails() {
 
       setChatMessages(prev => {
         const newMessages = [...prev, formattedMessage];
-        if (newMessages.length > 1) {
-          return newMessages.sort((a, b) =>
-            new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
-          );
-        }
-        return newMessages;
+        return newMessages.sort((a, b) =>
+          new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+        );
       });
     };
 
     const handleTradeUpdated = (updatedTrade: TradeData) => {
-      console.log("🔄 Trade updated via Socket.IO:", updatedTrade);
-
       if ((updatedTrade.status === "COMPLETED" || updatedTrade.status === "RELEASED" ||
            updatedTrade.escrow?.status === "RELEASED") && !isCryptoReleased) {
         setIsCryptoReleased(true);
@@ -395,7 +424,6 @@ function TradeDetails() {
 
     const handleCryptoReleased = (data: { tradeId: string; releasedAt: string }) => {
       if (data.tradeId === tradeData.id) {
-        console.log("🎉 Crypto released notification received:", data);
         setIsCryptoReleased(true);
         setReleaseTime(new Date(data.releasedAt));
         setTradeData(prev => prev ? {
@@ -431,7 +459,6 @@ function TradeDetails() {
         newSocket.off('crypto-released', handleCryptoReleased);
         newSocket.emit('leave-chat', tradeData.chat.id);
         newSocket.disconnect();
-        console.log("🧹 Socket.IO disconnected on cleanup");
       }
     };
   }, [tradeData?.chat?.id, tradeData?.buyer?.id, getAuthToken, currentUser?.id]);
@@ -446,17 +473,6 @@ function TradeDetails() {
       }, 100);
     }
   }, [chatMessages]);
-
-  // Active timer countdown
-  useEffect(() => {
-    if (timeLeft <= 0) return;
-
-    const timerId = setInterval(() => {
-      setTimeLeft(prev => prev - 1);
-    }, 1000);
-
-    return () => clearInterval(timerId);
-  }, [timeLeft]);
 
   // Check for dispute after 10 minutes of being paid
   useEffect(() => {
@@ -601,11 +617,7 @@ function TradeDetails() {
 
   // Get service message based on trade status
   const serviceMessage = useMemo(() => {
-    const isPaid = isTradeInReview || paidConfirmed;
-    const isDisputed = isTradeDisputed;
-    const isCompleted = isTradeCompleted;
-
-    if (isCompleted) {
+    if (isTradeCompleted) {
       return {
         title: "Trade Completed",
         message: `Your ${quantity.toFixed(5)} ${cryptoType} has been released from escrow and is now in your wallet! The trade is now complete.`,
@@ -621,7 +633,7 @@ function TradeDetails() {
           "You can leave a review for the seller"
         ]
       };
-    } else if (isDisputed) {
+    } else if (isTradeDisputed) {
       return {
         title: "Trade in Dispute",
         message: `A dispute has been opened for this trade. The ${fiatAmount.toFixed(2)} ${fiatCurrency} payment for ${quantity.toFixed(5)} ${cryptoType} is under review by Evolve2p support team.`,
@@ -637,7 +649,7 @@ function TradeDetails() {
           "Please respond promptly to any support inquiries"
         ]
       };
-    } else if (isPaid) {
+    } else if (isTradeInReview) {
       return {
         title: "Crypto in Escrow",
         message: `You've marked the trade as paid. ${fiatAmount.toFixed(2)} ${fiatCurrency} payment for ${quantity.toFixed(5)} ${cryptoType} is being reviewed. Your ${cryptoType} is securely held in escrow and will be released once payment is confirmed.`,
@@ -650,6 +662,34 @@ function TradeDetails() {
           "Waiting for seller to confirm receipt of payment",
           "Once confirmed, crypto will be automatically released to your wallet",
           "If seller doesn't respond within 10 minutes, you can open a dispute"
+        ]
+      };
+    } else if (isTradeCancelled) {
+      return {
+        title: "Trade Cancelled",
+        message: `This trade has been cancelled. Funds have been returned to the seller.`,
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        bgColor: "bg-[#342827]",
+        borderColor: "border-[#FE857D]",
+        textColor: "text-[#FE857D]",
+        listItems: [
+          "Trade cancelled successfully",
+          "No further action required",
+          "You can create a new trade from the marketplace"
+        ]
+      };
+    } else if (isExpired) {
+      return {
+        title: "Trade Expired",
+        message: `This trade has expired because you did not complete the payment within the time limit.`,
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        bgColor: "bg-[#342827]",
+        borderColor: "border-[#FE857D]",
+        textColor: "text-[#FE857D]",
+        listItems: [
+          "Payment time limit reached",
+          "Trade automatically expired",
+          "You can create a new trade"
         ]
       };
     } else {
@@ -668,15 +708,11 @@ function TradeDetails() {
         ]
       };
     }
-  }, [isTradeInReview, isTradeDisputed, isTradeCompleted, fiatAmount, fiatCurrency, quantity, cryptoType, paymentMethod, releaseTime, paidConfirmed]);
+  }, [isTradeCompleted, isTradeDisputed, isTradeInReview, isTradeCancelled, isExpired, fiatAmount, fiatCurrency, quantity, cryptoType, paymentMethod, releaseTime]);
 
   // Get the second service message
   const secondServiceMessage = useMemo(() => {
-    const isPaid = isTradeInReview || paidConfirmed;
-    const isDisputed = isTradeDisputed;
-    const isCompleted = isTradeCompleted;
-
-    if (isCompleted) {
+    if (isTradeCompleted) {
       return {
         title: "Transaction Complete",
         message: "The trade has been successfully completed. You can view the transaction in your wallet history.",
@@ -685,7 +721,7 @@ function TradeDetails() {
         borderColor: "border-[#1ECB84]",
         textColor: "text-[#1ECB84]"
       };
-    } else if (isDisputed) {
+    } else if (isTradeDisputed) {
       return {
         title: "Dispute Status",
         message: "The dispute has been submitted to Evolve2p support. A support agent will contact you shortly for additional information if needed.",
@@ -694,7 +730,7 @@ function TradeDetails() {
         borderColor: "border-[#FE857D]",
         textColor: "text-[#FE857D]"
       };
-    } else if (isPaid) {
+    } else if (isTradeInReview) {
       return {
         title: "Escrow Status",
         message: `Your ${cryptoType} is held in escrow by Evolve2p. It will be released once the seller confirms your payment.`,
@@ -703,9 +739,27 @@ function TradeDetails() {
         borderColor: "border-[#1ECB84]",
         textColor: "text-[#1ECB84]"
       };
+    } else if (isTradeCancelled) {
+      return {
+        title: "Cancellation Notice",
+        message: "This trade has been cancelled. No further action is needed.",
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        bgColor: "bg-[#342827]",
+        borderColor: "border-[#FE857D]",
+        textColor: "text-[#FE857D]"
+      };
+    } else if (isExpired) {
+      return {
+        title: "Expiration Notice",
+        message: "The payment time limit has been reached. This trade is now expired.",
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        bgColor: "bg-[#342827]",
+        borderColor: "border-[#FE857D]",
+        textColor: "text-[#FE857D]"
+      };
     }
     return null;
-  }, [isTradeInReview, isTradeDisputed, isTradeCompleted, cryptoType, releaseTime, paidConfirmed]);
+  }, [isTradeCompleted, isTradeDisputed, isTradeInReview, isTradeCancelled, isExpired, cryptoType, releaseTime]);
 
   // Handle file upload selection
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -897,7 +951,7 @@ function TradeDetails() {
     fetchTradeData();
   }, [tradeId, getAuthToken]);
 
-  // Fetch offer details
+  // Fetch offer details (suppress 404 logs)
   const fetchOfferDetails = async (offerId: string, authToken: string | null) => {
     try {
       const headers: HeadersInit = {
@@ -919,11 +973,12 @@ function TradeDetails() {
       if (response.ok) {
         const data = await response.json();
         setOfferDetails(data.data || data.offer || data);
-      } else {
+      } else if (response.status !== 404) {
+        // Only log non‑404 errors to avoid noise
         console.error('Offer fetch failed with status:', response.status);
       }
     } catch (err) {
-      console.error("❌ Error fetching offer details:", err);
+      console.error('❌ Failed to fetch offer details:', err);
     }
   };
 
@@ -960,12 +1015,9 @@ function TradeDetails() {
 
       setChatMessages(prev => {
         const newMessages = [...prev, optimisticMessage];
-        if (newMessages.length > 1) {
-          return newMessages.sort((a, b) =>
-            new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
-          );
-        }
-        return newMessages;
+        return newMessages.sort((a, b) =>
+          new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+        );
       });
 
       const savedInput = messageInput;
@@ -1096,7 +1148,7 @@ function TradeDetails() {
     }
   };
 
-  // Cancel trade with updated API response handling
+  // Cancel trade
   const handleCancelTrade = async () => {
     try {
       if (isTradeInReview || isTradeCompleted) {
@@ -1270,10 +1322,9 @@ function TradeDetails() {
   };
 
   // Calculate derived values
-  const status = tradeData?.status || "PENDING";
   const orderId = tradeData?.id ? `E2P-${tradeData.id.slice(0, 8).toUpperCase()}` : "";
 
-  // Format payment terms from offer, or use default
+  // Format payment terms
   const formatPaymentTerms = useCallback((terms: string): string[] => {
     if (terms) {
       return terms
@@ -1282,7 +1333,6 @@ function TradeDetails() {
         .filter(term => term.length > 0)
         .map(term => term.startsWith('•') ? term : `• ${term}`);
     } else {
-      // Default terms when none provided
       return [
         "• Only first-party payments",
         "• Bank-to-bank transfers only",
@@ -1293,11 +1343,11 @@ function TradeDetails() {
 
   const paymentTerms = offerDetails?.paymentTerms || tradeData?.offer?.paymentTerms || "";
 
-  // Check if cancel button should be shown (not when expired)
-  const shouldShowCancelButton = !isTradeInReview && !isTradeCompleted && tradeData?.status !== 'CANCELLED' && !isTradeDisputed && !isExpired;
+  // Check if cancel button should be shown (only for pending, not expired)
+  const shouldShowCancelButton = isTradePending && !isTradeCancelled && !isExpired;
 
-  // Check if paid button should be shown (not when expired)
-  const shouldShowPaidButton = !isTradeInReview && !isTradeCompleted && !isTradeDisputed && tradeData?.status === 'PENDING' && !isExpired;
+  // Check if paid button should be shown (only for pending, not expired)
+  const shouldShowPaidButton = isTradePending && !isTradeCancelled && !isExpired;
 
   // Get dispute reason for display
   const getDisplayDisputeReason = useCallback(() => {
@@ -1365,8 +1415,8 @@ function TradeDetails() {
           {/* Progress steps */}
           <div className="flex items-center justify-between max-w-2xl">
             <div className="flex flex-col items-center">
-              <div className={`w-full border-b-2 ${!isTradeInReview && !isTradeCompleted ? 'border-[#4DF2BE]' : 'border-[#4A4A4A]'} pb-2 px-4`}>
-                <p className={`text-base font-medium ${!isTradeInReview && !isTradeCompleted ? 'text-[#4DF2BE]' : 'text-[#5C5C5C]'} text-center`}>
+              <div className={`w-full border-b-2 ${!isTradeInReview && !isTradeCompleted && !isTradeCancelled && !isExpired ? 'border-[#4DF2BE]' : 'border-[#4A4A4A]'} pb-2 px-4`}>
+                <p className={`text-base font-medium ${!isTradeInReview && !isTradeCompleted && !isTradeCancelled && !isExpired ? 'text-[#4DF2BE]' : 'text-[#5C5C5C]'} text-center`}>
                   Pay
                 </p>
               </div>
@@ -1395,6 +1445,7 @@ function TradeDetails() {
                   {isTradeCompleted ? 'Trade Completed' :
                    isTradeDisputed ? 'Trade in Dispute' :
                    isTradeInReview ? 'Payment in Review' :
+                   isTradeCancelled ? 'Trade Cancelled' :
                    isExpired ? 'Trade Expired' : 'Order Created'}
                 </p>
                 <p className="text-sm font-medium text-[#C7C7C7] mt-1">
@@ -1414,6 +1465,10 @@ function TradeDetails() {
                   <p className="text-sm font-normal text-[#DBDBDB] mt-2">
                     Your payment is being reviewed. The {cryptoType} is securely held in escrow and will be released to you once the seller confirms receipt of payment.
                   </p>
+                ) : isTradeCancelled ? (
+                  <p className="text-sm font-normal text-[#DBDBDB] mt-2">
+                    This trade has been cancelled. Funds have been returned to the seller.
+                  </p>
                 ) : isExpired ? (
                   <p className="text-sm font-normal text-[#DBDBDB] mt-2">
                     This trade has expired because you did not complete the payment within the time limit.
@@ -1424,7 +1479,7 @@ function TradeDetails() {
                   </p>
                 )}
               </div>
-              {!isTradeCompleted && !isExpired && (
+              {!isTradeCompleted && !isExpired && !isTradeCancelled && !isTradeDisputed && (
                 <div className="flex items-center gap-2 px-3 py-1 bg-[#3A3A3A] rounded-2xl w-[100px]">
                   <Image src={Timer} alt="time" className="w-4 h-4" />
                   <p className={`text-sm font-medium ${timeLeft < 300 ? 'text-red-400' : 'text-[#DBDBDB]'}`}>
@@ -1432,9 +1487,9 @@ function TradeDetails() {
                   </p>
                 </div>
               )}
-              {isExpired && (
+              {(isExpired || isTradeCancelled) && (
                 <div className="flex items-center gap-2 px-3 py-1 bg-[#342827] rounded-2xl w-[100px] border border-red-500">
-                  <p className="text-sm font-medium text-red-400">Expired</p>
+                  <p className="text-sm font-medium text-red-400">{isExpired ? 'Expired' : 'Cancelled'}</p>
                 </div>
               )}
             </div>
@@ -1446,6 +1501,8 @@ function TradeDetails() {
                  isTradeDisputed ? "Trade is under dispute. You can communicate with the seller and support team in the chat." :
                  isTradeInReview
                   ? `Your ${cryptoType} is held in escrow by Evolve2p. It will be released once the seller confirms your payment.`
+                  : isTradeCancelled
+                  ? "This trade has been cancelled. You cannot proceed further."
                   : isExpired
                   ? "This trade has expired. You cannot proceed further."
                   : "Open chat to get payment details and pay the seller. Once done, mark as paid to continue."
@@ -1529,43 +1586,56 @@ function TradeDetails() {
                   </p>
                 </div>
 
-                {/* Payment Details (Bank Details) - using bracket notation for keys with spaces */}
-                {paymentDetails && !isTradeCompleted && (
+                {/* Payment Details (Bank Details) */}
+                {paymentDetails && !isTradeCompleted && !isTradeCancelled && !isExpired && (
                   <div className="border-t border-[#3A3A3A] p-3 sm:p-4 space-y-2">
                     <p className="text-xs font-semibold text-[#8F8F8F] uppercase">Seller's Payment Details</p>
-                    {paymentDetails["Bank Name"] && (
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm text-[#DBDBDB]">Bank Name</span>
-                        <div className="flex items-center gap-2">
-                          <span className="text-sm text-white">{paymentDetails["Bank Name"]}</span>
-                          <button onClick={() => copyToClipboard(paymentDetails["Bank Name"] ?? "")} className="text-[#4DF2BE] hover:text-white">
-                            <Image src={CopyIcon} alt="copy" width={16} height={16} />
-                          </button>
-                        </div>
-                      </div>
-                    )}
-                    {paymentDetails["Account Name"] && (
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm text-[#DBDBDB]">Account Name</span>
-                        <div className="flex items-center gap-2">
-                          <span className="text-sm text-white">{paymentDetails["Account Name"]}</span>
-                          <button onClick={() => copyToClipboard(paymentDetails["Account Name"] ?? "")} className="text-[#4DF2BE] hover:text-white">
-                            <Image src={CopyIcon} alt="copy" width={16} height={16} />
-                          </button>
-                        </div>
-                      </div>
-                    )}
-                    {paymentDetails["Account Number"] && (
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm text-[#DBDBDB]">Account Number</span>
-                        <div className="flex items-center gap-2">
-                          <span className="text-sm text-white">{paymentDetails["Account Number"]}</span>
-                          <button onClick={() => copyToClipboard(paymentDetails["Account Number"] ?? "")} className="text-[#4DF2BE] hover:text-white">
-                            <Image src={CopyIcon} alt="copy" width={16} height={16} />
-                          </button>
-                        </div>
-                      </div>
-                    )}
+                    
+                    {/* Try both spaced and snake_case keys */}
+                    {(() => {
+                      // Define possible key mappings
+                      const bankName = paymentDetails["Bank Name"] || paymentDetails["bank_name"] || paymentDetails["bankName"];
+                      const accountName = paymentDetails["Account Name"] || paymentDetails["account_name"] || paymentDetails["accountName"];
+                      const accountNumber = paymentDetails["Account Number"] || paymentDetails["account_number"] || paymentDetails["accountNumber"];
+                      
+                      return (
+                        <>
+                          {bankName && (
+                            <div className="flex items-center justify-between">
+                              <span className="text-sm text-[#DBDBDB]">Bank Name</span>
+                              <div className="flex items-center gap-2">
+                                <span className="text-sm text-white">{bankName}</span>
+                                <button onClick={() => copyToClipboard(bankName)} className="text-[#4DF2BE] hover:text-white">
+                                  <Image src={CopyIcon} alt="copy" width={16} height={16} />
+                                </button>
+                              </div>
+                            </div>
+                          )}
+                          {accountName && (
+                            <div className="flex items-center justify-between">
+                              <span className="text-sm text-[#DBDBDB]">Account Name</span>
+                              <div className="flex items-center gap-2">
+                                <span className="text-sm text-white">{accountName}</span>
+                                <button onClick={() => copyToClipboard(accountName)} className="text-[#4DF2BE] hover:text-white">
+                                  <Image src={CopyIcon} alt="copy" width={16} height={16} />
+                                </button>
+                              </div>
+                            </div>
+                          )}
+                          {accountNumber && (
+                            <div className="flex items-center justify-between">
+                              <span className="text-sm text-[#DBDBDB]">Account Number</span>
+                              <div className="flex items-center gap-2">
+                                <span className="text-sm text-white">{accountNumber}</span>
+                                <button onClick={() => copyToClipboard(accountNumber)} className="text-[#4DF2BE] hover:text-white">
+                                  <Image src={CopyIcon} alt="copy" width={16} height={16} />
+                                </button>
+                              </div>
+                            </div>
+                          )}
+                        </>
+                      );
+                    })()}
                   </div>
                 )}
 
@@ -1577,7 +1647,7 @@ function TradeDetails() {
                     isTradeDisputed ? 'bg-[#342827]' :
                     isTradeInReview ? 'bg-[#1B362B]' :
                     isExpired ? 'bg-[#342827]' :
-                    tradeData?.status === 'CANCELLED' ? 'bg-[#342827]' : 'bg-[#352E21]'
+                    isTradeCancelled ? 'bg-[#342827]' : 'bg-[#352E21]'
                   }`}>
                     {isTradeCompleted ? (
                       <>
@@ -1609,7 +1679,7 @@ function TradeDetails() {
                           EXPIRED
                         </p>
                       </>
-                    ) : tradeData?.status === 'CANCELLED' ? (
+                    ) : isTradeCancelled ? (
                       <>
                         <Image src={Yellow_i} alt="cancelled" className="w-3 h-3" />
                         <p className="text-xs font-medium text-[#FE857D]">
@@ -1651,7 +1721,7 @@ function TradeDetails() {
               </div>
 
               {/* Action Buttons */}
-              {tradeData?.status === 'CANCELLED' ? (
+              {isTradeCancelled ? (
                 <div className="mt-6">
                   <div className="w-full max-w-2xl h-12 bg-[#342827] border border-[#FE857D] text-[#FE857D] font-bold rounded-full flex items-center justify-center gap-2">
                     <Image src={Yellow_i} alt="cancelled" className="w-5 h-5" />
@@ -1729,6 +1799,22 @@ function TradeDetails() {
                     Waiting for seller to confirm payment and release {cryptoType} from escrow
                     {checkingRelease && ' (Checking for release...)'}
                   </p>
+                </div>
+              ) : isExpired ? (
+                <div className="mt-6">
+                  <div className="w-full max-w-2xl h-12 bg-[#342827] border border-[#FE857D] text-[#FE857D] font-bold rounded-full flex items-center justify-center gap-2">
+                    <Image src={Yellow_i} alt="expired" className="w-5 h-5" />
+                    <span>Trade Expired</span>
+                  </div>
+                  <p className="text-center text-sm text-[#8F8F8F] mt-2">
+                    This trade has expired. You cannot proceed further.
+                  </p>
+                  <button
+                    onClick={() => router.push('/market_place')}
+                    className="w-full max-w-2xl h-12 bg-[#3A3A3A] text-white font-bold rounded-full hover:bg-[#4A4A4A] transition-colors mt-4"
+                  >
+                    Return to Marketplace
+                  </button>
                 </div>
               ) : null}
 
@@ -1817,7 +1903,7 @@ function TradeDetails() {
         {showChat && (
           <div className="xl:w-96">
             <div className="bg-[#1A1A1A] rounded-xl overflow-hidden h-full flex flex-col max-h-[600px]">
-              {/* Chat header - Shows seller (counterparty) with role */}
+              {/* Chat header */}
               <div className="flex items-center justify-between p-4 sm:p-6 border-b border-[#3A3A3A]">
                 <div className="flex items-center gap-3">
                   <div className="relative">
@@ -1839,7 +1925,7 @@ function TradeDetails() {
                     </p>
                   </div>
                 </div>
-                {!isTradeCompleted && !isExpired && (
+                {!isTradeCompleted && !isExpired && !isTradeCancelled && !isTradeDisputed && (
                   <div className="flex items-center gap-2 px-3 py-1 bg-[#3A3A3A] rounded-2xl">
                     <Image src={Timer} alt="time" className="w-4 h-4" />
                     <p className={`text-sm font-medium ${timeLeft < 300 ? 'text-red-400' : 'text-[#DBDBDB]'}`}>
@@ -1855,17 +1941,23 @@ function TradeDetails() {
                   <div className={`flex items-center gap-2 px-3 py-1 rounded-2xl ${
                     isTradeCompleted ? 'bg-[#1B362B]' :
                     isTradeDisputed ? 'bg-[#342827]' :
-                    isTradeInReview ? 'bg-[#1B362B]' : 'bg-[#1B362B]'
+                    isTradeInReview ? 'bg-[#1B362B]' : 
+                    isTradeCancelled ? 'bg-[#342827]' :
+                    isExpired ? 'bg-[#342827]' : 'bg-[#1B362B]'
                   }`}>
                     <Image src={Gtime} alt="gtime" className="w-4 h-4" />
                     <p className={`text-sm font-medium ${
                       isTradeCompleted ? 'text-[#1ECB84]' :
                       isTradeDisputed ? 'text-[#FE857D]' :
-                      isTradeInReview ? 'text-[#1ECB84]' : 'text-[#1ECB84]'
+                      isTradeInReview ? 'text-[#1ECB84]' :
+                      isTradeCancelled ? 'text-[#FE857D]' :
+                      isExpired ? 'text-[#FE857D]' : 'text-[#1ECB84]'
                     }`}>
                       {isTradeCompleted ? 'Completed' :
                        isTradeDisputed ? 'In Dispute' :
-                       isTradeInReview ? 'In Escrow' : 'Active'}
+                       isTradeInReview ? 'In Escrow' :
+                       isTradeCancelled ? 'Cancelled' :
+                       isExpired ? 'Expired' : 'Active'}
                     </p>
                   </div>
                   {isTradeCompleted ? (
@@ -1885,11 +1977,15 @@ function TradeDetails() {
                       <Image src={Check} alt="check" className="w-5 h-5" />
                       <span>In Review</span>
                     </div>
+                  ) : isTradeCancelled || isExpired ? (
+                    <div className="px-6 py-3 bg-[#342827] border border-[#FE857D] text-[#FE857D] font-medium rounded-full flex items-center gap-2">
+                      <Image src={Yellow_i} alt="status" className="w-5 h-5" />
+                      <span>{isTradeCancelled ? 'Cancelled' : 'Expired'}</span>
+                    </div>
                   ) : (
                     <button
                       onClick={() => setShowPaidModal(true)}
                       className="px-6 py-3 bg-[#4DF2BE] text-[#0F1012] font-medium rounded-full hover:bg-[#3DD2A5] transition-colors"
-                      disabled={isExpired}
                     >
                       Paid
                     </button>
@@ -1911,18 +2007,18 @@ function TradeDetails() {
                   <div className={`rounded-2xl p-5 border shadow-lg ${
                     isTradeCompleted
                       ? 'bg-gradient-to-r from-[#1B362B] to-[#143026] border-[#1ECB84]'
-                      : isTradeDisputed
+                      : isTradeDisputed || isTradeCancelled || isExpired
                       ? 'bg-gradient-to-r from-[#342827] to-[#2A1F1F] border-[#FE857D]'
                       : 'bg-gradient-to-r from-[#1B362B] to-[#143026] border-[#1ECB84]'
                   }`}>
                     <div className="flex items-start gap-3 mb-3">
                       <div className={`w-10 h-10 ${
                         isTradeCompleted ? 'bg-[#0F1012]/30' :
-                        isTradeDisputed ? 'bg-[#0F1012]/30' : 'bg-[#0F1012]/30'
+                        isTradeDisputed || isTradeCancelled || isExpired ? 'bg-[#0F1012]/30' : 'bg-[#0F1012]/30'
                       } rounded-full flex items-center justify-center flex-shrink-0`}>
                         <svg className={`w-5 h-5 ${
                           isTradeCompleted ? 'text-[#1ECB84]' :
-                          isTradeDisputed ? 'text-[#FE857D]' : 'text-[#1ECB84]'
+                          isTradeDisputed || isTradeCancelled || isExpired ? 'text-[#FE857D]' : 'text-[#1ECB84]'
                         }`} fill="currentColor" viewBox="0 0 20 20">
                           <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd"></path>
                         </svg>
@@ -1933,31 +2029,17 @@ function TradeDetails() {
                           {serviceMessage.message}
                         </p>
 
-                        {/* Warning box inside service message */}
-                        {!isTradeCompleted && !isTradeDisputed && (
-                          <div className="mt-4 p-4 bg-[#352E21]/80 rounded-xl border border-[#FFC051]/30">
-                            <div className="flex items-start gap-2">
-                              <svg className="w-4 h-4 text-[#FFC051] mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                                <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd"></path>
-                              </svg>
-                              <p className="text-sm font-medium text-[#FFC051]">
-                                Third-party payments are not accepted for this trade. The selected bank accounts must belong to the buyer and seller respectively.
-                              </p>
-                            </div>
-                          </div>
-                        )}
-
                         {/* Steps list */}
                         <ul className="mt-4 space-y-3">
                           {serviceMessage.listItems.map((item, index) => (
                             <li key={index} className="flex items-start gap-3">
                               <div className={`w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5 ${
                                 isTradeCompleted ? 'bg-[#1ECB84]/20' :
-                                isTradeDisputed ? 'bg-[#FE857D]/20' : 'bg-[#1ECB84]/20'
+                                isTradeDisputed || isTradeCancelled || isExpired ? 'bg-[#FE857D]/20' : 'bg-[#1ECB84]/20'
                               }`}>
                                 <span className={`text-xs font-bold ${
                                   isTradeCompleted ? 'text-[#1ECB84]' :
-                                  isTradeDisputed ? 'text-[#FE857D]' : 'text-[#1ECB84]'
+                                  isTradeDisputed || isTradeCancelled || isExpired ? 'text-[#FE857D]' : 'text-[#1ECB84]'
                                 }`}>
                                   {index + 1}
                                 </span>
@@ -1977,7 +2059,10 @@ function TradeDetails() {
                     <div className="flex items-center justify-between mb-2">
                       <span className="text-xs font-semibold text-[#4DF2BE] uppercase tracking-wide">
                         {isTradeCompleted ? 'Evolve2p Transaction Service' :
-                         isTradeDisputed ? 'Evolve2p Dispute Service' : 'Evolve2p Escrow Service'}
+                         isTradeDisputed ? 'Evolve2p Dispute Service' :
+                         isTradeInReview ? 'Evolve2p Escrow Service' :
+                         isTradeCancelled ? 'Evolve2p Cancellation Service' :
+                         isExpired ? 'Evolve2p Expiration Service' : 'Evolve2p Service'}
                       </span>
                       <span className="text-xs text-[#8F8F8F]">
                         {secondServiceMessage.timestamp}
@@ -1986,18 +2071,18 @@ function TradeDetails() {
                     <div className={`rounded-2xl p-5 border shadow-lg ${
                       isTradeCompleted
                         ? 'bg-gradient-to-r from-[#1B362B] to-[#143026] border-[#1ECB84]'
-                        : isTradeDisputed
+                        : isTradeDisputed || isTradeCancelled || isExpired
                         ? 'bg-gradient-to-r from-[#342827] to-[#2A1F1F] border-[#FE857D]'
                         : 'bg-gradient-to-r from-[#1B362B] to-[#143026] border-[#1ECB84]'
                     }`}>
                       <div className="flex items-start gap-3">
                         <div className={`w-10 h-10 ${
                           isTradeCompleted ? 'bg-[#0F1012]/30' :
-                          isTradeDisputed ? 'bg-[#0F1012]/30' : 'bg-[#0F1012]/30'
+                          isTradeDisputed || isTradeCancelled || isExpired ? 'bg-[#0F1012]/30' : 'bg-[#0F1012]/30'
                         } rounded-full flex items-center justify-center flex-shrink-0`}>
                           <svg className={`w-5 h-5 ${
                             isTradeCompleted ? 'text-[#1ECB84]' :
-                            isTradeDisputed ? 'text-[#FE857D]' : 'text-[#1ECB84]'
+                            isTradeDisputed || isTradeCancelled || isExpired ? 'text-[#FE857D]' : 'text-[#1ECB84]'
                           }`} fill="currentColor" viewBox="0 0 20 20">
                             <path fillRule="evenodd" d="M2.166 4.999A11.954 11.954 0 0010 1.944 11.954 11.954 0 0017.834 5c.11.65.166 1.32.166 2.001 0 5.225-3.34 9.67-8 11.317C5.34 16.67 2 12.225 2 7c0-.682.057-1.35.166-2.001zm11.541 3.708a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd"></path>
                           </svg>
@@ -2140,10 +2225,13 @@ function TradeDetails() {
 
               {/* Message input with file upload */}
               <div className="p-4 border-t border-[#3A3A3A]">
-                {isTradeCompleted || isExpired ? (
+                {isTradeCompleted || isExpired || isTradeCancelled || isTradeDisputed ? (
                   <div className="text-center p-4 bg-[#1B362B] rounded-lg border border-[#1ECB84]">
                     <p className="text-sm text-[#1ECB84] font-medium">
-                      {isTradeCompleted ? "Trade completed." : "Trade expired."} Chat is now read-only.
+                      {isTradeCompleted ? "Trade completed." :
+                       isExpired ? "Trade expired." :
+                       isTradeCancelled ? "Trade cancelled." :
+                       "Trade disputed."} Chat is now read-only.
                     </p>
                   </div>
                 ) : (
@@ -2154,35 +2242,32 @@ function TradeDetails() {
                       className="hidden"
                       accept="image/*,.pdf,.doc,.docx"
                       onChange={handleFileUpload}
-                      disabled={sendingMessage || uploadingFile || isTradeDisputed}
+                      disabled={sendingMessage || uploadingFile}
                     />
 
                     <div className="flex-1 relative">
                       <input
                         value={messageInput}
                         onChange={(e) => setMessageInput(e.target.value)}
-                        disabled={sendingMessage || uploadingFile || isTradeDisputed}
+                        disabled={sendingMessage || uploadingFile}
                         className="w-full h-12 bg-[#222222] border-none px-4 pr-12 text-sm font-normal text-[#C7C7C7] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4DF2BE] disabled:opacity-50"
-                        placeholder={isTradeDisputed ? "Chat disabled during dispute" :
-                                  uploadingFile ? "Uploading file..." : "Type a message"}
+                        placeholder={uploadingFile ? "Uploading file..." : "Type a message"}
                       />
-                      {!isTradeDisputed && (
-                        <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
-                          <label htmlFor="file-upload" className={`cursor-pointer ${uploadingFile ? 'opacity-50' : ''}`}>
-                            <Image
-                              src={Mink}
-                              alt="upload"
-                              className="w-5 h-5 hover:opacity-80 transition-opacity"
-                              title={uploadingFile ? "Uploading..." : "Upload file"}
-                            />
-                          </label>
-                        </div>
-                      )}
+                      <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                        <label htmlFor="file-upload" className={`cursor-pointer ${uploadingFile ? 'opacity-50' : ''}`}>
+                          <Image
+                            src={Mink}
+                            alt="upload"
+                            className="w-5 h-5 hover:opacity-80 transition-opacity"
+                            title={uploadingFile ? "Uploading..." : "Upload file"}
+                          />
+                        </label>
+                      </div>
                     </div>
 
                     <button
                       type="submit"
-                      disabled={sendingMessage || uploadingFile || (!messageInput.trim() && !selectedFile) || isTradeDisputed}
+                      disabled={sendingMessage || uploadingFile || (!messageInput.trim() && !selectedFile)}
                       className="w-12 h-12 bg-[#4DF2BE] flex items-center justify-center rounded-lg hover:bg-[#3DD2A5] transition-colors disabled:opacity-50 disabled:cursor-not-allowed min-w-12"
                     >
                       {sendingMessage || uploadingFile ? (
@@ -2572,14 +2657,13 @@ function TradeDetails() {
   );
 }
 
-// ==================== MAIN PAGE COMPONENT with Suspense boundary ====================
+// ==================== MAIN PAGE COMPONENT ====================
 export default function PRC_Buy() {
   return (
     <main className="min-h-screen bg-[#0F1012] text-white">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-6">
         <Nav />
 
-        {/* Suspense boundary for the part that uses useSearchParams */}
         <Suspense fallback={
           <div className="flex justify-center items-center h-64">
             <div className="text-center">
@@ -2591,7 +2675,6 @@ export default function PRC_Buy() {
           <TradeDetails />
         </Suspense>
 
-        {/* Footer - static */}
         <div className="w-full h-[1px] bg-[#fff] mt-[50%] opacity-20 my-8"></div>
         <div className="mb-[80px] whitespace-nowrap mt-[20%]">
           <Footer />

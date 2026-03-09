@@ -131,6 +131,10 @@ const Wallet: React.FC<QRCodeBoxProps> = () => {
   const [transactionHash, setTransactionHash] = useState<string>("");
   const [recentTransaction, setRecentTransaction] = useState<Transaction | null>(null);
 
+  // Settings for deposit limit
+  const [settingsData, setSettingsData] = useState<any>(null);
+  const [settingsLoading, setSettingsLoading] = useState(false);
+
   // ========== VERIFICATION CHECK ==========
   const requireVerification = useCallback((callback: () => void) => {
     if (!clientUser?.kycVerified) {
@@ -285,6 +289,15 @@ const Wallet: React.FC<QRCodeBoxProps> = () => {
     }
   }, [selectedAsset, networkFee, cryptoPrices]);
 
+  const formatCurrency = useCallback((amount: number) => {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    }).format(amount);
+  }, []);
+
   // ========== Load user ==========
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -301,6 +314,36 @@ const Wallet: React.FC<QRCodeBoxProps> = () => {
       setError("Invalid user data");
     }
   }, [router]);
+
+  // Fetch settings after user loads
+  const fetchSettings = useCallback(async () => {
+    if (!clientUser) return;
+    setSettingsLoading(true);
+    try {
+      const stored = localStorage.getItem("UserData");
+      if (!stored) return;
+      const parsed = JSON.parse(stored);
+      const token = parsed?.token || parsed?.userData?.token || "";
+      const response = await fetch(`${API_BASE_URL}/api/admin/settings`, {
+        headers: {
+          "Authorization": `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setSettingsData(data);
+      }
+    } catch (error) {
+      // silent fail
+    } finally {
+      setSettingsLoading(false);
+    }
+  }, [clientUser]);
+
+  useEffect(() => {
+    if (clientUser) fetchSettings();
+  }, [clientUser, fetchSettings]);
 
   // Update current wallet when coin changes
   useEffect(() => {
@@ -520,6 +563,8 @@ const Wallet: React.FC<QRCodeBoxProps> = () => {
     );
   }, [activeTab, handleSwapClick]);
 
+  const depositLimit = settingsData?.depositLimit ?? 0; // fallback to 0 if not set
+
   if (error) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-[#0F1012] text-white">
@@ -654,24 +699,41 @@ const Wallet: React.FC<QRCodeBoxProps> = () => {
             </div>
           </div>
 
-          {/* Daily Limit Card */}
+          {/* Daily Limit Card (Deposit Limit) */}
           <div className="bg-[#222222] rounded-[12px] p-4 sm:p-6">
             <div className="mb-4">
               <p className="text-[14px] sm:text-[16px] font-[400] text-[#DBDBDB]">Daily Limit</p>
               <p className="text-[16px] sm:text-[18px] font-[500] text-[#FCFCFC]">
-                {showAllBalances ? "$14,850,000" : "****"}
+                {showAllBalances ? formatCurrency(depositLimit) : "****"}
               </p>
             </div>
             <div className="w-full bg-[#4A4A4A] rounded-[4px] h-2 mb-2">
-              <div className="bg-[#4DF2BE] rounded-[4px] h-2 w-3/4"></div>
+              <div 
+                className="bg-[#4DF2BE] rounded-[4px] h-2 transition-all duration-500"
+                style={{ width: `0%` }}
+              ></div>
             </div>
             <div className="flex flex-col xs:flex-row xs:justify-between text-[12px] sm:text-[14px] font-[400] text-[#DBDBDB] mb-4 gap-1">
-              <p>{showAllBalances ? "$14,850,000 remaining" : "**** remaining"}</p>
-              <p>Refreshes in 10 minutes</p>
+              <p>{showAllBalances ? `${formatCurrency(depositLimit)} remaining` : "**** remaining"}</p>
+              <p>Usage tracking not available</p>
             </div>
-            <button className="bg-[#2D2D2D] text-[#FCFCFC] px-4 py-2 sm:px-6 sm:py-2 rounded-full font-[700] text-[12px] sm:text-[14px] w-full xs:w-auto ml-auto block">
-              Increase Limit
-            </button>
+
+            {/* Crypto Icons Row */}
+            <div className="flex items-center justify-between mt-[70px] pt-4 border-t border-[#3A3A3A]">
+              {[
+                { icon: BTC, name: "BTC" },
+                { icon: ETH, name: "ETH" },
+                { icon: USDC, name: "USDC" },
+                { icon: USDT, name: "USDT" },
+              ].map((crypto) => (
+                <div key={crypto.name} className="flex flex-col items-center">
+                  <div className="w-8 h-8 rounded-full bg-[#2D2D2D] flex items-center justify-center mb-1">
+                    <Image src={crypto.icon} alt={crypto.name} width={16} height={16} className="w-4 h-4" />
+                  </div>
+                  <span className="text-[10px] text-[#8F8F8F]">{crypto.name}</span>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
 
@@ -695,7 +757,7 @@ const Wallet: React.FC<QRCodeBoxProps> = () => {
                 <div key={asset.symbol} className="bg-[#222222] rounded-[12px] p-3 md:p-4">
                   <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 md:gap-4">
                     <div className="flex items-center space-x-3 md:space-x-4 flex-1">
-                      <Image src={asset.icon} alt={asset.name} width={32} height={32} className="w-8 h-8 md:w-10 md:h-10" />
+                      <Image src={asset.icon} alt={asset.name} width={24} height={24} className="w-6 h-6 md:w-8 md:h-8" />
                       <div className="min-w-0 flex-1">
                         <p className="text-[14px] md:text-[16px] font-[700] text-[#FCFCFC] truncate">{asset.name}</p>
                         <p className="text-[12px] md:text-[14px] font-[400] text-[#8F8F8F] truncate">{getCurrentPrice(asset.symbol)}</p>

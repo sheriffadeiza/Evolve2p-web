@@ -164,7 +164,6 @@ const Market_place: React.FC = () => {
   const toggleFunnel = () => setIsFunnelOpen((prev) => !prev);
 
   const handleApply = () => {
-    // console removed
     setIsAmountOpen(false);
   };
 
@@ -173,14 +172,6 @@ const Market_place: React.FC = () => {
     { name: "ETH", icon: ETH },
     { name: "USDT", icon: USDT },
     { name: "USDC", icon: USDC },
-  ];
-
-  const methods2 = [
-    "Bank Transfer",
-    "PayPal",
-    "Credit Card",
-    "Cryptocurrency Wallet",
-    "Mobile Payment App",
   ];
 
   const regions = [
@@ -276,23 +267,35 @@ const Market_place: React.FC = () => {
     }
   };
 
-  // Load currencies
+  // Load currencies – use reliable flag CDN with fallback
   useEffect(() => {
     const loadCurrencies = async () => {
       setLoadingCurrencies(true);
       try {
         await countryCurrencyService.initialize();
-        const currencies = countryCurrencyService.getAllCurrencies();
+        let currencies = countryCurrencyService.getAllCurrencies();
+
+        // Replace each flag with a URL from flagicons.lipis.dev
+        currencies = currencies.map(currency => {
+          // Extract country code from the currency code (first two letters)
+          const countryCode = currency.code.slice(0, 2).toLowerCase();
+          return {
+            ...currency,
+            flag: `https://flagicons.lipis.dev/flags/4x3/${countryCode}.svg`
+          };
+        });
+
         setCurrencyOptions(currencies);
+
         const savedCurrency = localStorage.getItem('selectedCurrency');
         const currencyCode = savedCurrency || 'USD';
-        const defaultCurrency = countryCurrencyService.getCurrencyByCode(currencyCode) ||
+        const defaultCurrency = currencies.find(c => c.code === currencyCode) ||
                                currencies.find(c => c.code === 'USD') ||
                                currencies[0];
         setSelectedFiatCurrencyData(defaultCurrency);
         setSelectedFiatCurrencyCode(defaultCurrency.code);
       } catch (error) {
-        // ignore
+        console.error('Currency load failed', error);
       } finally {
         setLoadingCurrencies(false);
       }
@@ -317,9 +320,17 @@ const Market_place: React.FC = () => {
     if (allOffers.length > 0) applyFilters(allOffers);
   };
 
-  const filteredCurrencies = currencySearch
-    ? countryCurrencyService.searchCurrencies(currencySearch)
-    : currencyOptions;
+  // Filter currencies based on search input – using the transformed currencyOptions
+  const filteredCurrencies = useMemo(() => {
+    if (!currencySearch.trim()) return currencyOptions;
+    const searchLower = currencySearch.toLowerCase();
+    return currencyOptions.filter(
+      (c) =>
+        c.code.toLowerCase().includes(searchLower) ||
+        c.name.toLowerCase().includes(searchLower) ||
+        c.country.toLowerCase().includes(searchLower)
+    );
+  }, [currencySearch, currencyOptions]);
 
   const handleReset = () => {
     setMinAmount("");
@@ -577,7 +588,10 @@ const Market_place: React.FC = () => {
                         src={selectedFiatCurrencyData.flag}
                         alt={`${selectedFiatCurrencyData.country} flag`}
                         className="w-6 h-4 rounded object-cover"
-                        onError={(e) => (e.target as HTMLImageElement).src = 'https://flagcdn.com/w320/us.png'}
+                        onError={(e) => {
+                          // Fallback to a gray square if flag fails to load
+                          (e.target as HTMLImageElement).src = 'data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'40\' height=\'30\' viewBox=\'0 0 40 30\'%3E%3Crect width=\'40\' height=\'30\' fill=\'%23333\' /%3E%3C/svg%3E';
+                        }}
                       />
                     )}
                     <div>
@@ -610,7 +624,14 @@ const Market_place: React.FC = () => {
                             }`}
                             onClick={() => handleFiatCurrencySelect(currencyOption)}
                           >
-                            <img src={currencyOption.flag} alt={`${currencyOption.country} flag`} className="w-6 h-4 rounded mr-3 object-cover" />
+                            <img
+                              src={currencyOption.flag}
+                              alt={`${currencyOption.country} flag`}
+                              className="w-6 h-4 rounded mr-3 object-cover"
+                              onError={(e) => {
+                                (e.target as HTMLImageElement).src = 'data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'40\' height=\'30\' viewBox=\'0 0 40 30\'%3E%3Crect width=\'40\' height=\'30\' fill=\'%23333\' /%3E%3C/svg%3E';
+                              }}
+                            />
                             <div className="flex-1 min-w-0">
                               <p className="text-white text-sm font-medium truncate">{currencyOption.code}</p>
                               <p className="text-[#8F8F8F] text-xs truncate">{currencyOption.name}</p>

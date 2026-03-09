@@ -77,6 +77,7 @@ interface TradeData {
   chat: {
     id: string;
   };
+  expiresAt?: string;
   updatedAt?: string;
   createdAt?: string;
   markedPaidAt?: string;
@@ -142,7 +143,7 @@ interface ReleaseTradeResponse {
   trade: TradeData;
 }
 
-// ==================== Inner component that uses useSearchParams – must be wrapped in Suspense ====================
+// ==================== Inner component ====================
 function PRC_SellContent() {
   const router = useRouter();
   const params = useParams();
@@ -154,7 +155,7 @@ function PRC_SellContent() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showChat, setShowChat] = useState(false);
-  const [timeLeft, setTimeLeft] = useState(30 * 60);
+  const [timeLeft, setTimeLeft] = useState(0);
   const [messageInput, setMessageInput] = useState("");
   const [showReleaseModal, setShowReleaseModal] = useState(false);
   const [isReleasing, setIsReleasing] = useState(false);
@@ -186,14 +187,14 @@ function PRC_SellContent() {
         try {
           return JSON.parse(userData);
         } catch (e) {
-          // ignore parsing error
+          // ignore
         }
       }
     }
     return null;
   }, []);
 
-  // Get trade ID from URL (query param or dynamic route)
+  // Get trade ID from URL
   const getTradeIdFromUrl = useCallback(() => {
     const queryId = searchParams.get('tradeId');
     if (queryId) return queryId;
@@ -217,17 +218,15 @@ function PRC_SellContent() {
     return '📎';
   }, []);
 
-  // Copy to clipboard function
+  // Copy to clipboard
   const copyToClipboard = useCallback((text: string) => {
-    navigator.clipboard.writeText(text).catch(() => {
-      // fallback – do nothing
-    });
+    navigator.clipboard.writeText(text).catch(() => {});
   }, []);
 
   // Get current user data
   const currentUser = useMemo(() => getCurrentUser(), [getCurrentUser]);
 
-  // Determine if current user is seller (they should be, this is PRC_Sell)
+  // Determine if current user is seller (they should be)
   const isCurrentUserSeller = useMemo(() => {
     if (!tradeData || !currentUser) return true;
     return tradeData.seller.id === currentUser.id;
@@ -246,7 +245,6 @@ function PRC_SellContent() {
     fiatCurrency,
     cryptoType
   } = useMemo(() => {
-    // Calculate price per unit if not directly provided
     let pricePerUnit = tradeData?.offer?.price;
     if (!pricePerUnit && tradeData?.amountFiat && tradeData?.amountCrypto) {
       pricePerUnit = tradeData.amountFiat / tradeData.amountCrypto;
@@ -276,16 +274,58 @@ function PRC_SellContent() {
            tradeData?.escrow?.status === "RELEASED";
   }, [tradeData?.status, tradeData?.escrow?.status]);
 
+  // Check if trade is cancelled
+  const isTradeCancelled = useMemo(() => {
+    return tradeData?.status === "CANCELLED";
+  }, [tradeData?.status]);
+
   // Check if trade is awaiting release (paid but not released)
   const isTradeAwaitingRelease = useMemo(() => {
     return (tradeData?.status === "IN_REVIEW" || tradeData?.status === "PAID") &&
-           !isTradeCompleted && !isTradeDisputed;
-  }, [tradeData?.status, isTradeCompleted, isTradeDisputed]);
+           !isTradeCompleted && !isTradeDisputed && !isTradeCancelled;
+  }, [tradeData?.status, isTradeCompleted, isTradeDisputed, isTradeCancelled]);
+
+  // Check if trade is pending (waiting for buyer to pay)
+  const isTradePending = useMemo(() => {
+    return tradeData?.status === "PENDING" && !isTradeCancelled && !isTradeDisputed && !isTradeCompleted;
+  }, [tradeData?.status, isTradeCancelled, isTradeDisputed, isTradeCompleted]);
 
   // Check if timer has expired
   const isExpired = useMemo(() => timeLeft <= 0, [timeLeft]);
 
-  // Initialize Socket.IO connection
+  // Helper to calculate remaining time based on expiresAt
+  const calculateTimeLeft = useCallback(() => {
+    if (!tradeData?.expiresAt) return 0;
+    const expiry = new Date(tradeData.expiresAt).getTime();
+    const now = new Date().getTime();
+    return Math.max(0, Math.floor((expiry - now) / 1000));
+  }, [tradeData?.expiresAt]);
+
+  // Update timeLeft when tradeData changes
+  useEffect(() => {
+    if (tradeData?.expiresAt) {
+      setTimeLeft(calculateTimeLeft());
+    }
+  }, [tradeData, calculateTimeLeft]);
+
+  // Timer countdown – only runs if trade is pending (not cancelled/completed/disputed/expired)
+  useEffect(() => {
+    if (!isTradePending || timeLeft <= 0) return;
+
+    const timerId = setInterval(() => {
+      setTimeLeft(prev => {
+        if (prev <= 1) {
+          clearInterval(timerId);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(timerId);
+  }, [isTradePending, timeLeft]);
+
+  // Initialize Socket.IO connection (unchanged)
   useEffect(() => {
     if (!tradeData?.chat?.id || socket) return;
 
@@ -331,20 +371,13 @@ function PRC_SellContent() {
 
       setChatMessages(prev => {
         const newMessages = [...prev, formattedMessage];
-        if (newMessages.length > 1) {
-          return newMessages.sort((a, b) =>
-            new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
-          );
-        }
-        return newMessages;
+        return newMessages.sort((a, b) =>
+          new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+        );
       });
     };
 
     const handleTradeUpdated = (updatedTrade: TradeData) => {
-      if ((updatedTrade.status === "COMPLETED" || updatedTrade.status === "RELEASED" ||
-           updatedTrade.escrow?.status === "RELEASED") && !isTradeCompleted) {
-        // Trade completed
-      }
       setTradeData(updatedTrade);
     };
 
@@ -365,7 +398,7 @@ function PRC_SellContent() {
         newSocket.disconnect();
       }
     };
-  }, [tradeData?.chat?.id, tradeData?.buyer?.id, getAuthToken, currentUser?.id, chatMessages, currentUserUsername, buyerUsername, sellerUsername, isTradeCompleted]);
+  }, [tradeData?.chat?.id, tradeData?.buyer?.id, getAuthToken, currentUser?.id, chatMessages, currentUserUsername, buyerUsername, sellerUsername]);
 
   // Scroll to bottom when new messages arrive
   useEffect(() => {
@@ -377,17 +410,6 @@ function PRC_SellContent() {
       }, 100);
     }
   }, [chatMessages]);
-
-  // Active timer countdown
-  useEffect(() => {
-    if (timeLeft <= 0) return;
-
-    const timerId = setInterval(() => {
-      setTimeLeft(prev => prev - 1);
-    }, 1000);
-
-    return () => clearInterval(timerId);
-  }, [timeLeft]);
 
   // Check for dispute after 10 minutes of being in awaiting release
   useEffect(() => {
@@ -474,7 +496,7 @@ function PRC_SellContent() {
     }
   }, [showChat, tradeData?.chat?.id, fetchChatMessages, chatMessages.length]);
 
-  // Fetch trade data and log offer details
+  // Fetch trade data
   useEffect(() => {
     const fetchTradeData = async () => {
       if (!tradeId) {
@@ -518,13 +540,7 @@ function PRC_SellContent() {
 
         if (apiResponse.success && apiResponse.data) {
           const trade = apiResponse.data;
-
           setTradeData(trade);
-
-          // Log the trade data and offer details for debugging
-          console.log('📦 Trade data received:', trade);
-          console.log('🔄 Offer object:', trade.offer);
-          console.log('💳 Payment method details:', trade.offer?.paymentMethod?.details);
 
           if (trade.offer?.id) {
             await fetchOfferDetails(trade.offer.id, authToken);
@@ -544,35 +560,36 @@ function PRC_SellContent() {
     fetchTradeData();
   }, [tradeId, getAuthToken]);
 
-  // Fetch offer details and log them
+  // Fetch offer details
   const fetchOfferDetails = async (offerId: string, authToken: string | null) => {
-    try {
-      const headers: HeadersInit = {
-        'Content-Type': 'application/json',
-      };
+  try {
+    const headers: HeadersInit = {
+      'Content-Type': 'application/json',
+    };
 
-      if (authToken) {
-        headers['Authorization'] = `Bearer ${authToken}`;
-      }
-
-      const response = await fetch(
-        `${API_BASE_URL}/api/get-offer/${offerId}`,
-        {
-          method: 'GET',
-          headers: headers,
-        }
-      );
-
-      if (response.ok) {
-        const data = await response.json();
-        console.log('📦 Raw offer details response:', data);
-        setOfferDetails(data.data || data.offer || data);
-      }
-    } catch (err) {
-      console.error('❌ Failed to fetch offer details:', err);
+    if (authToken) {
+      headers['Authorization'] = `Bearer ${authToken}`;
     }
-  };
 
+    const response = await fetch(
+      `${API_BASE_URL}/api/get-offer/${offerId}`,
+      {
+        method: 'GET',
+        headers: headers,
+      }
+    );
+
+    if (response.ok) {
+      const data = await response.json();
+      setOfferDetails(data.data || data.offer || data);
+    } else if (response.status !== 404) {
+      // Only log non‑404 errors to avoid noise
+      console.error('Offer fetch failed with status:', response.status);
+    }
+  } catch (err) {
+    console.error('❌ Failed to fetch offer details:', err);
+  }
+};
   // Send message
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -606,12 +623,9 @@ function PRC_SellContent() {
 
       setChatMessages(prev => {
         const newMessages = [...prev, optimisticMessage];
-        if (newMessages.length > 1) {
-          return newMessages.sort((a, b) =>
-            new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
-          );
-        }
-        return newMessages;
+        return newMessages.sort((a, b) =>
+          new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+        );
       });
 
       const savedInput = messageInput;
@@ -832,7 +846,7 @@ function PRC_SellContent() {
     }
   };
 
-  // Format payment terms from offer, or use default
+  // Format payment terms
   const formatPaymentTerms = useCallback((terms: string): string[] => {
     if (terms) {
       return terms
@@ -913,6 +927,36 @@ function PRC_SellContent() {
           "Transaction is now closed"
         ]
       };
+    } else if (isTradeCancelled) {
+      return {
+        title: "Trade Cancelled",
+        message: `This trade has been cancelled. The crypto has been returned to you.`,
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        bgColor: "bg-[#342827]",
+        borderColor: "border-[#FE857D]",
+        textColor: "text-[#FE857D]",
+        listItems: [
+          "Trade cancelled by buyer",
+          "Crypto returned to your wallet",
+          "No further action required",
+          "You can create a new trade from the marketplace"
+        ]
+      };
+    } else if (isExpired) {
+      return {
+        title: "Trade Expired",
+        message: `This trade has expired because the buyer did not complete the payment within the time limit.`,
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        bgColor: "bg-[#342827]",
+        borderColor: "border-[#FE857D]",
+        textColor: "text-[#FE857D]",
+        listItems: [
+          "Payment time limit reached",
+          "Trade automatically expired",
+          "Crypto returned to your wallet",
+          "You can create a new trade"
+        ]
+      };
     } else if (isTradeAwaitingRelease) {
       return {
         title: "Buyer Has Marked as Paid - Awaiting Your Release",
@@ -945,7 +989,7 @@ function PRC_SellContent() {
         ]
       };
     }
-  }, [isTradeDisputed, isTradeCompleted, isTradeAwaitingRelease, fiatAmount, fiatCurrency, quantity, cryptoType, paymentMethod]);
+  }, [isTradeDisputed, isTradeCompleted, isTradeCancelled, isExpired, isTradeAwaitingRelease, fiatAmount, fiatCurrency, quantity, cryptoType, paymentMethod]);
 
   // Get the second service message
   const secondServiceMessage = useMemo(() => {
@@ -967,6 +1011,24 @@ function PRC_SellContent() {
         borderColor: "border-[#1ECB84]",
         textColor: "text-[#1ECB84]"
       };
+    } else if (isTradeCancelled) {
+      return {
+        title: "Cancellation Notice",
+        message: "This trade has been cancelled by the buyer. Your crypto has been returned.",
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        bgColor: "bg-[#342827]",
+        borderColor: "border-[#FE857D]",
+        textColor: "text-[#FE857D]"
+      };
+    } else if (isExpired) {
+      return {
+        title: "Expiration Notice",
+        message: "The payment time limit has been reached. This trade is now expired.",
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        bgColor: "bg-[#342827]",
+        borderColor: "border-[#FE857D]",
+        textColor: "text-[#FE857D]"
+      };
     } else if (isTradeAwaitingRelease) {
       return {
         title: "Crypto in Escrow",
@@ -978,7 +1040,7 @@ function PRC_SellContent() {
       };
     }
     return null;
-  }, [isTradeDisputed, isTradeCompleted, isTradeAwaitingRelease, cryptoType]);
+  }, [isTradeDisputed, isTradeCompleted, isTradeCancelled, isExpired, isTradeAwaitingRelease, cryptoType]);
 
   // Handle file upload
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -1020,8 +1082,8 @@ function PRC_SellContent() {
     e.target.value = '';
   };
 
-  // Check if release button should be shown
-  const shouldShowReleaseButton = isCurrentUserSeller && isTradeAwaitingRelease && !isTradeCompleted && !isTradeDisputed && tradeData?.status !== 'CANCELLED';
+  // Check if release button should be shown (only when awaiting release and not cancelled/expired)
+  const shouldShowReleaseButton = isCurrentUserSeller && isTradeAwaitingRelease && !isTradeCompleted && !isTradeDisputed && !isTradeCancelled && !isExpired;
 
   if (loading) {
     return (
@@ -1059,28 +1121,28 @@ function PRC_SellContent() {
 
   return (
     <>
-      {/* Back navigation – note: this is now inside the inner component because it uses router.back() */}
+      {/* Back button */}
       <div className="flex items-center gap-3 text-base font-medium text-white mb-6 lg:mb-8 cursor-pointer" onClick={() => router.back()}>
         <Image src={Less_than} alt="lessthan" className="w-4 h-4" />
         <p>Sell {cryptoType}</p>
       </div>
 
-      {/* Main content – everything that was previously in the return */}
+      {/* Main content */}
       <div className={`flex gap-6 lg:gap-8 ${showChat ? 'flex-col xl:flex-row' : 'flex-col'}`}>
         {/* Left section - Trade Details */}
         <div className={`${showChat ? 'xl:flex-1' : 'w-full'} max-w-4xl`}>
           {/* Progress steps */}
           <div className="flex items-center justify-between max-w-2xl">
             <div className="flex flex-col items-center">
-              <div className={`w-full border-b-2 ${!isTradeAwaitingRelease && !isTradeCompleted ? 'border-[#4DF2BE]' : 'border-[#4A4A4A]'} pb-2 px-4`}>
-                <p className={`text-base font-medium ${!isTradeAwaitingRelease && !isTradeCompleted ? 'text-[#4DF2BE]' : 'text-[#5C5C5C]'} text-center`}>
+              <div className={`w-full border-b-2 ${isTradePending ? 'border-[#4DF2BE]' : 'border-[#4A4A4A]'} pb-2 px-4`}>
+                <p className={`text-base font-medium ${isTradePending ? 'text-[#4DF2BE]' : 'text-[#5C5C5C]'} text-center`}>
                   Awaiting Payment
                 </p>
               </div>
             </div>
             <div className="flex flex-col items-center">
-              <div className={`w-full border-b-2 ${isTradeAwaitingRelease && !isTradeCompleted ? 'border-[#4DF2BE]' : 'border-[#4A4A4A]'} pb-2 px-4`}>
-                <p className={`text-base font-medium ${isTradeAwaitingRelease && !isTradeCompleted ? 'text-[#4DF2BE]' : 'text-[#5C5C5C]'} text-center`}>
+              <div className={`w-full border-b-2 ${isTradeAwaitingRelease ? 'border-[#4DF2BE]' : 'border-[#4A4A4A]'} pb-2 px-4`}>
+                <p className={`text-base font-medium ${isTradeAwaitingRelease ? 'text-[#4DF2BE]' : 'text-[#5C5C5C]'} text-center`}>
                   Release
                 </p>
               </div>
@@ -1101,6 +1163,7 @@ function PRC_SellContent() {
                 <p className="text-2xl font-normal text-white">
                   {isTradeDisputed ? 'Trade in Dispute' :
                    isTradeCompleted ? 'Trade Completed' :
+                   isTradeCancelled ? 'Trade Cancelled' :
                    isTradeAwaitingRelease ? 'Awaiting Your Release' :
                    isExpired ? 'Trade Expired' : 'Order Created'}
                 </p>
@@ -1116,6 +1179,10 @@ function PRC_SellContent() {
                   <p className="text-sm font-normal text-[#DBDBDB] mt-2">
                     Trade completed successfully. The crypto has been released to the buyer and payment is complete.
                   </p>
+                ) : isTradeCancelled ? (
+                  <p className="text-sm font-normal text-[#DBDBDB] mt-2">
+                    This trade has been cancelled. The crypto has been returned to your wallet.
+                  </p>
                 ) : isTradeAwaitingRelease ? (
                   <p className="text-sm font-normal text-[#DBDBDB] mt-2">
                     Buyer has marked the trade as paid. Please confirm payment in your bank account before releasing crypto.
@@ -1130,7 +1197,7 @@ function PRC_SellContent() {
                   </p>
                 )}
               </div>
-              {!isTradeCompleted && !isExpired && (
+              {!isTradeCompleted && !isExpired && !isTradeCancelled && !isTradeDisputed && (
                 <div className="flex items-center gap-2 px-3 py-1 bg-[#3A3A3A] rounded-2xl w-[100px]">
                   <Image src={Timer} alt="time" className="w-4 h-4" />
                   <p className={`text-sm font-medium ${timeLeft < 300 ? 'text-red-400' : 'text-[#DBDBDB]'}`}>
@@ -1138,9 +1205,9 @@ function PRC_SellContent() {
                   </p>
                 </div>
               )}
-              {isExpired && (
+              {(isExpired || isTradeCancelled) && (
                 <div className="flex items-center gap-2 px-3 py-1 bg-[#342827] rounded-2xl w-[100px] border border-red-500">
-                  <p className="text-sm font-medium text-red-400">Expired</p>
+                  <p className="text-sm font-medium text-red-400">{isExpired ? 'Expired' : 'Cancelled'}</p>
                 </div>
               )}
             </div>
@@ -1152,6 +1219,8 @@ function PRC_SellContent() {
                   ? "Trade is under dispute. You can communicate with the buyer and support team in the chat."
                   : isTradeCompleted
                   ? "Trade completed successfully. The crypto has been released to the buyer and payment is complete."
+                  : isTradeCancelled
+                  ? "This trade has been cancelled. No further action is needed."
                   : isTradeAwaitingRelease
                   ? "Buyer has marked the trade as paid. Please confirm payment in your bank account before releasing crypto."
                   : isExpired
@@ -1162,7 +1231,7 @@ function PRC_SellContent() {
               <button
                 onClick={() => setShowChat(!showChat)}
                 className={`w-full max-w-2xl h-12 flex items-center justify-center gap-2 rounded-full transition-colors ${
-                  isTradeDisputed
+                  isTradeDisputed || isTradeCancelled || isExpired
                     ? "bg-[#342827] border border-[#FE857D] cursor-pointer hover:bg-[#3D2C2C]"
                     : isTradeCompleted || isTradeAwaitingRelease
                     ? "bg-[#1B362B] border border-[#1ECB84] cursor-pointer hover:bg-[#1A4030]"
@@ -1171,7 +1240,7 @@ function PRC_SellContent() {
               >
                 <Image src={Ochat} alt="chat" className="w-5 h-5" />
                 <p className={`text-sm font-bold ${
-                  isTradeDisputed ? 'text-[#FE857D]' :
+                  isTradeDisputed || isTradeCancelled || isExpired ? 'text-[#FE857D]' :
                   isTradeCompleted || isTradeAwaitingRelease ? 'text-[#1ECB84]' : 'text-white'
                 }`}>
                   {showChat ? 'Close Chat' : 'Open Chat'}
@@ -1238,14 +1307,10 @@ function PRC_SellContent() {
                   </p>
                 </div>
 
-                {/* Payment Method - moved before Payment Details */}
-                <div className="flex items-center justify-between p-3 sm:p-4 border-t border-[#3A3A3A] border-l-2 border-l-[#FFFA66]">
-                  <p className="text-sm font-medium text-[#DBDBDB]">Payment Method</p>
-                  <p className="text-sm font-medium text-white">{paymentMethod}</p>
-                </div>
+              
 
-                {/* Payment Details - now after Payment Method */}
-                {paymentDetails && !isTradeCompleted && (
+                {/* Payment Details - only shown when trade is active and not cancelled/expired */}
+                {paymentDetails && !isTradeCompleted && !isTradeCancelled && !isExpired && (
                   <div className="border-t border-[#3A3A3A] p-3 sm:p-4 space-y-2">
                     <p className="text-xs font-semibold text-[#8F8F8F] uppercase">Buyer's Payment Details</p>
                     {paymentDetails.bank_name && (
@@ -1292,7 +1357,7 @@ function PRC_SellContent() {
                     isTradeDisputed ? 'bg-[#342827]' :
                     isTradeAwaitingRelease ? 'bg-[#1B362B]' :
                     isExpired ? 'bg-[#342827]' :
-                    tradeData?.status === 'CANCELLED' ? 'bg-[#342827]' : 'bg-[#352E21]'
+                    isTradeCancelled ? 'bg-[#342827]' : 'bg-[#352E21]'
                   }`}>
                     {isTradeCompleted ? (
                       <>
@@ -1324,7 +1389,7 @@ function PRC_SellContent() {
                           EXPIRED
                         </p>
                       </>
-                    ) : tradeData?.status === 'CANCELLED' ? (
+                    ) : isTradeCancelled ? (
                       <>
                         <Image src={Yellow_i} alt="cancelled" className="w-3 h-3" />
                         <p className="text-xs font-medium text-[#FE857D]">
@@ -1342,7 +1407,7 @@ function PRC_SellContent() {
                   </div>
                 </div>
 
-                {/* Dispute Reason (only show when disputed) */}
+                {/* Dispute Reason */}
                 {isTradeDisputed && tradeData?.dispute?.reason && (
                   <div className="flex items-center justify-between p-3 sm:p-4 border-t border-[#3A3A3A]">
                     <p className="text-sm font-medium text-[#DBDBDB]">Dispute Reason</p>
@@ -1354,7 +1419,7 @@ function PRC_SellContent() {
               </div>
 
               {/* Action Buttons */}
-              {tradeData?.status === 'CANCELLED' ? (
+              {isTradeCancelled ? (
                 <div className="mt-6">
                   <div className="w-full max-w-2xl h-12 bg-[#342827] border border-[#FE857D] text-[#FE857D] font-bold rounded-full flex items-center justify-center gap-2">
                     <Image src={Yellow_i} alt="cancelled" className="w-5 h-5" />
@@ -1390,6 +1455,22 @@ function PRC_SellContent() {
                   </div>
                   <p className="text-center text-sm text-[#8F8F8F] mt-2">
                     The crypto has been released to the buyer and payment is complete.
+                  </p>
+                  <button
+                    onClick={() => router.push('/market_place')}
+                    className="w-full max-w-2xl h-12 bg-[#3A3A3A] text-white font-bold rounded-full hover:bg-[#4A4A4A] transition-colors mt-4"
+                  >
+                    Return to Marketplace
+                  </button>
+                </div>
+              ) : isExpired ? (
+                <div className="mt-6">
+                  <div className="w-full max-w-2xl h-12 bg-[#342827] border border-[#FE857D] text-[#FE857D] font-bold rounded-full flex items-center justify-center gap-2">
+                    <Image src={Yellow_i} alt="expired" className="w-5 h-5" />
+                    <span>Trade Expired</span>
+                  </div>
+                  <p className="text-center text-sm text-[#8F8F8F] mt-2">
+                    This trade has expired. You cannot proceed further.
                   </p>
                   <button
                     onClick={() => router.push('/market_place')}
@@ -1493,11 +1574,11 @@ function PRC_SellContent() {
           </div>
         </div>
 
-        {/* Right section - Chat (Only shows when showChat is true) */}
+        {/* Right section - Chat */}
         {showChat && (
           <div className="xl:w-96">
             <div className="bg-[#1A1A1A] rounded-xl overflow-hidden h-full flex flex-col max-h-[600px]">
-              {/* Chat header - Shows buyer (counterparty) */}
+              {/* Chat header */}
               <div className="flex items-center justify-between p-4 sm:p-6 border-b border-[#3A3A3A]">
                 <div className="flex items-center gap-3">
                   <div className="relative">
@@ -1519,7 +1600,7 @@ function PRC_SellContent() {
                     </p>
                   </div>
                 </div>
-                {!isTradeCompleted && !isExpired && (
+                {!isTradeCompleted && !isExpired && !isTradeCancelled && !isTradeDisputed && (
                   <div className="flex items-center gap-2 px-3 py-1 bg-[#3A3A3A] rounded-2xl">
                     <Image src={Timer} alt="time" className="w-4 h-4" />
                     <p className={`text-sm font-medium ${timeLeft < 300 ? 'text-red-400' : 'text-[#DBDBDB]'}`}>
@@ -1535,17 +1616,23 @@ function PRC_SellContent() {
                   <div className={`flex items-center gap-2 px-3 py-1 rounded-2xl ${
                     isTradeCompleted ? 'bg-[#1B362B]' :
                     isTradeDisputed ? 'bg-[#342827]' :
-                    isTradeAwaitingRelease ? 'bg-[#1B362B]' : 'bg-[#352E21]'
+                    isTradeAwaitingRelease ? 'bg-[#1B362B]' :
+                    isTradeCancelled ? 'bg-[#342827]' :
+                    isExpired ? 'bg-[#342827]' : 'bg-[#352E21]'
                   }`}>
                     <Image src={Gtime} alt="gtime" className="w-4 h-4" />
                     <p className={`text-sm font-medium ${
                       isTradeCompleted ? 'text-[#1ECB84]' :
                       isTradeDisputed ? 'text-[#FE857D]' :
-                      isTradeAwaitingRelease ? 'text-[#1ECB84]' : 'text-[#FFC051]'
+                      isTradeAwaitingRelease ? 'text-[#1ECB84]' :
+                      isTradeCancelled ? 'text-[#FE857D]' :
+                      isExpired ? 'text-[#FE857D]' : 'text-[#FFC051]'
                     }`}>
                       {isTradeCompleted ? 'Completed' :
                        isTradeDisputed ? 'In Dispute' :
-                       isTradeAwaitingRelease ? 'Awaiting Release' : 'Awaiting Payment'}
+                       isTradeAwaitingRelease ? 'Awaiting Release' :
+                       isTradeCancelled ? 'Cancelled' :
+                       isExpired ? 'Expired' : 'Awaiting Payment'}
                     </p>
                   </div>
                   {shouldShowReleaseButton && (
@@ -1585,7 +1672,7 @@ function PRC_SellContent() {
                     </span>
                   </div>
                   <div className={`rounded-2xl p-5 border shadow-lg ${
-                    isTradeDisputed
+                    isTradeDisputed || isTradeCancelled || isExpired
                       ? 'bg-gradient-to-r from-[#342827] to-[#2A1F1F] border-[#FE857D]'
                       : isTradeCompleted || isTradeAwaitingRelease
                       ? 'bg-gradient-to-r from-[#1B362B] to-[#143026] border-[#1ECB84]'
@@ -1593,11 +1680,11 @@ function PRC_SellContent() {
                   }`}>
                     <div className="flex items-start gap-3 mb-3">
                       <div className={`w-10 h-10 ${
-                        isTradeDisputed ? 'bg-[#0F1012]/30' :
+                        isTradeDisputed || isTradeCancelled || isExpired ? 'bg-[#0F1012]/30' :
                         isTradeCompleted || isTradeAwaitingRelease ? 'bg-[#0F1012]/30' : 'bg-[#0F1012]/30'
                       } rounded-full flex items-center justify-center flex-shrink-0`}>
                         <svg className={`w-5 h-5 ${
-                          isTradeDisputed ? 'text-[#FE857D]' :
+                          isTradeDisputed || isTradeCancelled || isExpired ? 'text-[#FE857D]' :
                           isTradeCompleted || isTradeAwaitingRelease ? 'text-[#1ECB84]' : 'text-white'
                         }`} fill="currentColor" viewBox="0 0 20 20">
                           <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd"></path>
@@ -1610,7 +1697,7 @@ function PRC_SellContent() {
                         </p>
 
                         {/* Warning box inside service message */}
-                        {!isTradeDisputed && !isTradeCompleted && !isTradeAwaitingRelease && (
+                        {!isTradeDisputed && !isTradeCompleted && !isTradeAwaitingRelease && !isTradeCancelled && !isExpired && (
                           <div className="mt-4 p-4 bg-[#352E21]/80 rounded-xl border border-[#FFC051]/30">
                             <div className="flex items-start gap-2">
                               <svg className="w-4 h-4 text-[#FFC051] mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
@@ -1641,11 +1728,11 @@ function PRC_SellContent() {
                           {serviceMessage.listItems.map((item, index) => (
                             <li key={index} className="flex items-start gap-3">
                               <div className={`w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5 ${
-                                isTradeDisputed ? 'bg-[#FE857D]/20' :
+                                isTradeDisputed || isTradeCancelled || isExpired ? 'bg-[#FE857D]/20' :
                                 isTradeCompleted || isTradeAwaitingRelease ? 'bg-[#1ECB84]/20' : 'bg-[#4DF2BE]/20'
                               }`}>
                                 <span className={`text-xs font-bold ${
-                                  isTradeDisputed ? 'text-[#FE857D]' :
+                                  isTradeDisputed || isTradeCancelled || isExpired ? 'text-[#FE857D]' :
                                   isTradeCompleted || isTradeAwaitingRelease ? 'text-[#1ECB84]' : 'text-[#4DF2BE]'
                                 }`}>
                                   {index + 1}
@@ -1672,16 +1759,16 @@ function PRC_SellContent() {
                       </span>
                     </div>
                     <div className={`rounded-2xl p-5 border shadow-lg ${
-                      isTradeDisputed
+                      isTradeDisputed || isTradeCancelled || isExpired
                         ? 'bg-gradient-to-r from-[#342827] to-[#2A1F1F] border-[#FE857D]'
                         : 'bg-gradient-to-r from-[#1B362B] to-[#143026] border-[#1ECB84]'
                     }`}>
                       <div className="flex items-start gap-3">
                         <div className={`w-10 h-10 ${
-                          isTradeDisputed ? 'bg-[#0F1012]/30' : 'bg-[#0F1012]/30'
+                          isTradeDisputed || isTradeCancelled || isExpired ? 'bg-[#0F1012]/30' : 'bg-[#0F1012]/30'
                         } rounded-full flex items-center justify-center flex-shrink-0`}>
                           <svg className={`w-5 h-5 ${
-                            isTradeDisputed ? 'text-[#FE857D]' : 'text-[#1ECB84]'
+                            isTradeDisputed || isTradeCancelled || isExpired ? 'text-[#FE857D]' : 'text-[#1ECB84]'
                           }`} fill="currentColor" viewBox="0 0 20 20">
                             <path fillRule="evenodd" d="M2.166 4.999A11.954 11.954 0 0010 1.944 11.954 11.954 0 0017.834 5c.11.65.166 1.32.166 2.001 0 5.225-3.34 9.67-8 11.317C5.34 16.67 2 12.225 2 7c0-.682.057-1.35.166-2.001zm11.541 3.708a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd"></path>
                           </svg>
@@ -1697,7 +1784,7 @@ function PRC_SellContent() {
                   </div>
                 )}
 
-                {/* SEPARATOR: Start of Seller/Buyer Chat */}
+                {/* SEPARATOR */}
                 <div className="relative my-8">
                   <div className="absolute inset-0 flex items-center">
                     <div className="w-full border-t border-[#3A3A3A]"></div>
@@ -1709,7 +1796,7 @@ function PRC_SellContent() {
                   </div>
                 </div>
 
-                {/* SELLER/BUYER CHAT MESSAGES */}
+                {/* BUYER/SELLER CHAT MESSAGES */}
                 <div className="space-y-4">
                   {chatMessages.length > 0 ? (
                     chatMessages
@@ -1717,7 +1804,7 @@ function PRC_SellContent() {
                       .map((message) => {
                         const isBuyer = message.senderId === tradeData?.buyer.id;
                         const isCurrentUserMsg = message.senderId === currentUser?.id;
-                        const shouldBeOnRight = isCurrentUserMsg; // current user messages on right
+                        const shouldBeOnRight = isCurrentUserMsg;
 
                         const displayName = message.sender?.name || (isBuyer ? buyerUsername : sellerUsername);
                         const senderRole = isBuyer ? "Buyer" : "Seller";
@@ -1822,12 +1909,12 @@ function PRC_SellContent() {
                 </div>
               </div>
 
-              {/* Message input with file upload */}
+              {/* Message input */}
               <div className="p-4 border-t border-[#3A3A3A]">
-                {isTradeCompleted || isExpired || isTradeDisputed ? (
+                {isTradeCompleted || isExpired || isTradeCancelled || isTradeDisputed ? (
                   <div className="text-center p-4 bg-[#1B362B] rounded-lg border border-[#1ECB84]">
                     <p className="text-sm text-[#1ECB84] font-medium">
-                      {isTradeCompleted ? "Trade completed." : isExpired ? "Trade expired." : "Chat disabled during dispute."} Chat is now read-only.
+                      {isTradeCompleted ? "Trade completed." : isExpired ? "Trade expired." : isTradeCancelled ? "Trade cancelled." : "Chat disabled during dispute."} Chat is now read-only.
                     </p>
                   </div>
                 ) : (
@@ -2211,14 +2298,13 @@ function PRC_SellContent() {
   );
 }
 
-// ==================== MAIN PAGE COMPONENT with Suspense boundary ====================
+// ==================== MAIN PAGE COMPONENT ====================
 export default function PRC_Sell() {
   return (
     <main className="min-h-screen bg-[#0F1012] text-white">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-6">
         <Nav />
 
-        {/* Suspense boundary for the part that uses useSearchParams */}
         <Suspense fallback={
           <div className="flex justify-center items-center h-64">
             <div className="text-center">
@@ -2230,7 +2316,6 @@ export default function PRC_Sell() {
           <PRC_SellContent />
         </Suspense>
 
-        {/* Footer - static */}
         <div className="w-[100%] h-[1px] bg-[#fff] mt-[50%] opacity-20 my-8"></div>
         <div className="mb-[80px] whitespace-nowrap mt-[20%]">
           <Footer />

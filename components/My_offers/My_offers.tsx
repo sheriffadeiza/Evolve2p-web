@@ -1,7 +1,7 @@
 // components/MyOffers/MyOffers.tsx
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import Timer from "../../public/Assets/Evolve2p_timer/elements.svg";
@@ -26,6 +26,7 @@ interface Offer {
   user?: {
     username?: string;
     _id?: string;
+    id?: string;
   };
   currency?: string;
   fiatCurrency?: string;
@@ -53,6 +54,7 @@ interface UserData {
     token?: string;
   };
   _id?: string;
+  id?: string;
 }
 
 interface MyOffersProps {
@@ -98,7 +100,7 @@ const MyOffers: React.FC<MyOffersProps> = ({ initialTab = "ALL" }) => {
   ];
 
   // Helper: format date
-  const formatDate = (dateString: string): string => {
+  const formatDate = useCallback((dateString: string): string => {
     if (!dateString) return "Unknown date";
     try {
       const date = new Date(dateString);
@@ -113,38 +115,39 @@ const MyOffers: React.FC<MyOffersProps> = ({ initialTab = "ALL" }) => {
     } catch {
       return "Invalid date";
     }
-  };
+  }, []);
 
   // Helper function to get auth token
-  const getToken = (): string | null => authToken;
+  const getToken = useCallback((): string | null => authToken, [authToken]);
 
-  // Helper function to get user ID
-  const getUserId = (): string | null => {
+  // Helper function to get user ID – now memoized
+  const getUserId = useCallback((): string | null => {
     if (!clientUser) return null;
     if (clientUser.user?._id) return clientUser.user._id;
     if (clientUser.userData?._id) return clientUser.userData._id;
     if (clientUser._id) return clientUser._id;
+    if (clientUser.id) return clientUser.id;
     return null;
-  };
+  }, [clientUser]);
 
-  // Helper function to get username
-  const getUsername = (): string => {
+  // Helper function to get username – memoized
+  const username = useMemo((): string => {
     if (!clientUser) return "User";
-    const username = clientUser.username ||
-                    clientUser.user?.username ||
-                    clientUser.userData?.username ||
-                    clientUser.email ||
-                    "User";
-    return typeof username === "string" ? username : String(username);
-  };
+    const uname = clientUser.username ||
+                  clientUser.user?.username ||
+                  clientUser.userData?.username ||
+                  clientUser.email ||
+                  "User";
+    return typeof uname === "string" ? uname : String(uname);
+  }, [clientUser]);
 
   // Helper to get offer's fiat currency
-  const getOfferFiatCurrency = (offer: Offer): string => {
+  const getOfferFiatCurrency = useCallback((offer: Offer): string => {
     return offer.fiatCurrency || offer.currency || "USD";
-  };
+  }, []);
 
-  // Format currency
-  const formatCurrency = (amount: number | undefined | null, currencyCode: string = "USD"): string => {
+  // Format currency – memoized as function
+  const formatCurrency = useCallback((amount: number | undefined | null, currencyCode: string = "USD"): string => {
     if (amount === undefined || amount === null) return 'N/A';
     const symbol = currencyCode === "USD" ? "$" :
                   currencyCode === "EUR" ? "€" :
@@ -161,10 +164,10 @@ const MyOffers: React.FC<MyOffersProps> = ({ initialTab = "ALL" }) => {
         maximumFractionDigits: 2
       })}`;
     }
-  };
+  }, []);
 
-  // Calculate offer price
-  const calculateOfferPrice = (offer: Offer): string => {
+  // Calculate offer price – memoized for each offer
+  const calculateOfferPrice = useCallback((offer: Offer): string => {
     const offerFiatCurrency = getOfferFiatCurrency(offer);
     if (offer.finalPrice !== undefined && offer.finalPrice !== null && offer.finalPrice > 0) {
       return formatCurrency(offer.finalPrice, offerFiatCurrency);
@@ -180,42 +183,41 @@ const MyOffers: React.FC<MyOffersProps> = ({ initialTab = "ALL" }) => {
       return formatCurrency(calculatedPrice, offerFiatCurrency);
     }
     return 'Price N/A';
-  };
+  }, [formatCurrency, getOfferFiatCurrency]);
 
-  // Format limits
-  const formatLimits = (offer: Offer): string => {
+  // Format limits – memoized for each offer
+  const formatLimits = useCallback((offer: Offer): string => {
     const offerFiatCurrency = getOfferFiatCurrency(offer);
     const min = formatCurrency(offer.minLimit, offerFiatCurrency);
     const max = formatCurrency(offer.maxLimit, offerFiatCurrency);
     return `${min} – ${max}`;
-  };
+  }, [formatCurrency, getOfferFiatCurrency]);
 
-  // Get trading pair
-  const getTradingPair = (offer: Offer): string => {
+  // Get trading pair – memoized for each offer
+  const getTradingPair = useCallback((offer: Offer): string => {
     const offerFiatCurrency = getOfferFiatCurrency(offer);
     return `${offer.crypto}/${offerFiatCurrency}`;
-  };
+  }, [getOfferFiatCurrency]);
 
-  // Get user initial for avatar
-  const getUserInitial = (): string => {
-    const username = getUsername();
+  // Get user initial for avatar – memoized
+  const userInitial = useMemo((): string => {
     if (username && username.length > 0) {
       return username.startsWith("@") ? username.charAt(1).toUpperCase() : username.charAt(0).toUpperCase();
     }
     return "U";
-  };
+  }, [username]);
 
   // Helper to display payment method in dropdown
-  const getMethodDisplay = (method: any): string => {
+  const getMethodDisplay = useCallback((method: any): string => {
     if (!method) return "Unknown";
     const typeName = method.type?.name || "Payment Method";
     const details = method.details || {};
     const firstField = Object.values(details)[0];
     return firstField ? `${typeName} - ${firstField}` : typeName;
-  };
+  }, []);
 
   // Fetch user's saved payment methods (detailed)
-  const fetchUserPaymentMethods = async () => {
+  const fetchUserPaymentMethods = useCallback(async () => {
     const token = getToken();
     if (!token) return;
 
@@ -231,14 +233,13 @@ const MyOffers: React.FC<MyOffersProps> = ({ initialTab = "ALL" }) => {
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || "Failed to load your payment methods");
       setUserPaymentMethods(data.data || []);
-      console.log("✅ User payment methods loaded:", data.data);
     } catch (err: any) {
-      console.error("❌ Error fetching user payment methods:", err);
+      console.error("Error fetching user payment methods:", err.message);
       setErrorUserMethods(err.message);
     } finally {
       setLoadingUserMethods(false);
     }
-  };
+  }, [getToken]);
 
   // Load user data from localStorage and extract token
   useEffect(() => {
@@ -267,10 +268,10 @@ const MyOffers: React.FC<MyOffersProps> = ({ initialTab = "ALL" }) => {
     if (authToken) {
       fetchUserPaymentMethods();
     }
-  }, [authToken]);
+  }, [authToken, fetchUserPaymentMethods]);
 
   // Fetch user's offers
-  const fetchMyOffers = async () => {
+  const fetchMyOffers = useCallback(async () => {
     const token = getToken();
     if (!token) {
       setError("Authentication token not found");
@@ -297,7 +298,7 @@ const MyOffers: React.FC<MyOffersProps> = ({ initialTab = "ALL" }) => {
       try {
         data = text ? JSON.parse(text) : {};
       } catch (e) {
-        console.error("❌ Failed to parse JSON:", e);
+        console.error("Failed to parse JSON:", e);
         data = {};
       }
 
@@ -310,22 +311,20 @@ const MyOffers: React.FC<MyOffersProps> = ({ initialTab = "ALL" }) => {
       else if (data.data && Array.isArray(data.data.offers)) allOffers = data.data.offers;
 
       const userId = getUserId();
-      if (!userId) {
-        setOffers(allOffers);
-      } else {
-        const myOffers = allOffers.filter((offer: Offer) => {
-          const offerUserId = offer.user?._id || (offer.user as any)?.id;
-          return offerUserId === userId;
-        });
-        setOffers(myOffers);
-      }
+
+      const myOffers = allOffers.filter((offer: Offer) => {
+        const offerUserId = offer.user?._id || offer.user?.id;
+        return offerUserId === userId;
+      });
+
+      setOffers(myOffers);
     } catch (err: any) {
-      console.error("❌ Error fetching offers:", err);
+      console.error("Error fetching offers:", err.message);
       setError(err.message || "Failed to fetch offers");
     } finally {
       setLoading(false);
     }
-  };
+  }, [getToken, getUserId]);
 
   // Filter offers based on active tab
   useEffect(() => {
@@ -345,14 +344,34 @@ const MyOffers: React.FC<MyOffersProps> = ({ initialTab = "ALL" }) => {
   // Fetch offers when token is available
   useEffect(() => {
     if (authToken) fetchMyOffers();
-  }, [authToken]);
+  }, [authToken, fetchMyOffers]);
 
-  // Handle delete offer – using PUT and { id: offerId }
-  const handleDeleteOffer = async (offerId: string) => {
+  // --- DELETE HANDLER WITH OWNERSHIP CHECK ---
+  const handleDeleteOffer = useCallback(async (offerId: string) => {
     if (!offerId) {
       setError("Invalid offer ID");
       return;
     }
+
+    const offerToDelete = offers.find(o => (o.id || o._id) === offerId);
+    if (!offerToDelete) {
+      setError("Offer not found in local list");
+      return;
+    }
+
+    const currentUserId = getUserId();
+    const offerOwnerId = offerToDelete.user?._id || offerToDelete.user?.id;
+
+    if (!currentUserId || !offerOwnerId) {
+      setError("Could not determine user IDs for ownership check");
+      return;
+    }
+
+    if (currentUserId !== offerOwnerId) {
+      setError("You are not the owner of this offer. Cannot delete.");
+      return;
+    }
+
     const token = getToken();
     if (!token) {
       setError("Authentication token not found");
@@ -364,7 +383,6 @@ const MyOffers: React.FC<MyOffersProps> = ({ initialTab = "ALL" }) => {
     setSuccessMessage("");
 
     try {
-      console.log(`🗑️ Deleting offer: ${offerId}`);
       const response = await fetch(
         `${API_BASE_URL}/api/delete-offer`,
         {
@@ -383,8 +401,7 @@ const MyOffers: React.FC<MyOffersProps> = ({ initialTab = "ALL" }) => {
         data = await response.json();
       } else {
         const text = await response.text();
-        console.error("❌ Non-JSON response:", text);
-        throw new Error(`Server returned ${response.status}: ${text.substring(0, 100)}`);
+        throw new Error(`Server returned ${response.status}`);
       }
 
       if (!response.ok) {
@@ -395,15 +412,15 @@ const MyOffers: React.FC<MyOffersProps> = ({ initialTab = "ALL" }) => {
       setOffers(prev => prev.filter(offer => (offer.id || offer._id) !== offerId));
       setDeleteConfirm(null);
     } catch (err: any) {
-      console.error("❌ Error deleting offer:", err);
+      console.error("Error deleting offer:", err.message);
       setError(err.message || "Failed to delete offer");
     } finally {
       setLoading(false);
     }
-  };
+  }, [offers, getUserId, getToken]);
 
   // Handle edit click – open modal with offer data
-  const handleEditClick = (offer: Offer) => {
+  const handleEditClick = useCallback((offer: Offer) => {
     setEditingOffer(offer);
     let paymentMethodId = "";
     if (offer.paymentMethod) {
@@ -425,15 +442,15 @@ const MyOffers: React.FC<MyOffersProps> = ({ initialTab = "ALL" }) => {
       instructions: offer.instructions || "",
     });
     setEditTimeLimit(offer.paymentTime || "30 minutes");
-  };
+  }, []);
 
   // Handle edit form changes
-  const handleEditFormChange = (field: string, value: any) => {
+  const handleEditFormChange = useCallback((field: string, value: any) => {
     setEditFormData(prev => ({ ...prev, [field]: value }));
-  };
+  }, []);
 
-  // Handle update offer – mirrors the creation process
-  const handleUpdateOffer = async () => {
+  // Handle update offer – now refreshes the list after successful update
+  const handleUpdateOffer = useCallback(async () => {
     if (!editingOffer || !editingOffer.id && !editingOffer._id) {
       setError("No offer selected for editing");
       return;
@@ -447,7 +464,6 @@ const MyOffers: React.FC<MyOffersProps> = ({ initialTab = "ALL" }) => {
     // Validate
     if (!editFormData.crypto) { setError("Cryptocurrency is required"); return; }
     if (!editFormData.type) { setError("Offer type is required"); return; }
-    // Convert type to lowercase before sending (backend expects 'buy' or 'sell')
     const typeLower = editFormData.type?.toLowerCase();
     if (typeLower !== 'buy' && typeLower !== 'sell') {
       setError("Type must be 'buy' or 'sell'");
@@ -474,7 +490,7 @@ const MyOffers: React.FC<MyOffersProps> = ({ initialTab = "ALL" }) => {
       const payload = {
         offerId,
         crypto: editFormData.crypto,
-        type: typeLower, // send lowercase
+        type: typeLower,
         margin: editFormData.margin,
         minLimit: editFormData.minLimit,
         maxLimit: editFormData.maxLimit,
@@ -500,20 +516,16 @@ const MyOffers: React.FC<MyOffersProps> = ({ initialTab = "ALL" }) => {
       if (!response.ok) throw new Error(data?.message || `Server error ${response.status}`);
 
       setSuccessMessage("Offer updated successfully");
-      // Update the offer in the list
-      setOffers(prev => prev.map(offer =>
-        (offer.id || offer._id) === offerId
-          ? { ...offer, ...editFormData, paymentTime: editTimeLimit }
-          : offer
-      ));
       setEditingOffer(null);
+      // Refresh the list to get the latest data from the server
+      await fetchMyOffers();
     } catch (err: any) {
-      console.error("❌ Error updating offer:", err);
+      console.error("Error updating offer:", err.message);
       setError(err.message || "Failed to update offer");
     } finally {
       setEditLoading(false);
     }
-  };
+  }, [editingOffer, editFormData, editTimeLimit, getToken, fetchMyOffers]);
 
   // Clear messages after 3 seconds
   useEffect(() => {
@@ -855,8 +867,6 @@ const MyOffers: React.FC<MyOffersProps> = ({ initialTab = "ALL" }) => {
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
           {filteredOffers.map((offer) => {
             const offerId = offer.id || offer._id;
-            const username = getUsername();
-            const initial = getUserInitial();
             const tradingPair = getTradingPair(offer);
             const offerPrice = calculateOfferPrice(offer);
             const limits = formatLimits(offer);
@@ -870,7 +880,7 @@ const MyOffers: React.FC<MyOffersProps> = ({ initialTab = "ALL" }) => {
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center">
                     <div className="flex items-center justify-center rounded-full text-xs w-8 h-8 bg-[#4A4A4A] font-bold text-[#C7C7C7]">
-                      {initial}
+                      {userInitial}
                     </div>
                     <p className="ml-2 text-sm text-white font-medium">
                       {username.startsWith("@") ? username : `@${username}`}
