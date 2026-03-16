@@ -14,6 +14,7 @@ const Profilebd = () => {
   const router = useRouter();
 
   const [formData, setFormData] = useState({
+    fullName: "",
     username: "",
     country: "",
     countryCode: "",
@@ -30,7 +31,7 @@ const Profilebd = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingCountries, setIsLoadingCountries] = useState(true);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
-  const [errorMessage, setErrorMessage] = useState(""); // combined error display
+  const [errorMessage, setErrorMessage] = useState("");
 
   // Phone validation using react-phone-number-input
   const validatePhoneNumber = (phone: E164Number | undefined) => {
@@ -60,7 +61,6 @@ const Profilebd = () => {
       };
       
     } catch (error) {
-      console.error("Phone validation error:", error);
       return {
         isValid: false,
         message: "Error validating phone number",
@@ -182,12 +182,18 @@ const Profilebd = () => {
     return () => clearTimeout(handler);
   }, [formData.username]);
 
+  // Handlers
+  const handleFullNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setFormData((prev) => ({ ...prev, fullName: e.target.value }));
+  };
+
   const handleUsernameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData((prev) => ({ ...prev, username: e.target.value }));
   };
 
   const allFieldsValid = () => {
     return (
+      formData.fullName.trim() !== "" &&
       isValidUsername &&
       isPhoneValid &&
       formData.country.trim() !== ""
@@ -218,8 +224,10 @@ const Profilebd = () => {
         throw new Error("Missing email or password from previous step.");
       }
 
+      // Map frontend fullName to backend 'name' field
       const UserData = {
         email: currentData.email,
+        name: formData.fullName,          // Send as 'name' (backend expects this)
         username: formData.username,
         password: currentData.password,
         country: formData.country,
@@ -227,9 +235,8 @@ const Profilebd = () => {
         phone: phoneNumber?.toString() || "",
       };
 
-      // Use AbortController for timeout
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 15000); // 15s timeout
+      const timeoutId = setTimeout(() => controller.abort(), 15000);
 
       const SignupResponse = await fetch(BASE_URL + "auth/register", {
         method: "POST",
@@ -251,7 +258,6 @@ const Profilebd = () => {
         throw new Error("No access token received.");
       }
 
-      // Fetch user data with token
       const userResponse = await fetch(BASE_URL + "get-user", {
         method: "POST",
         headers: {
@@ -261,14 +267,11 @@ const Profilebd = () => {
       });
 
       const userData = await userResponse.json();
-
-      // Check if response contains user object (adjust based on actual API)
       const user = userData?.user || userData?.data || userData;
       if (!user) {
         throw new Error("Failed to fetch user data.");
       }
 
-      // Store user data
       localStorage.removeItem("UserReg");
       localStorage.setItem(
         "UserData",
@@ -278,7 +281,6 @@ const Profilebd = () => {
         })
       );
 
-      // Show success modal
       setShowSuccessModal(true);
     } catch (error: any) {
       console.error("Registration error:", error);
@@ -296,7 +298,7 @@ const Profilebd = () => {
     <div className="w-full lg:mx-0">
       <div className="flex flex-col px-4 lg:px-4 mx-auto py-16 lg:ml-[100px] gap-2 w-full border-none max-w-[400px] text-white">
 
-        {/* Success Modal - improved styling */}
+        {/* Success Modal */}
         {showSuccessModal && (
           <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50">
             <div className="bg-[#222222] p-8 rounded-xl w-[350px] text-center shadow-2xl border border-[#4DF2BE]/30">
@@ -326,6 +328,18 @@ const Profilebd = () => {
             {errorMessage}
           </div>
         )}
+
+        {/* Full Name */}
+        <div className="mt-4 w-full">
+          <label className="text-sm font-medium text-[#8F8F8F]">Full Name</label>
+          <input
+            type="text"
+            value={formData.fullName}
+            onChange={handleFullNameChange}
+            placeholder="Enter your full name"
+            className="w-full h-14 text-[#FCFCFC] rounded-lg px-4 py-3 bg-[#222222] border border-[#2E2E2E] focus:outline-none focus:border-[#4DF2BE]"
+          />
+        </div>
 
         {/* Username */}
         <div className="mt-4 w-full">
@@ -462,7 +476,7 @@ const Profilebd = () => {
           {isLoading ? <div className="loader-small"></div> : "Complete Registration"}
         </button>
 
-        {/* Global Styles for Phone Input */}
+        {/* Global Styles for Phone Input - Enhanced for dark dropdown */}
         <style jsx global>{`
           .custom-phone-input-register {
             width: 100%;
@@ -487,12 +501,30 @@ const Profilebd = () => {
             border-right: 1px solid #2E2E2E;
           }
           
+          /* The select element itself */
           .custom-phone-input-register .PhoneInputCountrySelect {
-            background: transparent;
+            background-color: #3A3A3A !important;
+            color: white !important;
             border: none;
-            color: #C7C7C7;
             font-size: 14px;
-            padding: 0;
+          }
+          
+          /* Dropdown list (options) */
+          .custom-phone-input-register .PhoneInputCountrySelect option {
+            background-color: #1A1A1A !important;
+            color: white !important;
+          }
+          
+          /* For browsers that use a separate popover */
+          .PhoneInputCountrySelectPopover,
+          .PhoneInputCountrySelectPopover ul,
+          .PhoneInputCountrySelectPopover li {
+            background-color: #1A1A1A !important;
+            color: white !important;
+          }
+          
+          .PhoneInputCountrySelectPopover li:hover {
+            background-color: #2D2D2D !important;
           }
           
           .custom-phone-input-register .PhoneInputCountrySelectArrow {
@@ -516,26 +548,15 @@ const Profilebd = () => {
             outline: none;
           }
           
-          .PhoneInputCountryDropdown {
-            background: #1A1A1A !important;
-            border: 1px solid #3A3A3A !important;
-            border-radius: 0.5rem !important;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5) !important;
-            max-height: 300px !important;
-            overflow-y: auto !important;
-            z-index: 9999 !important;
+          /* Additional fallbacks for native dropdown */
+          select.PhoneInputCountrySelect {
+            background-color: #3A3A3A !important;
+            color: white !important;
           }
           
-          .PhoneInputCountryDropdown option {
-            background: #1A1A1A !important;
-            color: #FFFFFF !important;
-            padding: 0.75rem 1rem !important;
-            border-bottom: 1px solid #2D2D2D !important;
-            cursor: pointer !important;
-          }
-          
-          .PhoneInputCountryDropdown option:hover {
-            background: #2D2D2D !important;
+          select.PhoneInputCountrySelect option {
+            background-color: #1A1A1A !important;
+            color: white !important;
           }
           
           .loader-small {

@@ -34,7 +34,6 @@ import DashboardTransactions from "@/app/dashboardTransaction/dashboardTrans";
 import { API_BASE_URL } from "@/config";
 import Footer from "../../components/Footer/Footer";
 
-// Lazy load QRCode component
 const QRCodeCanvas = lazy(() => import("qrcode.react").then(mod => ({ default: mod.QRCodeCanvas })));
 
 interface Wallet {
@@ -67,14 +66,12 @@ const currencies: Currency[] = [
   { name: "ETH", symbol: "Ξ" },
 ];
 
-// Safe number parser – prevents NaN
 const safeNumber = (value: any): number => {
   if (value === null || value === undefined) return 0;
   const num = Number(value);
   return isNaN(num) ? 0 : num;
 };
 
-// Crypto Price Service with fallback (no logs, user‑friendly errors)
 const CryptoPriceService = {
   async getMultipleCryptoPrices(coinIds: string[], vsCurrencies: string[] = ['usd']) {
     try {
@@ -84,7 +81,6 @@ const CryptoPriceService = {
       if (!response.ok) throw new Error();
       return await response.json();
     } catch {
-      // Fallback prices – safe, no logs
       return {
         bitcoin: { usd: 50000 },
         ethereum: { usd: 3000 },
@@ -137,12 +133,9 @@ const Dashboard: React.FC = () => {
   const [isSending, setIsSending] = useState(false);
   const [transactionHash, setTransactionHash] = useState<string>("");
   const [recentTransaction, setRecentTransaction] = useState<Transaction | null>(null);
-
-  // Settings for limits
   const [settingsData, setSettingsData] = useState<any>(null);
   const [settingsLoading, setSettingsLoading] = useState(false);
 
-  // ========== VERIFICATION CHECK ==========
   const requireVerification = useCallback((callback: () => void) => {
     if (!clientUser?.kycVerified) {
       setShowVerifyModal(true);
@@ -151,7 +144,6 @@ const Dashboard: React.FC = () => {
     callback();
   }, [clientUser]);
 
-  // ========== Memoized totals ==========
   const totalBalanceUSD = useMemo(() => {
     if (!clientUser?.wallets || !cryptoPrices) return 0;
     let total = 0;
@@ -191,7 +183,13 @@ const Dashboard: React.FC = () => {
       : converted.toFixed(2);
   }, [totalBalanceUSD, selectedCurrency, cryptoPrices, usdToNgnRate]);
 
-  // ========== Price fetching ==========
+  const cryptoAssets = useMemo(() => [
+    { symbol: "BTC", name: "Bitcoin", icon: BTC },
+    { symbol: "ETH", name: "Ethereum", icon: ETH },
+    { symbol: "USDC", name: "USDC", icon: USDC },
+    { symbol: "USDT", name: "USDT", icon: USDT },
+  ], []);
+
   useEffect(() => {
     const fetchPrices = async () => {
       setLoadingPrices(true);
@@ -208,7 +206,6 @@ const Dashboard: React.FC = () => {
     return () => clearInterval(interval);
   }, []);
 
-  // ========== Helper functions ==========
   const getAssetBalance = useCallback((symbol: string): string => {
     const wallet = clientUser?.wallets?.find((w: any) => w.currency?.toUpperCase() === symbol.toUpperCase());
     const balance = safeNumber(wallet?.balance);
@@ -273,7 +270,7 @@ const Dashboard: React.FC = () => {
     switch (selectedAsset.symbol) {
       case 'BTC': return amount * safeNumber(cryptoPrices.bitcoin?.usd || 50000);
       case 'ETH': return amount * safeNumber(cryptoPrices.ethereum?.usd || 3000);
-      default: return amount; // USDT/USDC
+      default: return amount;
     }
   }, [selectedAsset, sendAmount, cryptoPrices]);
 
@@ -295,7 +292,45 @@ const Dashboard: React.FC = () => {
     }).format(amount);
   }, []);
 
-  // ========== User loading ==========
+  // ========== Fetch fresh user data from backend ==========
+  const fetchUserFromAPI = useCallback(async (email: string, token: string) => {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/get-user`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ email }),
+      });
+
+      if (res.status === 401) {
+        localStorage.removeItem("UserData");
+        setError("Session expired. Please login again.");
+        setTimeout(() => router.push("/Logins/login"), 1500);
+        return;
+      }
+
+      if (res.ok) {
+        const data = await res.json();
+        const user = data.userData || data.user || data;
+        if (user) {
+          setClientUser(user);
+          // Update localStorage – preserve root token
+          const stored = localStorage.getItem("UserData");
+          if (stored) {
+            const parsed = JSON.parse(stored);
+            parsed.userData = user;
+            localStorage.setItem("UserData", JSON.stringify(parsed));
+          }
+        }
+      }
+    } catch (error) {
+      console.error("Error fetching user from API:", error);
+    }
+  }, [router]);
+
+  // ========== Load user from localStorage + refresh from API ==========
   useEffect(() => {
     if (typeof window === "undefined") return;
     const stored = localStorage.getItem("UserData");
@@ -305,14 +340,58 @@ const Dashboard: React.FC = () => {
       return;
     }
     try {
-      const userData = JSON.parse(stored);
-      setClientUser(userData?.userData || userData);
+      const parsed = JSON.parse(stored);
+      // Normalize structure: ensure accessToken and userData exist
+      let accessToken = parsed.accessToken || parsed.token || parsed.userData?.token;
+      let userData = parsed.userData || parsed.user || parsed;
+
+      // If userData is the whole object (i.e., no separate userData), extract email etc.
+      // We'll store normalized object back
+      const normalized = {
+        accessToken,
+        userData: userData,
+      };
+      // Save normalized version
+      localStorage.setItem("UserData", JSON.stringify(normalized));
+
+      const email = userData?.email;
+      if (accessToken && email) {
+        setClientUser(userData);
+        fetchUserFromAPI(email, accessToken); // refresh from backend
+      } else {
+        setError("Authentication information missing. Please login again.");
+        setTimeout(() => router.push("/Logins/login"), 1500);
+      }
     } catch {
       setError("Invalid user data");
     } finally {
       setLoading(false);
     }
-  }, [router]);
+  }, [router, fetchUserFromAPI]);
+
+  // ========== Listen for userDataUpdated event ==========
+  useEffect(() => {
+    const handleUserUpdate = () => {
+      const stored = localStorage.getItem("UserData");
+      if (stored) {
+        try {
+          const parsed = JSON.parse(stored);
+          const updatedUser = parsed.userData || parsed;
+          setClientUser(updatedUser); // show optimistic update immediately
+
+          // Refresh from backend to confirm – ensure we have email and token
+          const token = parsed.accessToken;
+          // Try to get email from updatedUser, fallback to parsed.userData?.email (if different)
+          const email = updatedUser?.email || parsed.userData?.email;
+          if (token && email) {
+            fetchUserFromAPI(email, token);
+          }
+        } catch {}
+      }
+    };
+    window.addEventListener('userDataUpdated', handleUserUpdate);
+    return () => window.removeEventListener('userDataUpdated', handleUserUpdate);
+  }, [fetchUserFromAPI]);
 
   // Fetch settings after user loads
   const fetchSettings = useCallback(async () => {
@@ -322,7 +401,8 @@ const Dashboard: React.FC = () => {
       const stored = localStorage.getItem("UserData");
       if (!stored) return;
       const parsed = JSON.parse(stored);
-      const token = parsed?.token || parsed?.userData?.token || "";
+      const token = parsed.accessToken;
+      if (!token) return;
       const response = await fetch(`${API_BASE_URL}/api/admin/settings`, {
         headers: {
           "Authorization": `Bearer ${token}`,
@@ -344,7 +424,6 @@ const Dashboard: React.FC = () => {
     if (clientUser) fetchSettings();
   }, [clientUser, fetchSettings]);
 
-  // Update current wallet when coin changes
   useEffect(() => {
     if (currentCoin && clientUser?.wallets) {
       const wallet = clientUser.wallets.find((w: Wallet) => w.currency?.toUpperCase() === currentCoin.toUpperCase());
@@ -352,15 +431,7 @@ const Dashboard: React.FC = () => {
     }
   }, [currentCoin, clientUser]);
 
-  // ========== Static data ==========
-  const cryptoAssets = useMemo(() => [
-    { symbol: "BTC", name: "Bitcoin", icon: BTC },
-    { symbol: "ETH", name: "Ethereum", icon: ETH },
-    { symbol: "USDC", name: "USDC", icon: USDC },
-    { symbol: "USDT", name: "USDT", icon: USDT },
-  ], []);
-
-  // ========== Handlers ==========
+  // ========== Handlers (unchanged, but ensure they use the normalized token) ==========
   const toggleVerifyModal = useCallback(() => setShowVerifyModal(prev => !prev), []);
   const toggleReceiveDropdown = useCallback(() => setIsReceiveOpen(prev => !prev), []);
   const toggleVisibility = useCallback(() => {
@@ -388,7 +459,6 @@ const Dashboard: React.FC = () => {
     setIsReceiveOpen(false);
   }, []);
 
-  // Send dropdown click – requires verification to open
   const handleSendDropdownClick = useCallback(() => {
     if (!clientUser?.kycVerified) {
       setShowVerifyModal(true);
@@ -397,7 +467,6 @@ const Dashboard: React.FC = () => {
     }
   }, [clientUser]);
 
-  // Individual asset Send – requires verification
   const handleSendClick = useCallback((symbol: string) => {
     requireVerification(() => {
       const asset = cryptoAssets.find(a => a.symbol === symbol);
@@ -410,7 +479,6 @@ const Dashboard: React.FC = () => {
     });
   }, [cryptoAssets, requireVerification]);
 
-  // Swap – requires verification
   const handleSwapClick = useCallback((symbol?: string) => {
     requireVerification(() => {
       router.push(symbol ? `/swap?from=${symbol}` : "/swap");
@@ -457,8 +525,8 @@ const Dashboard: React.FC = () => {
       setIsSending(true);
       const stored = localStorage.getItem("UserData");
       if (!stored) throw new Error("Authentication required");
-      const userData = JSON.parse(stored);
-      const token = userData.accessToken || userData.token;
+      const parsed = JSON.parse(stored);
+      const token = parsed.accessToken;
       if (!token) throw new Error("Authentication required");
 
       const amount = parseFloat(sendAmount);
@@ -481,6 +549,13 @@ const Dashboard: React.FC = () => {
         body: JSON.stringify(transactionData),
       });
 
+      if (response.status === 401) {
+        localStorage.removeItem("UserData");
+        setError("Session expired. Please login again.");
+        setTimeout(() => router.push("/Logins/login"), 1500);
+        return;
+      }
+
       const result = await response.json();
       if (!response.ok) throw new Error(result.message || "Transaction failed");
 
@@ -499,7 +574,7 @@ const Dashboard: React.FC = () => {
       };
       setRecentTransaction(newTransaction);
 
-      // Update local wallet balance (optimistic)
+      // Optimistic update
       if (clientUser?.wallets) {
         const updatedWallets = clientUser.wallets.map((wallet: Wallet) => {
           if (wallet.currency?.toUpperCase() === selectedAsset.symbol.toUpperCase()) {
@@ -508,7 +583,19 @@ const Dashboard: React.FC = () => {
           }
           return wallet;
         });
-        setClientUser({ ...clientUser, wallets: updatedWallets });
+        const updatedUser = { ...clientUser, wallets: updatedWallets };
+        setClientUser(updatedUser);
+        // Update localStorage – preserve root token
+        const stored = localStorage.getItem("UserData");
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          parsed.userData = updatedUser;
+          localStorage.setItem("UserData", JSON.stringify(parsed));
+        }
+        // Dispatch event to notify other components
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new Event('userDataUpdated'));
+        }
       }
 
       closeReviewModal();
@@ -518,7 +605,7 @@ const Dashboard: React.FC = () => {
     } finally {
       setIsSending(false);
     }
-  }, [clientUser, selectedAsset, sendAmount, receiverAddress, networkFee, getAmountInUSD, closeReviewModal]);
+  }, [clientUser, selectedAsset, sendAmount, receiverAddress, networkFee, getAmountInUSD, closeReviewModal, router]);
 
   const todoItems = useMemo(() => [
     { icon: Buy, title: "Buy Crypto", description: "Start a new buy order", onClick: () => router.push("/market_place") },
@@ -549,7 +636,7 @@ const Dashboard: React.FC = () => {
     );
   }
 
-  const withdrawalLimit = settingsData?.withdrawalLimit ?? 0; // fallback to 0 if not set
+  const withdrawalLimit = settingsData?.withdrawalLimit ?? 0;
 
   return (
     <main className="min-h-screen bg-[#0F1012] text-white">

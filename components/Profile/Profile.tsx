@@ -17,7 +17,7 @@ import { API_BASE_URL } from "@/config";
 import Footer from "../Footer/Footer";
 import { countryCurrencyService, CurrencyOption } from "../../utils/countryCurrencyService";
 import PhoneInput from 'react-phone-number-input';
-import { isValidPhoneNumber, isPossiblePhoneNumber } from 'react-phone-number-input';
+import { isValidPhoneNumber } from 'react-phone-number-input';
 import { E164Number } from 'libphonenumber-js';
 import 'react-phone-number-input/style.css';
 
@@ -53,6 +53,8 @@ interface Country {
 }
 
 interface UserData {
+  name?: string;               // from backend
+  fullName?: string;            // fallback
   email: string;
   username: string;
   phone: string;
@@ -88,19 +90,16 @@ const Toggle = ({
   );
 };
 
-// ✅ UPDATED: Helper function to format phone number to strict E.164 (no spaces, no special chars)
+// Helper function to format phone number to strict E.164 (no spaces, no special chars)
 const formatToE164 = (phone: string, countryDialCode: string = "+234"): string => {
   if (!phone) return "";
   
-  // Remove all non-digit characters except leading '+'
   const cleaned = phone.replace(/[^\d+]/g, '');
   
-  // If it already starts with '+', ensure only digits after it
   if (cleaned.startsWith('+')) {
     return '+' + cleaned.slice(1).replace(/\D/g, '');
   }
   
-  // Otherwise, construct E.164 from dial code and digits
   const digitsOnly = cleaned.replace(/\D/g, '');
   if (!digitsOnly) return "";
   
@@ -373,7 +372,7 @@ const Profile = () => {
     loadCountries();
   }, []);
 
-  // Load user data and currencies - FIXED E.164 FORMATTING
+  // Load user data and currencies - with correct name field
   useEffect(() => {
     const loadUserData = async () => {
       if (typeof window === 'undefined') {
@@ -393,6 +392,8 @@ const Profile = () => {
           setClientUser(userDataFromStorage);
           
           const userDataObj: UserData = {
+            name: userDataFromStorage.name || parsed.name || "",          // prioritize "name"
+            fullName: userDataFromStorage.fullName || parsed.fullName || "", // fallback
             email: userDataFromStorage.email || parsed.email || "",
             username: userDataFromStorage.username || parsed.username || "",
             phone: parsed.phone || userDataFromStorage.phone || "",
@@ -409,19 +410,13 @@ const Profile = () => {
           
           setUserData(userDataObj);
           
-          // ✅ Format phone to strict E.164 (no spaces)
-          const selectedCountry = userDataObj.country || { name: "Nigeria", code: "NG", dial_code: "+234" };
-          const formattedPhone = formatToE164(userDataObj.phone, selectedCountry.dial_code);
+          // Ensure selectedCountry is properly set with a code
+          const savedCountry = userDataObj.country || { name: "Nigeria", code: "NG", dial_code: "+234" };
+          setSelectedCountry(savedCountry);
           
+          // Format phone to strict E.164
+          const formattedPhone = formatToE164(userDataObj.phone, savedCountry.dial_code);
           setPhoneNumber(formattedPhone as E164Number || undefined);
-          setSelectedCountry(selectedCountry);
-          
-          // Optionally clean stored phone number to avoid warning next time
-          if (stored && parsed.phone !== formattedPhone) {
-            parsed.phone = formattedPhone;
-            if (parsed.userData) parsed.userData.phone = formattedPhone;
-            localStorage.setItem("UserData", JSON.stringify(parsed));
-          }
           
           if (userDataObj.dayOfBirth) {
             try {
@@ -441,7 +436,7 @@ const Profile = () => {
 
           const originalDataObj = {
             phone: formattedPhone || "",
-            country: selectedCountry,
+            country: savedCountry,
             day: userDataObj.dayOfBirth ? new Date(userDataObj.dayOfBirth).getDate().toString().padStart(2, "0") : "",
             month: userDataObj.dayOfBirth ? (new Date(userDataObj.dayOfBirth).getMonth() + 1).toString().padStart(2, "0") : "",
             year: userDataObj.dayOfBirth ? new Date(userDataObj.dayOfBirth).getFullYear().toString() : "",
@@ -499,15 +494,14 @@ const Profile = () => {
     setSelectedCountry(country);
     setOpenCountry(false);
     setCountrySearch("");
-    // Clear phone validation when country changes? The phone input will handle revalidation.
   };
 
   // Filter countries based on search
   const filteredCountries = countrySearch
     ? countries.filter(country =>
-      country.name.toLowerCase().includes(countrySearch.toLowerCase()) ||
-      country.code.toLowerCase().includes(countrySearch.toLowerCase())
-    )
+        country.name.toLowerCase().includes(countrySearch.toLowerCase()) ||
+        country.code.toLowerCase().includes(countrySearch.toLowerCase())
+      )
     : countries;
 
   // Handle currency selection
@@ -525,15 +519,8 @@ const Profile = () => {
   // Helper function to get display email
   const getDisplayEmail = () => {
     if (loading) return "Loading...";
-    
-    if (clientUser?.email) {
-      return clientUser.email;
-    }
-    
-    if (userData?.email) {
-      return userData.email;
-    }
-    
+    if (clientUser?.email) return clientUser.email;
+    if (userData?.email) return userData.email;
     return "No email found";
   };
 
@@ -542,17 +529,27 @@ const Profile = () => {
     if (loading) return "@User";
     
     let rawUsername = "";
-    
-    if (clientUser?.username) {
-      rawUsername = clientUser.username;
-    }
-    
+    if (clientUser?.username) rawUsername = clientUser.username;
     if (rawUsername) {
       const cleanUsername = rawUsername.replace(/@/g, '');
       return `@${cleanUsername}`;
     }
-    
     return "@User";
+  };
+
+  // Helper function to get display full name (prioritize "name" from backend)
+  const getDisplayFullName = () => {
+    if (loading) return "Loading...";
+    
+    // Check clientUser first (most up-to-date)
+    if (clientUser?.name) return clientUser.name;
+    if (clientUser?.fullName) return clientUser.fullName;
+    
+    // Then check our constructed userData
+    if (userData?.name) return userData.name;
+    if (userData?.fullName) return userData.fullName;
+    
+    return "Not provided";
   };
 
   // Save Changes function
@@ -902,15 +899,32 @@ const Profile = () => {
 
             {/* Save Message */}
             {saveMessage && (
-              <div className={`mb-6 p-3 rounded-lg text-sm font-medium ${saveMessage.includes("✅")
-                ? "bg-[#1A3A2F] text-[#4DF2BE]"
-                : "bg-[#3A2A2A] text-[#FE857D]"
+              <div className={`mb-6 p-3 rounded-lg text-sm font-medium ${
+                saveMessage.includes("✅")
+                  ? "bg-[#1A3A2F] text-[#4DF2BE]"
+                  : "bg-[#3A2A2A] text-[#FE857D]"
                 }`}>
                 {saveMessage}
               </div>
             )}
 
             <form className="space-y-6" onSubmit={(e) => e.preventDefault()}>
+              {/* Full Name - non-editable */}
+              <div className="flex flex-col">
+                <label className="text-sm font-medium text-[#C7C7C7]">
+                  Full Name
+                </label>
+                <input
+                  type="text"
+                  readOnly
+                  value={getDisplayFullName()}
+                  className="h-12 lg:h-14 bg-[#1F1F1F] border border-[#3A3A3A] mt-1 px-4 rounded-lg text-sm font-normal text-[#FFFFFF] cursor-not-allowed focus:border-[#4DF2BE] transition-colors"
+                />
+                <div className="flex items-center h-7 bg-[#2D2D2D] text-xs text-[#8F8F8F] font-normal px-3 rounded-b-lg">
+                  Contact admin to change name
+                </div>
+              </div>
+
               {/* Email - Locked */}
               <div className="flex flex-col">
                 <label className="text-sm font-medium text-[#C7C7C7]">
@@ -958,7 +972,9 @@ const Profile = () => {
                         {phoneVerificationLoading ? (
                           <span className="text-sm text-[#8F8F8F]">Checking...</span>
                         ) : (
-                          <span className={`text-sm font-bold flex items-center gap-1 ${isPhoneValid ? "text-[#4DF2BE]" : "text-[#FE857D]"}`}>
+                          <span className={`text-sm font-bold flex items-center gap-1 ${
+                            isPhoneValid ? "text-[#4DF2BE]" : "text-[#FE857D]"
+                          }`}>
                             {isPhoneValid ? "✓ Valid" : "✗ Invalid"}
                           </span>
                         )}
@@ -1025,19 +1041,25 @@ const Profile = () => {
                     >
                       <div className="w-full h-12 lg:h-14 bg-gradient-to-b from-[#1F1F1F] to-[#222222] border border-[#3A3A3A] hover:border-[#4DF2BE]/50 transition-all duration-200 rounded-lg flex items-center justify-between px-4 group hover:shadow-lg hover:shadow-[#4DF2BE]/10">
                         <div className="flex items-center gap-3">
-                          <img
-                            src={`https://flagcdn.com/w40/${selectedCountry.code.toLowerCase()}.png`}
-                            alt={selectedCountry.name}
-                            className="w-8 h-6 rounded object-cover border border-[#3A3A3A]"
-                            onError={(e) => {
-                              (e.target as HTMLImageElement).src = 'data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'40\' height=\'30\' viewBox=\'0 0 40 30\'%3E%3Crect width=\'40\' height=\'30\' fill=\'%23333\' /%3E%3C/svg%3E';
-                            }}
-                          />
+                          {selectedCountry && selectedCountry.code ? (
+                            <img
+                              src={`https://flagcdn.com/w40/${selectedCountry.code.toLowerCase()}.png`}
+                              alt={selectedCountry.name}
+                              className="w-8 h-6 rounded object-cover border border-[#3A3A3A]"
+                              onError={(e) => {
+                                (e.target as HTMLImageElement).src = 'data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'40\' height=\'30\' viewBox=\'0 0 40 30\'%3E%3Crect width=\'40\' height=\'30\' fill=\'%23333\' /%3E%3C/svg%3E';
+                              }}
+                            />
+                          ) : (
+                            <div className="w-8 h-6 rounded bg-[#3A3A3A]"></div>
+                          )}
                           <span className="text-sm font-medium text-white">
-                            {selectedCountry.name}
+                            {selectedCountry?.name || "Select Country"}
                           </span>
                         </div>
-                        <div className={`transition-transform duration-200 ${openCountry ? "rotate-180" : ""}`}>
+                        <div className={`transition-transform duration-200 ${
+                          openCountry ? "rotate-180" : ""
+                        }`}>
                           <Image src={ArrowD} alt="arrow-down" className="w-4 h-4 opacity-70 group-hover:opacity-100" />
                         </div>
                       </div>
@@ -1084,21 +1106,28 @@ const Profile = () => {
                                 <div
                                   key={country.code}
                                   onClick={() => handleCountrySelect(country)}
-                                  className={`flex items-center py-3 px-4 rounded-lg cursor-pointer transition-all duration-150 ${selectedCountry.code === country.code
-                                    ? "bg-gradient-to-r from-[#4DF2BE]/10 to-[#4DF2BE]/5 border-l-2 border-[#4DF2BE]"
-                                    : "bg-[#2D2D2D] hover:bg-[#3A3A3A]"
-                                    }`}
+                                  className={`flex items-center py-3 px-4 rounded-lg cursor-pointer transition-all duration-150 ${
+                                    selectedCountry?.code === country.code
+                                      ? "bg-gradient-to-r from-[#4DF2BE]/10 to-[#4DF2BE]/5 border-l-2 border-[#4DF2BE]"
+                                      : "bg-[#2D2D2D] hover:bg-[#3A3A3A]"
+                                  }`}
                                 >
                                   <div className="flex items-center gap-3">
-                                    <img
-                                      src={`https://flagcdn.com/w40/${country.code.toLowerCase()}.png`}
-                                      alt={country.name}
-                                      className="w-8 h-6 rounded object-cover border border-[#3A3A3A]"
-                                      onError={(e) => {
-                                        (e.target as HTMLImageElement).src = 'data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'40\' height=\'30\' viewBox=\'0 0 40 30\'%3E%3Crect width=\'40\' height=\'30\' fill=\'%23333\' /%3E%3C/svg%3E';
-                                      }}
-                                    />
-                                    <div className={`text-sm font-medium ${selectedCountry.code === country.code ? "text-white" : "text-[#DBDBDB]"}`}>
+                                    {country.code ? (
+                                      <img
+                                        src={`https://flagcdn.com/w40/${country.code.toLowerCase()}.png`}
+                                        alt={country.name}
+                                        className="w-8 h-6 rounded object-cover border border-[#3A3A3A]"
+                                        onError={(e) => {
+                                          (e.target as HTMLImageElement).src = 'data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'40\' height=\'30\' viewBox=\'0 0 40 30\'%3E%3Crect width=\'40\' height=\'30\' fill=\'%23333\' /%3E%3C/svg%3E';
+                                        }}
+                                      />
+                                    ) : (
+                                      <div className="w-8 h-6 rounded bg-[#3A3A3A]"></div>
+                                    )}
+                                    <div className={`text-sm font-medium ${
+                                      selectedCountry?.code === country.code ? "text-white" : "text-[#DBDBDB]"
+                                    }`}>
                                       {country.name}
                                     </div>
                                   </div>
@@ -1144,7 +1173,9 @@ const Profile = () => {
                       : "DD/MM/YYYY"}
                   </span>
 
-                  <div className={`absolute right-3 top-1/2 -translate-y-1/2 transition-transform duration-200 ${openDate ? "rotate-180" : ""}`}>
+                  <div className={`absolute right-3 top-1/2 -translate-y-1/2 transition-transform duration-200 ${
+                    openDate ? "rotate-180" : ""
+                  }`}>
                     <Image src={ArrowD} alt="arrow" className="w-4 h-4 opacity-70 group-hover:opacity-100" />
                   </div>
                 </div>
@@ -1230,7 +1261,9 @@ const Profile = () => {
                         <Image
                           src={Barrow}
                           alt="arrow-down"
-                          className={`w-3 h-3 transition-transform duration-200 ${openCurrency ? "rotate-180" : ""}`}
+                          className={`w-3 h-3 transition-transform duration-200 ${
+                            openCurrency ? "rotate-180" : ""
+                          }`}
                         />
                       </div>
                     </div>
@@ -1281,10 +1314,11 @@ const Profile = () => {
                                 <div
                                   key={currencyOption.code}
                                   onClick={() => handleCurrencySelect(currencyOption)}
-                                  className={`flex items-center justify-between py-3 px-4 rounded-lg cursor-pointer transition-all duration-150 ${selectedCurrency?.code === currencyOption.code
-                                    ? "bg-gradient-to-r from-[#4DF2BE]/10 to-[#4DF2BE]/5 border-l-2 border-[#4DF2BE]"
-                                    : "bg-[#2D2D2D] hover:bg-[#3A3A3A]"
-                                    }`}
+                                  className={`flex items-center justify-between py-3 px-4 rounded-lg cursor-pointer transition-all duration-150 ${
+                                    selectedCurrency?.code === currencyOption.code
+                                      ? "bg-gradient-to-r from-[#4DF2BE]/10 to-[#4DF2BE]/5 border-l-2 border-[#4DF2BE]"
+                                      : "bg-[#2D2D2D] hover:bg-[#3A3A3A]"
+                                  }`}
                                 >
                                   <div className="flex items-center gap-3">
                                     <img
@@ -1298,13 +1332,17 @@ const Profile = () => {
                                       }}
                                     />
                                     <div>
-                                      <div className={`text-sm font-medium ${selectedCurrency?.code === currencyOption.code ? "text-white" : "text-[#DBDBDB]"}`}>
+                                      <div className={`text-sm font-medium ${
+                                        selectedCurrency?.code === currencyOption.code ? "text-white" : "text-[#DBDBDB]"
+                                      }`}>
                                         {currencyOption.name}
                                       </div>
                                       <div className="text-xs text-[#8F8F8F]">{currencyOption.country}</div>
                                     </div>
                                   </div>
-                                  <span className={`text-sm font-medium ${selectedCurrency?.code === currencyOption.code ? "text-[#4DF2BE]" : "text-[#8F8F8F]"}`}>
+                                  <span className={`text-sm font-medium ${
+                                    selectedCurrency?.code === currencyOption.code ? "text-[#4DF2BE]" : "text-[#8F8F8F]"
+                                  }`}>
                                     {currencyOption.code}
                                   </span>
                                 </div>
@@ -1360,7 +1398,9 @@ const Profile = () => {
                         <Image
                           src={Barrow}
                           alt="arrow"
-                          className={`ml-2 w-3 h-3 transition-transform duration-200 ${openLang ? "rotate-180" : ""}`}
+                          className={`ml-2 w-3 h-3 transition-transform duration-200 ${
+                            openLang ? "rotate-180" : ""
+                          }`}
                         />
                       </div>
                     </div>
@@ -1375,12 +1415,15 @@ const Profile = () => {
                                 setSelectedLang(lang);
                                 setOpenLang(false);
                               }}
-                              className={`px-4 py-3 flex items-center justify-between cursor-pointer transition-all duration-150 ${selectedLang === lang
-                                ? "bg-gradient-to-r from-[#4DF2BE]/10 to-[#4DF2BE]/5 border-l-2 border-[#4DF2BE]"
-                                : "hover:bg-[#2D2D2D]"
-                                }`}
+                              className={`px-4 py-3 flex items-center justify-between cursor-pointer transition-all duration-150 ${
+                                selectedLang === lang
+                                  ? "bg-gradient-to-r from-[#4DF2BE]/10 to-[#4DF2BE]/5 border-l-2 border-[#4DF2BE]"
+                                  : "hover:bg-[#2D2D2D]"
+                              }`}
                             >
-                              <span className={`text-sm font-medium ${selectedLang === lang ? "text-[#4DF2BE]" : "text-[#DBDBDB]"}`}>
+                              <span className={`text-sm font-medium ${
+                                selectedLang === lang ? "text-[#4DF2BE]" : "text-[#DBDBDB]"
+                              }`}>
                                 {lang}
                               </span>
                               {selectedLang === lang && (
@@ -1421,7 +1464,7 @@ const Profile = () => {
                   Account Security Notice
                 </p>
                 <p className="text-xs text-[#8F8F8F]">
-                  For security reasons, email and username changes are restricted.
+                  For security reasons, full name, email, and username changes are restricted.
                   Please contact our admin team for any account modifications.
                   Phone number, country, date of birth, and preferences can be updated freely.
                 </p>

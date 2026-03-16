@@ -23,14 +23,8 @@ import Share from "../../public/Assets/Evolve2p_share/elements.svg";
 import Footer from "../Footer/Footer";
 import { API_BASE_URL } from "@/config";
 import { useRouter } from "next/navigation";
-import WalletTransactions from "@/app/walletTransaction/walletTrans";
 
-// Lazy load QRCode component
 const QRCodeCanvas = lazy(() => import("qrcode.react").then(mod => ({ default: mod.QRCodeCanvas })));
-
-interface QRCodeBoxProps {
-  value?: string;
-}
 
 interface Wallet {
   id: string;
@@ -62,14 +56,12 @@ const currencies: Currency[] = [
   { name: "ETH", symbol: "Ξ" },
 ];
 
-// Safe number parser
 const safeNumber = (value: any): number => {
   if (value === null || value === undefined) return 0;
   const num = Number(value);
   return isNaN(num) ? 0 : num;
 };
 
-// Crypto Price Service with fallback
 const CryptoPriceService = {
   async getMultipleCryptoPrices(coinIds: string[], vsCurrencies: string[] = ['usd']) {
     try {
@@ -100,7 +92,7 @@ const CryptoPriceService = {
   }
 };
 
-const Wallet: React.FC<QRCodeBoxProps> = () => {
+const Wallet: React.FC = () => {
   const router = useRouter();
   const [showReceiveModal, setShowReceiveModal] = useState(false);
   const [showSendModal, setShowSendModal] = useState(false);
@@ -130,12 +122,10 @@ const Wallet: React.FC<QRCodeBoxProps> = () => {
   const [isSending, setIsSending] = useState(false);
   const [transactionHash, setTransactionHash] = useState<string>("");
   const [recentTransaction, setRecentTransaction] = useState<Transaction | null>(null);
-
-  // Settings for deposit limit
   const [settingsData, setSettingsData] = useState<any>(null);
   const [settingsLoading, setSettingsLoading] = useState(false);
+  const [showVerifyModal, setShowVerifyModal] = useState(false);
 
-  // ========== VERIFICATION CHECK ==========
   const requireVerification = useCallback((callback: () => void) => {
     if (!clientUser?.kycVerified) {
       setShowVerifyModal(true);
@@ -144,9 +134,6 @@ const Wallet: React.FC<QRCodeBoxProps> = () => {
     callback();
   }, [clientUser]);
 
-  const [showVerifyModal, setShowVerifyModal] = useState(false);
-
-  // ========== Memoized values ==========
   const totalBalanceUSD = useMemo(() => {
     if (!clientUser?.wallets || !cryptoPrices) return 0;
     let total = 0;
@@ -193,7 +180,6 @@ const Wallet: React.FC<QRCodeBoxProps> = () => {
     { symbol: "USDT", name: "USDT", icon: USDT },
   ], []);
 
-  // ========== Price fetching ==========
   useEffect(() => {
     const fetchPrices = async () => {
       setLoadingPrices(true);
@@ -210,7 +196,6 @@ const Wallet: React.FC<QRCodeBoxProps> = () => {
     return () => clearInterval(interval);
   }, []);
 
-  // ========== Helper functions ==========
   const getAssetBalance = useCallback((symbol: string): string => {
     const wallet = clientUser?.wallets?.find((w: any) => w.currency?.toUpperCase() === symbol.toUpperCase());
     const balance = safeNumber(wallet?.balance);
@@ -244,10 +229,9 @@ const Wallet: React.FC<QRCodeBoxProps> = () => {
     }
   }, [cryptoPrices]);
 
-  const formatShortAddress = useCallback((address: string): string => {
-    if (!address) return "";
-    if (address.length <= 12) return address;
-    return `${address.substring(0, 6)}...${address.substring(address.length - 6)}`;
+  const formatShortAddress = useCallback((addr: string) => {
+    if (!addr) return "";
+    return addr.length > 12 ? `${addr.substring(0, 6)}...${addr.substring(addr.length - 6)}` : addr;
   }, []);
 
   const getCurrencyIcon = useCallback((currency: string) => {
@@ -298,7 +282,45 @@ const Wallet: React.FC<QRCodeBoxProps> = () => {
     }).format(amount);
   }, []);
 
-  // ========== Load user ==========
+  // ========== Fetch fresh user data from backend ==========
+  const fetchUserFromAPI = useCallback(async (email: string, token: string) => {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/get-user`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ email }),
+      });
+
+      if (res.status === 401) {
+        localStorage.removeItem("UserData");
+        setError("Session expired. Please login again.");
+        setTimeout(() => router.push("/Logins/login"), 1500);
+        return;
+      }
+
+      if (res.ok) {
+        const data = await res.json();
+        const user = data.userData || data.user || data;
+        if (user) {
+          setClientUser(user);
+          // Update localStorage – preserve root token
+          const stored = localStorage.getItem("UserData");
+          if (stored) {
+            const parsed = JSON.parse(stored);
+            parsed.userData = user;
+            localStorage.setItem("UserData", JSON.stringify(parsed));
+          }
+        }
+      }
+    } catch (error) {
+      console.error("Error fetching user from API:", error);
+    }
+  }, [router]);
+
+  // ========== Load user from localStorage + refresh from API ==========
   useEffect(() => {
     if (typeof window === "undefined") return;
     const stored = localStorage.getItem("UserData");
@@ -308,12 +330,50 @@ const Wallet: React.FC<QRCodeBoxProps> = () => {
       return;
     }
     try {
-      const userData = JSON.parse(stored);
-      setClientUser(userData?.userData || userData);
+      const parsed = JSON.parse(stored);
+      // Normalize structure: ensure accessToken and userData exist
+      let accessToken = parsed.accessToken || parsed.token || parsed.userData?.token;
+      let userData = parsed.userData || parsed.user || parsed;
+
+      // Save normalized version back
+      const normalized = { accessToken, userData };
+      localStorage.setItem("UserData", JSON.stringify(normalized));
+
+      const email = userData?.email;
+      if (accessToken && email) {
+        setClientUser(userData);
+        fetchUserFromAPI(email, accessToken); // refresh from backend
+      } else {
+        setError("Authentication information missing. Please login again.");
+        setTimeout(() => router.push("/Logins/login"), 1500);
+      }
     } catch {
       setError("Invalid user data");
     }
-  }, [router]);
+  }, [router, fetchUserFromAPI]);
+
+  // ========== Listen for userDataUpdated event ==========
+  useEffect(() => {
+    const handleUserUpdate = () => {
+      const stored = localStorage.getItem("UserData");
+      if (stored) {
+        try {
+          const parsed = JSON.parse(stored);
+          const updatedUser = parsed.userData || parsed;
+          setClientUser(updatedUser); // show optimistic update immediately
+
+          // Refresh from backend to confirm – ensure we have email and token
+          const token = parsed.accessToken;
+          const email = updatedUser?.email || parsed.userData?.email;
+          if (token && email) {
+            fetchUserFromAPI(email, token);
+          }
+        } catch {}
+      }
+    };
+    window.addEventListener('userDataUpdated', handleUserUpdate);
+    return () => window.removeEventListener('userDataUpdated', handleUserUpdate);
+  }, [fetchUserFromAPI]);
 
   // Fetch settings after user loads
   const fetchSettings = useCallback(async () => {
@@ -323,7 +383,8 @@ const Wallet: React.FC<QRCodeBoxProps> = () => {
       const stored = localStorage.getItem("UserData");
       if (!stored) return;
       const parsed = JSON.parse(stored);
-      const token = parsed?.token || parsed?.userData?.token || "";
+      const token = parsed.accessToken;
+      if (!token) return;
       const response = await fetch(`${API_BASE_URL}/api/admin/settings`, {
         headers: {
           "Authorization": `Bearer ${token}`,
@@ -382,7 +443,6 @@ const Wallet: React.FC<QRCodeBoxProps> = () => {
     setIsReceiveOpen(false);
   }, []);
 
-  // Send dropdown click – requires verification
   const handleSendDropdownClick = useCallback(() => {
     if (!clientUser?.kycVerified) {
       setShowVerifyModal(true);
@@ -391,7 +451,6 @@ const Wallet: React.FC<QRCodeBoxProps> = () => {
     }
   }, [clientUser]);
 
-  // Individual asset Send – requires verification
   const handleSendClick = useCallback((symbol: string) => {
     requireVerification(() => {
       const asset = cryptoAssets.find(a => a.symbol === symbol);
@@ -404,7 +463,6 @@ const Wallet: React.FC<QRCodeBoxProps> = () => {
     });
   }, [cryptoAssets, requireVerification]);
 
-  // Swap – requires verification
   const handleSwapClick = useCallback(() => {
     requireVerification(() => {
       router.push("/swap");
@@ -446,14 +504,13 @@ const Wallet: React.FC<QRCodeBoxProps> = () => {
     }
   }, [currentWallet]);
 
-  // Token extraction (no logs)
   const getAuthToken = (): string => {
     if (typeof window === "undefined") return "";
-    const userDataString = localStorage.getItem("UserData");
-    if (!userDataString) return "";
+    const stored = localStorage.getItem("UserData");
+    if (!stored) return "";
     try {
-      const userData = JSON.parse(userDataString);
-      return userData.token || userData.accessToken || userData.access_token || userData.authToken || "";
+      const parsed = JSON.parse(stored);
+      return parsed.accessToken || "";
     } catch {
       return "";
     }
@@ -491,6 +548,13 @@ const Wallet: React.FC<QRCodeBoxProps> = () => {
         body: JSON.stringify(transactionData),
       });
 
+      if (response.status === 401) {
+        localStorage.removeItem("UserData");
+        setError("Session expired. Please login again.");
+        setTimeout(() => router.push("/Logins/login"), 1500);
+        return;
+      }
+
       const result = await response.json();
       if (!response.ok) throw new Error(result.message || "Transaction failed");
 
@@ -518,7 +582,19 @@ const Wallet: React.FC<QRCodeBoxProps> = () => {
           }
           return wallet;
         });
-        setClientUser({ ...clientUser, wallets: updatedWallets });
+        const updatedUser = { ...clientUser, wallets: updatedWallets };
+        setClientUser(updatedUser);
+        // Update localStorage – preserve root token
+        const stored = localStorage.getItem("UserData");
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          parsed.userData = updatedUser;
+          localStorage.setItem("UserData", JSON.stringify(parsed));
+        }
+        // Dispatch event to notify other components
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new Event('userDataUpdated'));
+        }
       }
 
       closeReviewModal();
@@ -528,7 +604,7 @@ const Wallet: React.FC<QRCodeBoxProps> = () => {
     } finally {
       setIsSending(false);
     }
-  }, [clientUser, selectedAsset, sendAmount, receiverAddress, networkFee, getAmountInUSD, closeReviewModal]);
+  }, [clientUser, selectedAsset, sendAmount, receiverAddress, networkFee, getAmountInUSD, closeReviewModal, router]);
 
   // ========== Custom Tabs ==========
   const CustomTabs = useMemo(() => {
@@ -546,6 +622,8 @@ const Wallet: React.FC<QRCodeBoxProps> = () => {
             onClick={() => {
               if (tab.id === "swap") {
                 handleSwapClick();
+              } else if (tab.id === "transaction") {
+                router.push("/transactions");
               } else {
                 setActiveTab(tab.id);
               }
@@ -561,9 +639,9 @@ const Wallet: React.FC<QRCodeBoxProps> = () => {
         ))}
       </div>
     );
-  }, [activeTab, handleSwapClick]);
+  }, [activeTab, handleSwapClick, router]);
 
-  const depositLimit = settingsData?.depositLimit ?? 0; // fallback to 0 if not set
+  const depositLimit = settingsData?.depositLimit ?? 0;
 
   if (error) {
     return (
@@ -581,10 +659,7 @@ const Wallet: React.FC<QRCodeBoxProps> = () => {
     <main className="min-h-screen bg-[#0F1012] text-white">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 md:py-8">
         <Nav />
-
-        <div className="flex justify-center md:justify-start mt-6 md:mt-8">
-          {CustomTabs}
-        </div>
+        <div className="flex justify-center md:justify-start mt-6 md:mt-8">{CustomTabs}</div>
 
         {/* Balance Card */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6 mt-6 md:mt-8">
@@ -630,7 +705,6 @@ const Wallet: React.FC<QRCodeBoxProps> = () => {
             </div>
 
             <div className="flex flex-col xs:flex-row gap-3">
-              {/* Send button – requires verification */}
               <div className="relative">
                 <button
                   className="flex items-center justify-center bg-[#2D2D2D] text-[#4DF2BE] px-3 py-2 sm:px-4 sm:py-3 rounded-full font-[700] text-[12px] sm:text-[14px] gap-2 w-full xs:w-auto min-w-[110px] sm:min-w-[120px]"
@@ -659,7 +733,6 @@ const Wallet: React.FC<QRCodeBoxProps> = () => {
                 )}
               </div>
 
-              {/* Receive button – always available */}
               <div className="relative">
                 <button
                   className="flex items-center justify-center bg-[#2D2D2D] text-[#4DF2BE] px-3 py-2 sm:px-4 sm:py-3 rounded-full font-[700] text-[12px] sm:text-[14px] gap-2 w-full xs:w-auto min-w-[120px] sm:min-w-[130px]"
@@ -688,7 +761,6 @@ const Wallet: React.FC<QRCodeBoxProps> = () => {
                 )}
               </div>
 
-              {/* Swap button – requires verification */}
               <button
                 className="flex items-center justify-center bg-[#2D2D2D] text-[#4DF2BE] px-3 py-2 sm:px-4 sm:py-3 rounded-full font-[700] text-[12px] sm:text-[14px] gap-2 w-full xs:w-auto min-w-[110px] sm:min-w-[120px]"
                 onClick={handleSwapClick}
@@ -699,7 +771,6 @@ const Wallet: React.FC<QRCodeBoxProps> = () => {
             </div>
           </div>
 
-          {/* Daily Limit Card (Deposit Limit) */}
           <div className="bg-[#222222] rounded-[12px] p-4 sm:p-6">
             <div className="mb-4">
               <p className="text-[14px] sm:text-[16px] font-[400] text-[#DBDBDB]">Daily Limit</p>
@@ -708,17 +779,13 @@ const Wallet: React.FC<QRCodeBoxProps> = () => {
               </p>
             </div>
             <div className="w-full bg-[#4A4A4A] rounded-[4px] h-2 mb-2">
-              <div 
-                className="bg-[#4DF2BE] rounded-[4px] h-2 transition-all duration-500"
-                style={{ width: `0%` }}
-              ></div>
+              <div className="bg-[#4DF2BE] rounded-[4px] h-2 transition-all duration-500" style={{ width: `0%` }}></div>
             </div>
             <div className="flex flex-col xs:flex-row xs:justify-between text-[12px] sm:text-[14px] font-[400] text-[#DBDBDB] mb-4 gap-1">
               <p>{showAllBalances ? `${formatCurrency(depositLimit)} remaining` : "**** remaining"}</p>
               <p>Usage tracking not available</p>
             </div>
 
-            {/* Crypto Icons Row */}
             <div className="flex items-center justify-between mt-[70px] pt-4 border-t border-[#3A3A3A]">
               {[
                 { icon: BTC, name: "BTC" },
@@ -814,13 +881,7 @@ const Wallet: React.FC<QRCodeBoxProps> = () => {
           </div>
         </div>
 
-        {activeTab === "transaction" && (
-          <div className="mt-8 md:mt-12">
-            <WalletTransactions />
-          </div>
-        )}
-
-        {/* SEND MODAL STEP 1 */}
+        {/* SEND MODAL - STEP 1: Address */}
         {showSendModal && selectedAsset && sendStep === "address" && (
           <div className="fixed inset-0 bg-black bg-opacity-70 backdrop-blur-sm flex justify-center items-end sm:items-center z-[999] p-3">
             <div className="bg-[#0F1012] rounded-xl w-full max-w-md p-5 sm:p-6 shadow-xl border border-[#2D2D2D]">
@@ -849,7 +910,7 @@ const Wallet: React.FC<QRCodeBoxProps> = () => {
           </div>
         )}
 
-        {/* SEND MODAL STEP 2 */}
+        {/* SEND MODAL - STEP 2: Amount */}
         {showSendModal && selectedAsset && sendStep === "amount" && (
           <div className="fixed inset-0 bg-black bg-opacity-70 backdrop-blur-sm flex justify-center items-end sm:items-center z-[999] p-3">
             <div className="bg-[#0F1012] rounded-xl w-full max-w-md p-5 sm:p-6 shadow-xl border border-[#2D2D2D]">
